@@ -1,7 +1,7 @@
 .env
 .venv/
 __pycache__/
-scripts/probe_out/
+# scripts/probe_out/
 
 #
 assets/

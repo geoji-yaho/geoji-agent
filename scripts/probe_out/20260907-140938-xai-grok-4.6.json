@@ -1,0 +1,272 @@
+{
+ "model": "grok-4.6",
+ "provider": "xai",
+ "n": 3,
+ "parallel": 1,
+ "split": false,
+ "intensities": [
+  "SPICY",
+  "HELL"
+ ],
+ "strict": true,
+ "temperature": null,
+ "reasoning_effort": "low",
+ "max_tokens": null,
+ "summary": {
+  "latency_mean": 12.085983366705477,
+  "latency_median": 11.617315900046378,
+  "latency_p90": 13.62324670003727,
+  "latency_max": 13.62324670003727,
+  "validated_ok": 3,
+  "total_cost_usd": 0.021630000000000003
+ },
+ "results": [
+  {
+   "idx": 0,
+   "ok": true,
+   "latency_s": 13.62324670003727,
+   "prompt_tokens": 2819,
+   "completion_tokens": 496,
+   "reasoning_tokens": 358,
+   "cached_tokens": 512,
+   "cost_usd": 0.009994000000000001,
+   "cost_source": "usage",
+   "problems": [],
+   "output": {
+    "texts": [
+     {
+      "intensity": "SPICY",
+      "headline": "택시가 아니라 이불 문제입니다.",
+      "statement": [
+       {
+        "text": "9/2 택시 9,500원 사유도 늦잠이었습니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F2"
+        ]
+       },
+       {
+        "text": "같은 늦잠 택시로 최근 30일 유죄만 이미 2회입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F3"
+        ]
+       },
+       {
+        "text": "지하철은 있었고, 알람을 더 맞추는 게 12,000원보다 쌉니다.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "REPEAT_OFFENSE",
+      "selected_candidate": 1
+     },
+     {
+      "intensity": "HELL",
+      "headline": "택시 월 1회, 이번 달 4회째.",
+      "statement": [
+       {
+        "text": "방 규칙 한 달에 택시 1번에 걸렸고, 이번 달 4회째입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F4"
+        ]
+       },
+       {
+        "text": "최근 7일 택시만 3회, 합계 31,000원입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1"
+        ]
+       },
+       {
+        "text": "그 돈이면 알람 시계입니다. 이불에서 나오십시오.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "ROOM_RULE_CALLBACK",
+      "selected_candidate": 2
+     }
+    ],
+    "meme_tag": "GUILTY_LIGHT",
+    "meme_hints": {
+     "emotion": "exasperated",
+     "keywords": [
+      "늦잠",
+      "택시",
+      "알람",
+      "이불"
+     ]
+    }
+   },
+   "error": null,
+   "parts": 1
+  },
+  {
+   "idx": 1,
+   "ok": true,
+   "latency_s": 11.617315900046378,
+   "prompt_tokens": 2819,
+   "completion_tokens": 348,
+   "reasoning_tokens": 414,
+   "cached_tokens": 2816,
+   "cost_usd": 0.005986,
+   "cost_source": "usage",
+   "problems": [],
+   "output": {
+    "texts": [
+     {
+      "intensity": "SPICY",
+      "headline": "지난주도 늦잠, 이번주도 늦잠.",
+      "statement": [
+       {
+        "text": "9/2 택시 9,500원의 사유도 늦잠이었다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F2"
+        ]
+       },
+       {
+        "text": "같은 사유로 최근 30일 유죄 2회다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F3"
+        ]
+       },
+       {
+        "text": "지하철이 있었고, 문제는 택시가 아니라 이불입니다.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "REPEAT_OFFENSE",
+      "selected_candidate": 1
+     },
+     {
+      "intensity": "HELL",
+      "headline": "월 1회는 권고가 아닙니다.",
+      "statement": [
+       {
+        "text": "방 규칙 '한 달에 택시 1번'에 걸린다. 이번 달 4회째다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F4"
+        ]
+       },
+       {
+        "text": "최근 7일 택시 3회, 합계 31,000원이다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1"
+        ]
+       },
+       {
+        "text": "늦잠은 변명이 아닙니다. 알람을 맞추십시오.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "ROOM_RULE_CALLBACK",
+      "selected_candidate": 2
+     }
+    ],
+    "meme_tag": "GUILTY_LIGHT",
+    "meme_hints": {
+     "emotion": "핀잔",
+     "keywords": [
+      "택시",
+      "늦잠",
+      "알람",
+      "지하철"
+     ]
+    }
+   },
+   "error": null,
+   "parts": 1
+  },
+  {
+   "idx": 2,
+   "ok": true,
+   "latency_s": 11.017387500032783,
+   "prompt_tokens": 2819,
+   "completion_tokens": 396,
+   "reasoning_tokens": 310,
+   "cached_tokens": 2816,
+   "cost_usd": 0.0056500000000000005,
+   "cost_source": "usage",
+   "problems": [],
+   "output": {
+    "texts": [
+     {
+      "intensity": "SPICY",
+      "headline": "지난주도 늦잠, 이번 주도 늦잠.",
+      "statement": [
+       {
+        "text": "9/2 택시 9,500원 사유도 늦잠이었고, 같은 사유로 최근 30일 유죄 2회입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F2",
+         "F3"
+        ]
+       },
+       {
+        "text": "최근 7일 택시만 3회, 합계 31,000원입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1"
+        ]
+       },
+       {
+        "text": "택시가 아니라 이불이 문제입니다. 알람을 늘리십시오.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "REPEAT_OFFENSE",
+      "selected_candidate": 1
+     },
+     {
+      "intensity": "HELL",
+      "headline": "택시 월 1회, 이번 달 4회째.",
+      "statement": [
+       {
+        "text": "방 규칙 '한 달에 택시 1번'에 걸립니다. 이번 달 4회째입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F4"
+        ]
+       },
+       {
+        "text": "최근 7일 택시 3회에 31,000원입니다. 그 돈이면 알람 시계입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1"
+        ]
+       },
+       {
+        "text": "늦잠은 변명이 아닙니다. 지하철이 있었습니다. 정신 차리십시오.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "ROOM_RULE_CALLBACK",
+      "selected_candidate": 2
+     }
+    ],
+    "meme_tag": "GUILTY_LIGHT",
+    "meme_hints": {
+     "emotion": "exasperated",
+     "keywords": [
+      "늦잠",
+      "택시",
+      "알람",
+      "월1회"
+     ]
+    }
+   },
+   "error": null,
+   "parts": 1
+  }
+ ]
+}

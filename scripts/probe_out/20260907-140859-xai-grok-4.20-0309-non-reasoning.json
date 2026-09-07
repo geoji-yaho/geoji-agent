@@ -1,0 +1,449 @@
+{
+ "model": "grok-4.20-0309-non-reasoning",
+ "provider": "xai",
+ "n": 5,
+ "parallel": 1,
+ "split": false,
+ "intensities": [
+  "SPICY",
+  "HELL"
+ ],
+ "strict": true,
+ "temperature": null,
+ "reasoning_effort": null,
+ "max_tokens": null,
+ "summary": {
+  "latency_mean": 5.327920439955778,
+  "latency_median": 5.226629599928856,
+  "latency_p90": 6.654756300034933,
+  "latency_max": 6.654756300034933,
+  "validated_ok": 5,
+  "total_cost_usd": 0.01434535
+ },
+ "results": [
+  {
+   "idx": 0,
+   "ok": true,
+   "latency_s": 6.654756300034933,
+   "prompt_tokens": 2151,
+   "completion_tokens": 475,
+   "reasoning_tokens": 0,
+   "cached_tokens": 128,
+   "cost_usd": 0.00374185,
+   "cost_source": "usage",
+   "problems": [],
+   "output": {
+    "texts": [
+     {
+      "intensity": "SPICY",
+      "headline": "늦잠은 죄가 아닌데 택시는 죄임",
+      "statement": [
+       {
+        "text": "최근 7일 동안 택시를 이미 3번 탔고, 이번 달 4회째입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1",
+         "F4"
+        ]
+       },
+       {
+        "text": "지난번에도 같은 늦잠 이유로 택시를 탔습니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F2",
+         "F3"
+        ]
+       },
+       {
+        "text": "지하철이 있는데 알람을 12개 맞추는 게 먼저입니다.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "PREMISE_REJECTION",
+      "selected_candidate": 0
+     },
+     {
+      "intensity": "HELL",
+      "headline": "택시 기사님 단골 됐죠? 명함 받으세요",
+      "statement": [
+       {
+        "text": "최근 7일 3번, 이번 달 4회째. 방 규칙 ‘한 달에 택시 1번’은 장식이 아닙니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1",
+         "F4"
+        ]
+       },
+       {
+        "text": "31,000원이면 알람 시계 세 개를 살 수 있습니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1"
+        ]
+       },
+       {
+        "text": "이불이 문제지 택시가 답이 아닙니다. 정신 차리십시오.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "ROOM_RULE_CALLBACK",
+      "selected_candidate": 2
+     }
+    ],
+    "meme_tag": "GUILTY_LIGHT",
+    "meme_hints": {
+     "emotion": "짜증",
+     "keywords": [
+      "늦잠",
+      "택시",
+      "알람",
+      "반복",
+      "규칙위반"
+     ]
+    }
+   },
+   "error": null,
+   "parts": 1
+  },
+  {
+   "idx": 1,
+   "ok": true,
+   "latency_s": 4.8834724999032915,
+   "prompt_tokens": 2151,
+   "completion_tokens": 457,
+   "reasoning_tokens": 0,
+   "cached_tokens": 2112,
+   "cost_usd": 0.0016136500000000001,
+   "cost_source": "usage",
+   "problems": [],
+   "output": {
+    "texts": [
+     {
+      "intensity": "SPICY",
+      "headline": "지하철이 있었잖아요. 알람을 12개 맞추세요.",
+      "statement": [
+       {
+        "text": "최근 7일 동안 택시를 3회나 이용했습니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1"
+        ]
+       },
+       {
+        "text": "같은 늦잠 사유로 30일 내 유죄 2회, 이번 달 이미 4회째입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F3",
+         "F4"
+        ]
+       },
+       {
+        "text": "택시가 아니라 이불이 문제입니다.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "REPEAT_OFFENSE",
+      "selected_candidate": 1
+     },
+     {
+      "intensity": "HELL",
+      "headline": "택시 월 1회 규칙은 권장사항이 아닙니다.",
+      "statement": [
+       {
+        "text": "이번 달 4회째 택시입니다. 방 규칙은 권장이 아닙니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F4"
+        ]
+       },
+       {
+        "text": "사유에 참작할 사정은 전혀 없고, 31,000원이면 알람 시계 세 개 값입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1",
+         "F6"
+        ]
+       },
+       {
+        "text": "피고인은 이불 밖이 위험하다는 걸 몸으로 증명 중입니다.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "ROOM_RULE_CALLBACK",
+      "selected_candidate": 2
+     }
+    ],
+    "meme_tag": "GUILTY_LIGHT",
+    "meme_hints": {
+     "emotion": "짜증",
+     "keywords": [
+      "늦잠",
+      "택시중독",
+      "이불",
+      "알람"
+     ]
+    }
+   },
+   "error": null,
+   "parts": 1
+  },
+  {
+   "idx": 2,
+   "ok": true,
+   "latency_s": 4.5543137999484316,
+   "prompt_tokens": 2151,
+   "completion_tokens": 448,
+   "reasoning_tokens": 0,
+   "cached_tokens": 128,
+   "cost_usd": 0.0036743500000000003,
+   "cost_source": "usage",
+   "problems": [],
+   "output": {
+    "texts": [
+     {
+      "intensity": "SPICY",
+      "headline": "늦잠은 죄가 아닌데 택시는 죄임",
+      "statement": [
+       {
+        "text": "최근 7일 동안 택시를 3회나 이용했습니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1"
+        ]
+       },
+       {
+        "text": "같은 늦잠 사유로 최근 30일 유죄 2회, 이번 달 이미 4회째입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F3",
+         "F4"
+        ]
+       },
+       {
+        "text": "지하철이 있었잖아요. 알람을 12개 맞추세요.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "PREMISE_REJECTION",
+      "selected_candidate": 0
+     },
+     {
+      "intensity": "HELL",
+      "headline": "택시 기사님 단골 됐죠?",
+      "statement": [
+       {
+        "text": "이번 달 4회째 택시. 방 규칙은 장식이 아닙니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F4"
+        ]
+       },
+       {
+        "text": "31,000원이면 알람 시계 세 개 사는 돈입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1"
+        ]
+       },
+       {
+        "text": "피고인은 이불 밖이 위험하다는 걸 몸으로 증명 중입니다. 정신 차리십시오.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "ROOM_RULE_CALLBACK",
+      "selected_candidate": 2
+     }
+    ],
+    "meme_tag": "GUILTY_LIGHT",
+    "meme_hints": {
+     "emotion": "짜증",
+     "keywords": [
+      "늦잠",
+      "반복",
+      "알람",
+      "이불",
+      "규칙위반"
+     ]
+    }
+   },
+   "error": null,
+   "parts": 1
+  },
+  {
+   "idx": 3,
+   "ok": true,
+   "latency_s": 5.226629599928856,
+   "prompt_tokens": 2151,
+   "completion_tokens": 472,
+   "reasoning_tokens": 0,
+   "cached_tokens": 128,
+   "cost_usd": 0.00373435,
+   "cost_source": "usage",
+   "problems": [],
+   "output": {
+    "texts": [
+     {
+      "intensity": "SPICY",
+      "headline": "늦잠은 죄가 아닌데 택시는 죄임",
+      "statement": [
+       {
+        "text": "최근 7일 동안 택시를 3회나 이용했다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1"
+        ]
+       },
+       {
+        "text": "같은 늦잠 사유로 30일 내 유죄 2회, 이번 달 이미 4회째다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F3",
+         "F4"
+        ]
+       },
+       {
+        "text": "지하철이 있었잖아요. 알람을 12개 맞추세요.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "PREMISE_REJECTION",
+      "selected_candidate": 0
+     },
+     {
+      "intensity": "HELL",
+      "headline": "택시 기사님 단골 됐죠? 명함 받으세요",
+      "statement": [
+       {
+        "text": "최근 7일 택시 3회, 31,000원. 이번 달 이미 4회째다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1",
+         "F4"
+        ]
+       },
+       {
+        "text": "사유에 참작할 사정 하나 없이 편의 목적이며, 방 규칙도 명백히 위반했다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F6"
+        ]
+       },
+       {
+        "text": "31,000원이면 알람 시계 세 개입니다. 하나만 사세요.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "CHEAPER_ALTERNATIVE",
+      "selected_candidate": 3
+     }
+    ],
+    "meme_tag": "GUILTY_LIGHT",
+    "meme_hints": {
+     "emotion": "짜증",
+     "keywords": [
+      "늦잠",
+      "택시",
+      "반복",
+      "알람",
+      "규칙위반"
+     ]
+    }
+   },
+   "error": null,
+   "parts": 1
+  },
+  {
+   "idx": 4,
+   "ok": true,
+   "latency_s": 5.32042999996338,
+   "prompt_tokens": 2151,
+   "completion_tokens": 444,
+   "reasoning_tokens": 0,
+   "cached_tokens": 2112,
+   "cost_usd": 0.0015811500000000001,
+   "cost_source": "usage",
+   "problems": [],
+   "output": {
+    "texts": [
+     {
+      "intensity": "SPICY",
+      "headline": "늦잠은 죄가 아닌데 택시는 죄임",
+      "statement": [
+       {
+        "text": "최근 7일간 택시 3회, 이번 달 4회째입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1",
+         "F4"
+        ]
+       },
+       {
+        "text": "지난번에도 늦잠 사유로 택시 타고 유죄 받은 기록이 있습니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F2",
+         "F3"
+        ]
+       },
+       {
+        "text": "지하철이 있는데 알람을 12개 맞추는 게 먼저 아닙니까.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "REPEAT_OFFENSE",
+      "selected_candidate": 1
+     },
+     {
+      "intensity": "HELL",
+      "headline": "이불이 문제입니다",
+      "statement": [
+       {
+        "text": "이번 달 택시 4회째, 규칙은 장식이 아닙니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F4"
+        ]
+       },
+       {
+        "text": "31,000원이면 알람 시계 세 개 사는 돈입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1"
+        ]
+       },
+       {
+        "text": "피고인은 이불 밖이 위험하다는 걸 몸으로 증명 중입니다. 정신 차리십시오.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "ROOM_RULE_CALLBACK",
+      "selected_candidate": 2
+     }
+    ],
+    "meme_tag": "GUILTY_LIGHT",
+    "meme_hints": {
+     "emotion": "한숨",
+     "keywords": [
+      "늦잠",
+      "택시",
+      "반복",
+      "알람",
+      "이불"
+     ]
+    }
+   },
+   "error": null,
+   "parts": 1
+  }
+ ]
+}

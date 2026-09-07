@@ -1,0 +1,142 @@
+{
+ "model": "grok-4.6",
+ "provider": "xai",
+ "n": 10,
+ "parallel": 1,
+ "intensities": [
+  "SPICY",
+  "HELL"
+ ],
+ "strict": true,
+ "temperature": null,
+ "summary": {
+  "latency_mean": null,
+  "latency_median": null,
+  "latency_p90": null,
+  "latency_max": null,
+  "validated_ok": 0,
+  "total_cost_usd": 0.0
+ },
+ "results": [
+  {
+   "idx": 0,
+   "ok": false,
+   "latency_s": 61.31441150000319,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "cached_tokens": 0,
+   "cost_usd": 0.0,
+   "problems": [],
+   "output": null,
+   "error": "APITimeoutError: Request timed out."
+  },
+  {
+   "idx": 1,
+   "ok": false,
+   "latency_s": 60.02398629998788,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "cached_tokens": 0,
+   "cost_usd": 0.0,
+   "problems": [],
+   "output": null,
+   "error": "APITimeoutError: Request timed out."
+  },
+  {
+   "idx": 2,
+   "ok": false,
+   "latency_s": 60.02682659996208,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "cached_tokens": 0,
+   "cost_usd": 0.0,
+   "problems": [],
+   "output": null,
+   "error": "APITimeoutError: Request timed out."
+  },
+  {
+   "idx": 3,
+   "ok": false,
+   "latency_s": 60.0157104000682,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "cached_tokens": 0,
+   "cost_usd": 0.0,
+   "problems": [],
+   "output": null,
+   "error": "APITimeoutError: Request timed out."
+  },
+  {
+   "idx": 4,
+   "ok": false,
+   "latency_s": 60.01602720003575,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "cached_tokens": 0,
+   "cost_usd": 0.0,
+   "problems": [],
+   "output": null,
+   "error": "APITimeoutError: Request timed out."
+  },
+  {
+   "idx": 5,
+   "ok": false,
+   "latency_s": 60.01781480002683,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "cached_tokens": 0,
+   "cost_usd": 0.0,
+   "problems": [],
+   "output": null,
+   "error": "APITimeoutError: Request timed out."
+  },
+  {
+   "idx": 6,
+   "ok": false,
+   "latency_s": 60.028438800014555,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "cached_tokens": 0,
+   "cost_usd": 0.0,
+   "problems": [],
+   "output": null,
+   "error": "APITimeoutError: Request timed out."
+  },
+  {
+   "idx": 7,
+   "ok": false,
+   "latency_s": 60.02606649999507,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "cached_tokens": 0,
+   "cost_usd": 0.0,
+   "problems": [],
+   "output": null,
+   "error": "APITimeoutError: Request timed out."
+  },
+  {
+   "idx": 8,
+   "ok": false,
+   "latency_s": 60.022941799950786,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "cached_tokens": 0,
+   "cost_usd": 0.0,
+   "problems": [],
+   "output": null,
+   "error": "APITimeoutError: Request timed out."
+  },
+  {
+   "idx": 9,
+   "ok": false,
+   "latency_s": 60.02243200002704,
+   "prompt_tokens": 0,
+   "completion_tokens": 0,
+   "cached_tokens": 0,
+   "cost_usd": 0.0,
+   "problems": [],
+   "output": null,
+   "error": "APITimeoutError: Request timed out."
+  }
+ ]
+}

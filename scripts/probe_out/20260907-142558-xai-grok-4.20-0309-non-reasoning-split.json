@@ -1,0 +1,529 @@
+{
+ "model": "grok-4.20-0309-non-reasoning",
+ "provider": "xai",
+ "n": 6,
+ "parallel": 1,
+ "split": true,
+ "prompt_version": "writer-v3-harsh-angles",
+ "intensities": [
+  "SPICY",
+  "HELL"
+ ],
+ "strict": true,
+ "temperature": 1.0,
+ "reasoning_effort": null,
+ "max_tokens": null,
+ "summary": {
+  "latency_mean": 2.90581934999985,
+  "latency_median": 2.905135050008539,
+  "latency_p90": 3.21256579994224,
+  "latency_max": 3.342993300058879,
+  "validated_ok": 4,
+  "total_cost_usd": 0.045330300000000004
+ },
+ "results": [
+  {
+   "idx": 0,
+   "ok": false,
+   "latency_s": 3.21256579994224,
+   "prompt_tokens": 6048,
+   "completion_tokens": 552,
+   "reasoning_tokens": 0,
+   "cached_tokens": 256,
+   "cost_usd": 0.0086712,
+   "cost_source": "usage",
+   "problems": [
+    "[SPICY] 근거 없는 fact: '12,000원이면 지하철 8번입니다.'"
+   ],
+   "output": {
+    "texts": [
+     {
+      "intensity": "SPICY",
+      "headline": "12,000원 = 지하철 8번",
+      "statement": [
+       {
+        "text": "12,000원이면 지하철 8번입니다.",
+        "kind": "fact",
+        "evidence_ids": []
+       },
+       {
+        "text": "최근 7일 동안 벌써 택시 3번, 합계 31,000원.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1"
+        ]
+       },
+       {
+        "text": "늦잠은 반복되는데 알람은 안 사는 선택, 참 합리적이었습니다.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "CHEAPER_ALTERNATIVE",
+      "selected_candidate": 3
+     },
+     {
+      "intensity": "HELL",
+      "headline": "12,000원이면 지하철 8번입니다",
+      "statement": [
+       {
+        "text": "피고인은 최근 7일 동안 택시를 3번 탔습니다. 합계 31,000원이면 알람 시계 3개 값입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1"
+        ]
+       },
+       {
+        "text": "그런데 또 늦잠 자고 12,000원을 지하철 8번으로 태워버렸네요.",
+        "kind": "opinion",
+        "evidence_ids": []
+       },
+       {
+        "text": "이번 달 4회째, 방 규칙은 장식이 아닙니다. 정신 차리십시오.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F4"
+        ]
+       }
+      ],
+      "banter_strategy": "CHEAPER_ALTERNATIVE",
+      "selected_candidate": 3
+     }
+    ],
+    "meme_tag": "GUILTY_LIGHT",
+    "meme_hints": {
+     "emotion": "머쓱+자조",
+     "keywords": [
+      "늦잠",
+      "택시",
+      "지하철",
+      "알람",
+      "반복"
+     ]
+    },
+    "_angle": "환산"
+   },
+   "error": null,
+   "parts": 2
+  },
+  {
+   "idx": 1,
+   "ok": true,
+   "latency_s": 2.664581699995324,
+   "prompt_tokens": 6032,
+   "completion_tokens": 384,
+   "reasoning_tokens": 0,
+   "cached_tokens": 256,
+   "cost_usd": 0.008231200000000001,
+   "cost_source": "usage",
+   "problems": [],
+   "output": {
+    "texts": [
+     {
+      "intensity": "SPICY",
+      "headline": "이번 달 4번째 늦잠 택시",
+      "statement": [
+       {
+        "text": "최근 7일 택시 3회, 30일 동안 같은 '늦잠' 사유로 유죄 2회.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1",
+         "F2",
+         "F3"
+        ]
+       },
+       {
+        "text": "지하철이 파업했나요? 아니면 알람이 파업했나요?",
+        "kind": "opinion",
+        "evidence_ids": []
+       },
+       {
+        "text": "이불이 출근 안 시키는 모양입니다.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "REPEAT_OFFENSE",
+      "selected_candidate": 1
+     },
+     {
+      "intensity": "HELL",
+      "headline": "이번 달 택시 4회째, 늦잠 3연속",
+      "statement": [
+       {
+        "text": "최근 7일 택시 3회, 30일 동안 같은 늦잠 사유로 유죄 2회.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1",
+         "F3"
+        ]
+       },
+       {
+        "text": "피고인은 이불이 출근을 방해하는 줄 알고 택시를 불렀다.",
+        "kind": "opinion",
+        "evidence_ids": []
+       },
+       {
+        "text": "알람 대신 택시를 4번이나 찍은 손가락, 정신 차리십시오.",
+        "kind": "opinion",
+        "evidence_ids": [
+         "F4"
+        ]
+       }
+      ],
+      "banter_strategy": "REPEAT_OFFENSE",
+      "selected_candidate": 1
+     }
+    ],
+    "meme_tag": "GUILTY_LIGHT",
+    "meme_hints": {
+     "emotion": "짜증 섞인 비웃음",
+     "keywords": [
+      "늦잠",
+      "반복",
+      "택시",
+      "알람",
+      "패턴"
+     ]
+    },
+    "_angle": "반복"
+   },
+   "error": null,
+   "parts": 2
+  },
+  {
+   "idx": 2,
+   "ok": false,
+   "latency_s": 2.4045051999855787,
+   "prompt_tokens": 6030,
+   "completion_tokens": 391,
+   "reasoning_tokens": 0,
+   "cached_tokens": 320,
+   "cost_usd": 0.008179,
+   "cost_source": "usage",
+   "problems": [
+    "[SPICY] 근거 없는 fact: '사유: ‘늦잠 자서 택시 탐’'",
+    "[HELL] 근거 없는 fact: \"피고인은 '늦잠 자서 택시 탐'이라고 변명했습니다.\""
+   ],
+   "output": {
+    "texts": [
+     {
+      "intensity": "SPICY",
+      "headline": "늦잠 자서 택시?",
+      "statement": [
+       {
+        "text": "사유: ‘늦잠 자서 택시 탐’",
+        "kind": "fact",
+        "evidence_ids": []
+       },
+       {
+        "text": "그럼 이불이 출근을 방해한 게 아니라 택시가 출근 수단이 된 겁니다.",
+        "kind": "opinion",
+        "evidence_ids": [
+         "F1",
+         "F2",
+         "F6"
+        ]
+       },
+       {
+        "text": "지난번에도 늦잠, 이번에도 늦잠이면 알람이 아니라 습관을 고치셔야죠.",
+        "kind": "opinion",
+        "evidence_ids": [
+         "F3"
+        ]
+       }
+      ],
+      "banter_strategy": "EXCUSE_STRIPPING",
+      "selected_candidate": 1
+     },
+     {
+      "intensity": "HELL",
+      "headline": "늦잠 자서 택시? 이불이 범인입니다",
+      "statement": [
+       {
+        "text": "피고인은 '늦잠 자서 택시 탐'이라고 변명했습니다.",
+        "kind": "fact",
+        "evidence_ids": []
+       },
+       {
+        "text": "최근 7일 택시 3회, 같은 늦잠 사유로 30일 내 유죄 2회, 이번 달 이미 4회째.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1",
+         "F2",
+         "F3",
+         "F4"
+        ]
+       },
+       {
+        "text": "이불이 문제지 교통이 문제는 아닙니다. 정신 차리십시오.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "REPEAT_OFFENSE",
+      "selected_candidate": 1
+     }
+    ],
+    "meme_tag": "GUILTY_LIGHT",
+    "meme_hints": {
+     "emotion": "비웃음",
+     "keywords": [
+      "늦잠",
+      "습관",
+      "택시",
+      "알람"
+     ]
+    },
+    "_angle": "변명 해부"
+   },
+   "error": null,
+   "parts": 2
+  },
+  {
+   "idx": 3,
+   "ok": true,
+   "latency_s": 2.945920499972999,
+   "prompt_tokens": 6024,
+   "completion_tokens": 475,
+   "reasoning_tokens": 0,
+   "cached_tokens": 2560,
+   "cost_usd": 0.0060295,
+   "cost_source": "usage",
+   "problems": [],
+   "output": {
+    "texts": [
+     {
+      "intensity": "SPICY",
+      "headline": "이 속도면 연말에 택시 월세 낸다",
+      "statement": [
+       {
+        "text": "최근 7일 택시 3회, 30일 동안 같은 늦잠 변명으로 유죄 2회.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1",
+         "F3"
+        ]
+       },
+       {
+        "text": "이 속도면 12월에는 택시비가 월세를 넘어설 기세입니다.",
+        "kind": "opinion",
+        "evidence_ids": []
+       },
+       {
+        "text": "알람은 안 맞추고 택시만 열심히 타는 인생, 참 합리적인 선택이었습니다.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "REPEAT_OFFENSE",
+      "selected_candidate": 1
+     },
+     {
+      "intensity": "HELL",
+      "headline": "이 속도면 9월 말에 택시비로 월급 반 토막",
+      "statement": [
+       {
+        "text": "최근 7일 택시 3회, 이번 달 이미 4회째.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1",
+         "F4"
+        ]
+       },
+       {
+        "text": "이 속도면 9월 말까지 9번 더 부를 기세입니다. 연말엔 택시 기사랑 가족사진 찍고 있을 판.",
+        "kind": "opinion",
+        "evidence_ids": []
+       },
+       {
+        "text": "이불이 원수라면 알람을 12개 사십시오. 정신 차리십시오.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "REPEAT_OFFENSE",
+      "selected_candidate": 1
+     }
+    ],
+    "meme_tag": "GUILTY_LIGHT",
+    "meme_hints": {
+     "emotion": "한숨",
+     "keywords": [
+      "늦잠",
+      "택시 중독",
+      "예산 폭발",
+      "알람 거부"
+     ]
+    },
+    "_angle": "미래 예언"
+   },
+   "error": null,
+   "parts": 2
+  },
+  {
+   "idx": 4,
+   "ok": true,
+   "latency_s": 3.342993300058879,
+   "prompt_tokens": 6036,
+   "completion_tokens": 546,
+   "reasoning_tokens": 0,
+   "cached_tokens": 896,
+   "cost_usd": 0.007969200000000001,
+   "cost_source": "usage",
+   "problems": [],
+   "output": {
+    "texts": [
+     {
+      "intensity": "SPICY",
+      "headline": "방 규칙이 너한테 실망했다",
+      "statement": [
+       {
+        "text": "최근 7일 택시 3회, 이번 달 이미 4회째.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1",
+         "F4"
+        ]
+       },
+       {
+        "text": "방 규칙이 '한 달에 택시 1번'이라고 분명히 말했는데, 넌 그 규칙을 매일 늦잠으로 배신하고 있다.",
+        "kind": "opinion",
+        "evidence_ids": []
+       },
+       {
+        "text": "규칙이 포기하기 전에 알람이나 좀 맞춰라.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "ROOM_RULE_CALLBACK",
+      "selected_candidate": 2
+     },
+     {
+      "intensity": "HELL",
+      "headline": "방 규칙이 너 때문에 포기했다",
+      "statement": [
+       {
+        "text": "방 규칙 '한 달에 택시 1번'은 이번 달 4회째에 실망을 넘어 포기 상태에 들어갔습니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F4"
+        ]
+       },
+       {
+        "text": "늦잠 한 번에 12,000원, 최근 7일 3번, 9월 2일에도 같은 변명. 규칙이 이제 너를 믿지 않습니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1",
+         "F2",
+         "F3"
+        ]
+       },
+       {
+        "text": "이불이 문제지 지하철이 문제는 아니었습니다. 정신 차리십시오.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "ROOM_RULE_CALLBACK",
+      "selected_candidate": 2
+     }
+    ],
+    "meme_tag": "GUILTY_LIGHT",
+    "meme_hints": {
+     "emotion": "disappointed",
+     "keywords": [
+      "방규칙",
+      "실망",
+      "늦잠",
+      "포기"
+     ]
+    },
+    "_angle": "규칙 의인화"
+   },
+   "error": null,
+   "parts": 2
+  },
+  {
+   "idx": 5,
+   "ok": true,
+   "latency_s": 2.864349600044079,
+   "prompt_tokens": 6024,
+   "completion_tokens": 402,
+   "reasoning_tokens": 0,
+   "cached_tokens": 2176,
+   "cost_usd": 0.0062502,
+   "cost_source": "usage",
+   "problems": [],
+   "output": {
+    "texts": [
+     {
+      "intensity": "SPICY",
+      "headline": "알람 12개 맞추고 지하철 타세요",
+      "statement": [
+       {
+        "text": "최근 7일 동안 택시를 3번이나 탔습니다. 합계 31,000원이면 지하철 20번 넘게 탈 수 있는 돈입니다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1"
+        ]
+       },
+       {
+        "text": "늦잠 자서 탔다는 변명은 이미 30일 동안 두 번 유죄 먹은 사유인데, 또 반복하는 건 알람이 아니라 본인입니다.",
+        "kind": "opinion",
+        "evidence_ids": [
+         "F2",
+         "F3"
+        ]
+       }
+      ],
+      "banter_strategy": "CHEAPER_ALTERNATIVE",
+      "selected_candidate": 0
+     },
+     {
+      "intensity": "HELL",
+      "headline": "늦잠 1회당 12,000원? 알람 3개 사세요",
+      "statement": [
+       {
+        "text": "최근 7일 택시 3회, 31,000원. 늦잠 사유도 반복이다.",
+        "kind": "fact",
+        "evidence_ids": [
+         "F1",
+         "F2",
+         "F3"
+        ]
+       },
+       {
+        "text": "12,000원이면 알람 시계 세 개 사서 베개 밑에 깔고 자도 모자랄 판에, 매번 택시를 부릅니다.",
+        "kind": "opinion",
+        "evidence_ids": []
+       },
+       {
+        "text": "이불이 문제지 도로가 문제는 아닙니다. 정신 차리십시오.",
+        "kind": "opinion",
+        "evidence_ids": []
+       }
+      ],
+      "banter_strategy": "CHEAPER_ALTERNATIVE",
+      "selected_candidate": 3
+     }
+    ],
+    "meme_tag": "GUILTY_LIGHT",
+    "meme_hints": {
+     "emotion": "비웃음",
+     "keywords": [
+      "늦잠",
+      "택시",
+      "알람",
+      "지하철",
+      "반복"
+     ]
+    },
+    "_angle": "대안 조롱"
+   },
+   "error": null,
+   "parts": 2
+  }
+ ]
+}
