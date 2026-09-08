@@ -2,7 +2,7 @@
 
 > 근거: proposal2 §1(아키텍처), §2.2 결정 16~24, §7.1 업무 테이블 추가 필드, §8.1 이벤트·큐, §9 API 계약, §10 판결 확정 트랜잭션, §11 마감·재시도·삭제 경합, §12(정책 버전이 finalize 에 걸림), §17 짤, §19 role 분리, §20 작업 3·8 완료 기준·먼저 실패시킬 케이스, §21 백엔드·프론트 변경 계약. proposal2 는 git 에 없으므로 백엔드가 **이 파일 한 장만 읽으면** 되게 옮겨 적었다.
 > **대상 독자: 백엔드 담당.** AI 파트 계획서(01~08)는 이 문서를 참조한다. 계약이 바뀌면 여기와 `01-contracts-fake-provider.md` 를 같이 고친다.
-> **가장 먼저 답해야 할 것: D-20.** 백엔드와 AI 가 같은 Postgres 인스턴스를 쓰고, 업무 트랜잭션 안에서 `ai.jobs` 를 INSERT 할 수 있는가. 아니면 outbox 전달 계층이 먼저 필요하고 9/8~9/18 일정 전체가 흔들린다(proposal2 부록 D). **9/8 까지 회신.**
+> **9/8 갱신: D-20 · D-21 · 전달 방식 · 배포는 §15 에서 확정됐다. 서버에는 재판 흐름이 아직 없으므로 §2~§9 가 전부 신규 작업이다.** (원문) **가장 먼저 답해야 할 것: D-20.** 백엔드와 AI 가 같은 Postgres 인스턴스를 쓰고, 업무 트랜잭션 안에서 `ai.jobs` 를 INSERT 할 수 있는가. 아니면 outbox 전달 계층이 먼저 필요하고 9/8~9/18 일정 전체가 흔들린다(proposal2 부록 D). **9/8 까지 회신.**
 
 ## 0. 읽는 법
 
@@ -39,7 +39,7 @@ Frontend ──▶ Main Backend ── 내부 HTTP ──▶ AI API (FastAPI)  :
 - **워커는 업무 테이블을 직접 쓰지 않는다.** 최종 저장 권한은 백엔드 내부 API 에만 있다(결정 17)
 - role 분리: `ai_api`(심문용 최소 권한 — DB 는 `ai.case_budgets`·`ai.llm_calls` 쓰기만), `ai_worker`(`ai` 스키마 읽기·쓰기, 단 `jobs` INSERT 불가), `backend`(업무 테이블 전부 + `ai.jobs` INSERT/UPDATE + `ai.privacy_epochs`·`ai.verdict_commit_records`·`ai.text_evidence_refs` 쓰기 + 무효화 SQL 대상 `ai.evidence`·`ai.dossiers`·`ai.trial_prep`·`ai.memory_facts`·`ai.node_results` UPDATE)
 - 내부 API 인증: `Authorization: Bearer <SERVICE_AUTH_TOKEN>`. 요청에 `X-Trace-Id`·`X-Request-Id`·`X-Job-Id`·`X-Generation-Id`. 로그에 토큰 금지. **외부 사용자가 임의 `user_id`·`room_id` 로 조회하는 엔드포인트로 노출하지 않는다**
-- 공통 규칙(§6.1): ID 는 문자열(신규 AI 테이블 UUID, 기존 업무 ID 는 opaque text). 금액 `amount_krw` 양의 정수. 시각 RFC3339 UTC(`timestamptz`), 화면에서만 KST. 알 수 없는 필드 거부, `schema_version=1`. 강도 enum `MILD|SPICY|HELL`(D-21), 평결 enum `GUILTY|NOT_GUILTY|APPROVED|REJECTED` — **백엔드 실제 enum 과의 매핑을 9/9 까지 고정**
+- 공통 규칙(§6.1): ID 는 문자열(신규 AI 테이블 UUID, 기존 업무 ID 는 opaque text). 금액 `amount_krw` 양의 정수. 시각 RFC3339 UTC(`timestamptz`), 화면에서만 KST. 알 수 없는 필드 거부, `schema_version=1`. enum 은 **프론트 값이 표준**(9/8 확정, §15.2 D-21): 강도 `mild|spicy|hell`, 평결 `guilty|notGuilty|agree|disagree|dismissed`, 게시물 `spent|considering`, 형량 `probation|oneDay|life`. 이 문서의 다른 절에 남은 대문자 표기(`MILD`·`GUILTY`·`SPENT` 등)는 CT-07 에서 일괄 치환
 
 ## 2. DB (proposal2 §7.1)
 
@@ -193,7 +193,7 @@ COMMIT
 | `GET /posts/{id}/share-card` | 공개 허용 문구·이미지 metadata 만. **Evidence 원문·개인 이력 반환 금지.** `PUBLIC` 근거 문구만 | |
 
 - 제출 상태 `NEW → NEEDS_INPUT → COMPLETED`, `BLOCKED`, `EXPIRED`. 최초 `PASS` 는 `NEW → COMPLETED`. `payload_hash` = 정규화된 타입·금액·사유·카테고리·공유 방 목록. 질문은 제출당 1회(`question_shown`)
-- 프론트 폴링: 1초 → 15초 뒤 5초, 화면 이탈 시 취소, 템플릿 후 30초 또는 재진입. **`text_version` 이 작은 응답으로 UI 를 덮지 않는다.** 빈 화면 대신 대기 메시지
+- **전달 방식은 폴링으로 확정(9/8, §15.2). Realtime · SSE 없음.** 프론트 폴링: 1초 → 15초 뒤 5초, 화면 이탈 시 취소, `AI_READY` 면 즉시 중단, 템플릿 후 30초 또는 재진입. **`text_version` 이 작은 응답으로 UI 를 덮지 않는다.** 빈 화면 대신 대기 메시지
 - `source=TEMPLATE` 이면 AI 판사 라벨·양형 이유 블록 숨김. 지옥맛 방장 확인 문구: "지옥맛은 반말과 욕설, 인격 조롱이 나옵니다. 멤버 전원이 동의했는지 확인해주세요."
 
 ## 10. 템플릿 공유 파일
@@ -233,11 +233,50 @@ COMMIT
 
 | ID | 항목 | 기한 |
 |---|---|---|
-| **D-20** | 공유 Postgres 인스턴스 + 업무 트랜잭션 안 `ai.jobs` INSERT 가능 여부, DB 소유권·role 승인 | **9/8** |
-| D-21 | 강도 enum `MILD|SPICY|HELL` 채택 | 9/9 |
-| enum 매핑 | 평결 `GUILTY|NOT_GUILTY|APPROVED|REJECTED` ↔ 백엔드 실제 값, 카테고리 enum 목록 | 9/9 |
+| ~~D-20~~ | **확정(§15.2)** — Supabase 인스턴스 공유. 남은 것: role·grants 생성, Session Pooler 접속 정보 | 9/9 |
+| ~~D-21~~ | **확정(§15.2)** — 프론트 값 표준. 남은 것: `rooms.spice_level` 값 변경 | 9/9 |
+| ~~enum 매핑~~ | **확정(§15.2)** — 카테고리 11종 고정 | 9/9 |
 | CaseSnapshot | `post_version`·`audience_version`·`privacy_versions`·`rule_version`·`policy` 를 채울 수 있는가 | 9/9 |
 | §4.4 | 제출 → 게시물 매핑 통지 방식 | 9/14 |
 | §4.5 | trace 조회 프록시 주체 | 9/16 |
 | §4.6 | `generation-failed` 오류 코드 표 채택 | 9/10 |
 | §5 10단계 | 일부 강도 TEMPLATE 시 `TEXT_RETRY payload.intensities[]` 채택 | 9/13 |
+
+## 15. 9/8 결정 기록 — 서버 코드 대조 (`geoji-server` · `geoji-web` 확인)
+
+> 9/8 AI 파트가 `geoji-server`(Spring Boot 4.1.1 · Java 25 · Supabase Postgres · Elastic Beanstalk t3.micro)와 `geoji-web`(`docs/product/SPEC.md` · `src/shared/domain/*.ts`)을 읽고 사용자와 확정한 것. **§14 의 D-20 · D-21 · enum 매핑 행은 이 표가 대체한다.** 계약서 01 의 enum 교체는 CT-07 에서.
+
+### 15.1 서버 현재 상태 (9/8 `main` 7550b1e 기준, 사실)
+- **재판 흐름이 없다.** 게시물·투표·평결·양형·배심 테이블과 API 가 하나도 없고 `rooms.vote_deadline_minutes` 만 있다 → §2 `004` · §3 INSERT · §4 내부 API · §5 finalize · §6 watchdog · §9 공개 API 가 **전부 신규 작업**
+- 있는 것: `profiles`, `rooms`(`spice_level` = `mild/hot/direct`, `rules text[]`), `room_members`(`debt_score`), `expenses`(`category` 자유 문자열, "AI 추론 자리"), `comments`(expense 단위), `crown_history`, `weekly_awards`, `challenges`, `patrol_notifications`, `daily_logs`
+- `ai/AiClient.java` — 상 이름 발명 · 도전 과제 서술 · 순찰 위험 문구 3개를 **동기 HTTP** 로 기대하는 인터페이스. 지금은 `StubAiClient` 고정 문구
+- DB: **Supabase 관리형 Postgres 1개**, Session Pooler(IPv4, `aws-0-ap-southeast-1.pooler.supabase.com:5432`) 접속. 스키마 소스는 `supabase/migrations/0001_init.sql`(별도 저장소, 여기 없음), Hibernate `ddl-auto: validate`. enum 은 Postgres native enum, 소문자
+- 배포: Elastic Beanstalk Java SE, t3.micro 단일 인스턴스, `main` push 시 GitHub Actions 자동 배포. 댓글 실시간은 Supabase Realtime
+- 프론트(`geoji-web`): 재판 흐름 그대로. `Intensity = mild|spicy|hell`, `Verdict = guilty|notGuilty|agree|disagree|dismissed`, `PostType = spent|considering`, `Sentence = probation|oneDay|life`, 카테고리 11종 상수. `ROADMAP.md` 미결정 표에 "판결 전달 방식(동기 또는 SSE) — AI·백엔드가 정한다" 가 남아 있다
+
+### 15.2 확정 (9/8, 사용자)
+| ID | 결정 | 백엔드가 할 일 | AI 파트가 할 일 |
+|---|---|---|---|
+| 범위 | **재판 흐름(proposal2)이 팀 확정 방향.** 서버의 시상식·왕관·순찰·도전·하루로그는 별개 기능 | §2~§9 그대로 착수 | — |
+| **D-20** | 공유 Postgres = **Supabase 인스턴스 그대로.** `ai` 스키마를 같은 DB 에 둔다. "업무 트랜잭션 안 INSERT" 는 평결 확정 트랜잭션(§3)이 생기면서 같이 | `ai_api`·`ai_worker` role 생성·grants(§1), Session Pooler 접속 정보 전달 | 001~003 러너를 Supabase 에 Session Pooler 로 적용 |
+| 연동 | **하이브리드.** 판결(그래프 B·C·retain·TEXT_RETRY)은 `ai.jobs` 큐 + 워커 + finalize(이 문서). 서버 `AiClient` 3종(상·도전·순찰)은 **동기 HTTP** 로 별도 제공 — P0 범위 밖, M3 이후 여유 시 | `AiClient` HTTP 구현은 AI 파트 API 문서가 나온 뒤 | 동기 엔드포인트 3개는 별도 카드(09 P1 후보) |
+| **D-21** | **프론트 값이 API 표준.** 강도 `mild/spicy/hell`, 평결 `guilty/notGuilty/agree/disagree/dismissed`, 게시물 `spent/considering`, 형량 `probation/oneDay/life`. 짤 태그 5종은 기획서 값(`GUILTY_HEAVY`…) 유지 | `rooms.spice_level` enum 을 `mild/spicy/hell` 로 변경(`hot→spicy`, `direct→hell`). 평결·게시물·형량 enum 도 위 값으로 | 01 계약 enum 전면 교체(CT-07, 0.25d) |
+| 카테고리 | **프론트 11종 고정**: 식비 · 배달 · 카페/간식 · 교통/택시 · 쇼핑/패션 · 뷰티 · 취미/여가 · 술/유흥 · 구독 · 생활 · 기타 | `posts.category` CHECK 제약(`expenses` 도 맞추면 좋음) | 심문관 enum 주입 값 = 이 11종(07 §3.3) |
+| 모델 | **계획서대로 Grok(서기) + OpenAI luna(심문관·양형관·검수관).** 프론트 `SPEC.md` "Claude Haiku 4.5 단독" · `ROADMAP.md` "Grok 은 심사 이후" 는 구버전 | — | 프론트 문서 갱신 요청, 제출 폼 "사용한 AI 도구명" 갱신 |
+| **전달** | **폴링.** Supabase Realtime · SSE 는 안 한다. 프론트가 `GET /posts/{id}/verdict` 를 1초 간격으로, **화면 이탈 시 중단, `text_status=AI_READY` 면 즉시 중단**(`TEMPLATE_READY` 는 §9 의 30초 규칙). Realtime 은 M4 이후 검토하되 그때도 폴링을 재연결 폴백으로 남긴다 | §9 `GET verdict` 그대로. **Realtime publication · RLS 정책 작업 없음** | 프론트 `ROADMAP.md` 미결정 행 닫도록 통보 |
+| 배포 | **백엔드가 관리하는 별도 EC2 1대에 Docker Compose.** AI 파트는 `ai-api` · `ai-worker` 이미지(GHCR) + compose 조각 + 환경변수 목록만 넘긴다 | EC2 생성, compose 실행, 환경변수·벤더 키 주입, Supabase 접속 | Dockerfile 2개 · CI 이미지 빌드 · compose 조각(02) |
+
+### 15.3 확정 (9/8, 사용자 — AI 파트 내부 결정, 백엔드는 참고만)
+| ID | 결정 | 백엔드에 걸리는 것 |
+|---|---|---|
+| D-08 | AI 파트 **2명**, 일정 그대로(07 보류 없음, M3 9/15 유지) | 없음 |
+| D-07 | `GUARDRAIL_POLICY_VERSION=guardrail-v2` 로 시작. 팀 비준은 M3 검수(9/15) 때, 미비준 시 v1 | finalize 가 저장하는 정책 버전 문자열이 `guardrail-v2` |
+| D-19 | 양형 이유 템플릿 치환 **확정으로 닫음**(팀 확인 불필요) | §5 `reason_source=TEMPLATE` 그대로 |
+| D-04 | 방 댓글 말투 예시는 **P0 제외**, `ROOM_COMMENT_STYLE_ENABLED=false` 유지. retain 은 한다 | `resolve-evidence` 의 `style_comments` 는 P0 에서 빈 배열 |
+| D-22 | 모델 동시성 8 로 시작, 429 시 하향 | 없음 |
+| 키·결제 | xAI · OpenAI 키는 **AI 파트 개인 계정**으로 발급·결제, 팀에 정산. 키는 EC2 환경변수로만 전달 | compose 환경변수에 `XAI_API_KEY` · `OPENAI_API_KEY` 주입, 로그 금지 |
+| AiClient 3종 | 서버의 상 이름·도전 서술·순찰 문구용 동기 엔드포인트는 **P1(심사 이후)**. P0 에서는 `StubAiClient` 유지 | `AiClient` HTTP 구현 착수 시점도 P1 |
+
+### 15.4 남은 것
+- §14 의 나머지 행(CaseSnapshot 필드, §4.4 · §4.5 · §4.6, §5 10단계)은 그대로 회신 대기
+- D-23(양형관 실측), 검수관 모델은 작업 3·6 실측 뒤. 알림 채널·비용 임계, LangSmith·CI 실비는 미정

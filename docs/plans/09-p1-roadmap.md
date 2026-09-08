@@ -16,6 +16,7 @@
 | A reflect 워커 | 이미 아픈 것(조건부) | 사용자당 판결 10건을 넘으면 recall 참조 20개로는 "패턴" 이 문장에 안 나온다. 심사 2주 `recall_user` 후보 수 집계로 판정 |
 | B Hindsight 어댑터 | 수요 미확인 | 별도 서비스 운영·과금·개인정보(D-03). Postgres recall 이 Hit@3 90% 를 넘기면 불필요. 인터페이스만으로 포트폴리오 설명 가능(proposal2 §16.3) |
 | C 방 댓글 말투 켜기(`ROOM_COMMENT_STYLE_ENABLED`) | D-04 대기 | retain 은 P0 에서 이미 한다. 고지 문구 확정 즉시 켤 수 있다 |
+| H 서버 `AiClient` 3종 동기 엔드포인트(주간 상 이름 발명 · 도전 과제 서술 · 순찰 위험 문구) | 9/8 결정 P1 | `geoji-server` 가 `StubAiClient` 로 데모 가능. 그래프 없이 Grok 1프롬프트 × 3, 각 0.25d. 10 §15.3 |
 | D 공개 이력 콜백(`PUBLIC_HISTORY_CALLBACK_ENABLED`) | 수요 미확인 | 공개 공유 카드에서 과거 이력을 언급하는 것 — 공개 범위 정책 확정 뒤 |
 | E 드립 후보 OpenAI 대체 | 비용(수요 미확인) | 건당 −3원. 골든셋 judge 가 같을 때만 |
 | F `grok-4.6` 재평가 | 외부 의존 | xAI 가 추론 해제를 열 때까지 착수 불가 |

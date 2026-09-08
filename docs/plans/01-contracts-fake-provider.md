@@ -53,13 +53,13 @@ ports/{llm,backend,memory,jobs,ledger}.py ─ 작업 2~6 이 구현할 인터페
 | 대상 | 요청 | 기한 |
 |---|---|---|
 | 팀·백엔드 | **D-20** — 백엔드와 같은 Postgres 인스턴스에 `ai` 스키마를 두고, 업무 트랜잭션에서 `ai.jobs` 를 INSERT 할 수 있는가. 아니면 outbox 전달 계층이 먼저 필요하고 §20 일정 전체가 흔들린다(proposal2 부록 D) | **9/8** |
-| 백엔드 | D-21 강도 enum `MILD`/`SPICY`/`HELL` 채택 여부, 평결 enum(`GUILTY`/`NOT_GUILTY`/`APPROVED`/`REJECTED`)과 백엔드 실제 enum 매핑, 카테고리 enum 목록 | 9/9 |
+| 백엔드 | ~~D-21~~ **9/8 확정(10 §15.2): 프론트 값이 표준** — 강도 `mild/spicy/hell`, 평결 `guilty/notGuilty/agree/disagree/dismissed`, 게시물 `spent/considering`, 형량 `probation/oneDay/life`, 카테고리 11종 고정. **이 문서의 대문자 enum 은 CT-07 에서 전부 치환** | 9/9 |
 | 백엔드 | `CaseSnapshot` 을 채울 수 있는지 — `post_version`·`audience_version`·`privacy_versions`·`room_snapshots.rule_version`·`policy{allowed_sentences[{code,rank}], fallback_sentence, reason_required}`·`default_intensity`. 없는 필드는 9/9 까지 회신(`10-backend-contract.md` §4) | 9/9 |
 | 프론트 | `verdict-view-v1` 스키마 검토(폴링 응답 형태, `text_version` 규칙) | 9/10 |
 
 ### 팀 결정 대기
 - D-20(위). D-21(강도 enum). xAI·OpenAI 키·결제 관리 주체
-- `GUARDRAIL_POLICY_VERSION` 기본값 — proposal2 는 `guardrail-v2` 를 **제안**(D-07 비준 대상). 작업 1 은 두 버전의 fixture 를 모두 만들고 기본값은 설정으로 둔다
+- `GUARDRAIL_POLICY_VERSION` 기본값 — **9/8 확정 `guardrail-v2`**(D-07 팀 비준은 M3 검수 시, 미비준 시 v1). 작업 1 은 두 버전의 fixture 를 모두 만들고 기본값은 설정으로 둔다
 
 ## 3. 기술 상세 설계 (Technical Design)
 
