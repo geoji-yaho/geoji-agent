@@ -29,7 +29,7 @@ prompts/** 변경 ─▶ tests/evaluations/run_regression.py (골든 50사건 ×
 ### 현상태 (proposal2 §5.4)
 | 항목 | 값 |
 |---|---|
-| 서기 v5.3 | 강도별 병렬 3.1초 / p90 3.4초 / 6/6 / 11.7원. 순한맛 문단 2줄, `DEBATING` 분기 없음 |
+| 서기 v5.3 | 강도별 병렬 3.1초 / p90 3.4초 / 6/6 / 11.7원. 순한맛 문단 2줄, `considering` 분기 없음 |
 | OpenAI 3역할 | 작업 3 실측값(`00-INDEX.md` §7). 조서는 미실측 |
 | 원장·예산 | 테이블은 04 DDL 로 존재, 코드 없음. `LedgerPort` no-op |
 | 예시 | `ai.banter_examples` 0건 |
@@ -41,7 +41,7 @@ prompts/** 변경 ─▶ tests/evaluations/run_regression.py (골든 50사건 ×
 |---|---|:--:|:--:|
 | 3.1 | `openai_compat_llm.py` 완성 + `domain/retries.py`(오류 분류·벤더별 장애 분리·백오프) | Critical | M |
 | 3.2 | `domain/budget.py` 비용 예약·정산 + `adapters/postgres_call_ledger.py`(`llm_calls`·`case_budgets`·`node_results`) + 제출 단위 임시 예산 | Critical | M |
-| 3.3 | 프롬프트 v6/v2 — 순한맛·`DEBATING`, 조서·드립·양형관·검수관 튜닝, `PROMPT_BUNDLE_VERSION` | Critical | M |
+| 3.3 | 프롬프트 v6/v2 — 순한맛·`considering`, 조서·드립·양형관·검수관 튜닝, `PROMPT_BUNDLE_VERSION` | Critical | M |
 | 3.4 | 골든셋 50사건(+지옥맛 20) + 회귀 평가기 + judge | Critical | M |
 | 3.5 | 검수관 재현율(라벨 40) → `MODEL_EVALUATOR_HELL` 결정 | High | S |
 | 3.6 | 드립 예시 60(`gen`/`pair`/`import`, `approved` 필터) | High | M(+팀) |
@@ -93,7 +93,7 @@ prompts/** 변경 ─▶ tests/evaluations/run_regression.py (골든 50사건 ×
 
 ### 3.3 프롬프트 (`prompts/`, proposal2 §12·§13)
 강도 정의(단일 정의 — 프롬프트·검수관·judge 공유, `guardrail-v2`):
-| | `MILD` | `SPICY` | `HELL` |
+| | `mild` | `spicy` | `hell` |
 |---|---|---|---|
 | 말투 | 존댓말 | 반말 허용 | 반말, "너" 직접 조준 |
 | 비속어 | 0 | **0** | 닫힌 목록(`lexicon.HELL_ALLOWED_PROFANITY`), 판결당 1회, 같은 욕 반복 금지 |
@@ -104,9 +104,9 @@ prompts/** 변경 ─▶ tests/evaluations/run_regression.py (골든 50사건 ×
 
 | 파일 | 변경 |
 |---|---|
-| `writer/common-v6.md` | v5.3 공통 + **사건 유형 절**(`SPENT`/`DEBATING`): `APPROVED` 는 `NECESSITY_APPROVAL` 계열 "억지로 비난하지 않되 후회는 본인 몫", `REJECTED` 는 전제 부정·대안 조롱. 형량·무지출 언급 금지. 예시는 다른 사건(스투시 반팔·키보드) |
+| `writer/common-v6.md` | v5.3 공통 + **사건 유형 절**(`spent`/`considering`): `agree` 는 `NECESSITY_APPROVAL` 계열 "억지로 비난하지 않되 후회는 본인 몫", `disagree` 는 전제 부정·대안 조롱. 형량·무지출 언급 금지. 예시는 다른 사건(스투시 반팔·키보드) |
 | `writer/mild-v6.md` | 순한맛 확장 — 예시(다른 사건): 배달 "야근한 날의 치킨은 이해해요. 다만 이번 달 세 번째라는 것만 기억해요." / 커피 "커피 한 잔이 하루를 바꾸죠. 열두 잔이면 통장이 바뀌고요." |
-| `writer/spicy-v6.md`·`hell-v6.md` | v5.3 유지 + `DEBATING` 예시 1개씩 |
+| `writer/spicy-v6.md`·`hell-v6.md` | v5.3 유지 + `considering` 예시 1개씩 |
 | `banter-v2.md` | 원칙 체크리스트 적용, 승인 예시 3개 참고·복사 금지 |
 | `sentencing-v1.md` | 가중·감경은 반드시 라벨, 예시 2개(다른 사건) |
 | `context-v1.md` | 유지 + 인젝션 의심 예시 |
@@ -132,9 +132,9 @@ prompts/** 변경 ─▶ tests/evaluations/run_regression.py (골든 50사건 ×
 원문 20+(팀 수집, 출처·이용 범위 메타, 출력 복사 금지) → `gen`(Grok, 전략 8 × 카테고리 6, 다른 사건 원칙) → `pair`(팀 쌍대 선택 CSV) → `import`(`ai.banter_examples approved=true, version`) → 평가 세트 30 별도. 런타임 recall 은 **`approved=true` 만**(§7.3).
 
 ### 3.7 사람 검수 · D-07 자료
-- export `tests/evaluations/review/<ts>.csv`(case, intensity, headline, statement, sentence, reason, evidence, 5축, 통과, 사유). `MILD`·`SPICY` 는 20건 추가 생성해 각 50, `HELL` 50. 검수자 3명 전량
-- 통과: 5축 평균 ≥ judge 기준 **그리고** `HELL` 불통과 ≤ 2/50, `MILD`·`SPICY` 욕·인격 단정 0. 불통과는 사유별로 묶어 프롬프트·lexicon 수정 → 재실행 → 재검수
-- D-07 자료: `HELL` 50 결과 + v4/v5.2/v6 대비 + 방장 문구 + 방 단위 옵트인 근거. 결정 후 `GUARDRAIL_POLICY_VERSION` 확정, `00-INDEX.md` §8.4
+- export `tests/evaluations/review/<ts>.csv`(case, intensity, headline, statement, sentence, reason, evidence, 5축, 통과, 사유). `mild`·`spicy` 는 20건 추가 생성해 각 50, `hell` 50. 검수자 3명 전량
+- 통과: 5축 평균 ≥ judge 기준 **그리고** `hell` 불통과 ≤ 2/50, `mild`·`spicy` 욕·인격 단정 0. 불통과는 사유별로 묶어 프롬프트·lexicon 수정 → 재실행 → 재검수
+- D-07 자료: `hell` 50 결과 + v4/v5.2/v6 대비 + 방장 문구 + 방 단위 옵트인 근거. 결정 후 `GUARDRAIL_POLICY_VERSION` 확정, `00-INDEX.md` §8.4
 
 ## 4. 완료 기준 (DoD)
 
@@ -179,7 +179,7 @@ psql "$DATABASE_URL" -c "select node, vendor, model_id, status, actual_micro_usd
 | RM-01 | 어댑터 완성·오류 분류 | 6 상황, 백오프, degraded, 비동기 세션 규칙 | adapter | 0.5d | 03 VF-04 |
 | RM-02 | 예산·원장 | reserve/settle/UNKNOWN, cap, `call_index`, ticks, 제출 임시 예산 | domain·adapter | 0.75d | 04 ME-01 |
 | RM-03 | `node_results` 재사용 | 키 5요소, 24h, 무효화 연동, 그래프 훅 | adapter | 0.25d | RM-02 |
-| RM-04 | 프롬프트 v6/v2 | 순한맛·DEBATING·5종 튜닝·번들 버전 | prompt | 0.75d | 05 GR-07 |
+| RM-04 | 프롬프트 v6/v2 | 순한맛·considering·5종 튜닝·번들 버전 | prompt | 0.75d | 05 GR-07 |
 | RM-05 | 골든셋·회귀 평가기 | 50사건·자동 검사·judge·기준선·`--quick`·정책 옵션 | eval | 0.75d | RM-01 |
 | RM-06 | 검수관 재현율 | 라벨 40·luna/terra·결정 | eval | 0.25d | RM-05 |
 | RM-07 | 드립 예시 60 | gen/pair/import, 팀 채점 | data | 0.5d(+팀) | 04 |

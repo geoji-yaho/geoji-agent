@@ -144,10 +144,10 @@ UPDATE ai.node_results SET invalidated_at = now() WHERE invalidated_at IS NULL A
 -- text_evidence_refs → verdict view 템플릿 전환은 백엔드(10 §8)
 ```
 - 늦은 retain: RETAIN 핸들러는 (1) `processed_memory_events` (2) snapshot 이 `deleted`/404 면 skip (3) 스코프 epoch 가 job 생성 시점보다 크면 skip. 세 조건이 "삭제 후 늦은 retain 부활" 을 막는다
-- `domain/comment_safety.py`: `post_status=JUDGED` 만, 21~200자, URL·전화·이메일 제외, `DEATH_WORDS` 제외, 방 강도별 욕 규칙(`MILD`·`SPICY` 는 `PROFANITY` 포함 제외, `HELL` 은 허용 목록 밖 제외), 작성자=피고인 제외, `@` 호출 제외, 정규화 중복 제거
+- `domain/comment_safety.py`: `post_status=JUDGED` 만, 21~200자, URL·전화·이메일 제외, `DEATH_WORDS` 제외, 방 강도별 욕 규칙(`mild`·`spicy` 는 `PROFANITY` 포함 제외, `hell` 은 허용 목록 밖 제외), 작성자=피고인 제외, `@` 호출 제외, 정규화 중복 제거
 
 ### 3.6 데모 C 시드 (`scripts/seed_memory_demo_c.py --user --room --post-ids a,b`)
-- `user/{uuid}` SPEND+VERDICT 2건(스타벅스 6,100원 −10일·−4일, `GUILTY` 80%/100%), `room/{uuid}` VERDICT 2건. scope `ROOMS [room]`. `source_id` 는 백엔드 시드가 만든 실제 `post_id`(10 §12) — 그래야 `resolve-evidence` 가 본문을 돌려준다
+- `user/{uuid}` SPEND+VERDICT 2건(스타벅스 6,100원 −10일·−4일, `guilty` 80%/100%), `room/{uuid}` VERDICT 2건. scope `ROOMS [room]`. `source_id` 는 백엔드 시드가 만든 실제 `post_id`(10 §12) — 그래야 `resolve-evidence` 가 본문을 돌려준다
 - 확인: 3번째 스타벅스 사건 fixture 로 `recall_user` → 2건, `resolve-evidence`(가짜) → 본문, `build_evidence` → `PRIOR` 2개 + AGGREGATE 반복 2건
 
 ## 4. 완료 기준 (DoD)

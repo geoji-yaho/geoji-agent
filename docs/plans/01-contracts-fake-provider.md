@@ -7,16 +7,16 @@
 ## 1. 개요 및 구현 목표
 
 ### 목적:
-- 모든 후속 작업이 공유하는 **계약을 코드보다 먼저 고정**한다 — `contracts/*.schema.json` 7종, pydantic 미러, fixture(부록 A 의 HELL 예시 + 정책 버전별 기대값)
+- 모든 후속 작업이 공유하는 **계약을 코드보다 먼저 고정**한다 — `contracts/*.schema.json` 7종, pydantic 미러, fixture(부록 A 의 hell 예시 + 정책 버전별 기대값)
 - **fake provider** 로 외부 LLM 없이 상태·정합성을 검증할 수 있게 한다(proposal2 §20 "외부 LLM 호출 전에 fake provider 로 상태·정합성부터 확인"). 일반 CI 는 fake 만 쓴다
 - 프로젝트 골격(`src/geoji_ai/`, 설정, 로깅, 헬스)과 **ports 5종**(llm·backend·memory·jobs·ledger)의 시그니처를 잠근다. 의존 방향 `api/workers → application → domain/ports`, `domain` 은 FastAPI·LangGraph·SQLAlchemy·벤더 SDK 에 의존하지 않는다
-- 먼저 실패시킬 것(§20 작업 1): **알 수 없는 필드 · HELL 누락 · 같은 intensity 중복 · 없는 Evidence 라벨 · EvaluationReport 누락 · 정책 버전 불일치**
+- 먼저 실패시킬 것(§20 작업 1): **알 수 없는 필드 · hell 누락 · 같은 intensity 중복 · 없는 Evidence 라벨 · EvaluationReport 누락 · 정책 버전 불일치**
 
 ### 핵심 플로우:
 ```
 contracts/*.schema.json (정본, schema_version=1)
    ├─ src/geoji_ai/contracts/*.py  (pydantic 미러 — 동등성 테스트로 정본과 묶음)
-   ├─ contracts/fixtures/*.json     (HELL 예시 · 정책 v1/v2 기대값 · 합성 snapshot/jury/dossier)
+   ├─ contracts/fixtures/*.json     (hell 예시 · 정책 v1/v2 기대값 · 합성 snapshot/jury/dossier)
    └─ tests/contracts/              (거부 케이스 6종 + fixture 로드)
 adapters/fake_llm.py  ─ 역할별 고정 출력 + 장애 시나리오(timeout·429·거부·잘림·JSON 오류·강도 1개 실패)
 ports/{llm,backend,memory,jobs,ledger}.py ─ 작업 2~6 이 구현할 인터페이스
@@ -40,7 +40,7 @@ ports/{llm,backend,memory,jobs,ledger}.py ─ 작업 2~6 이 구현할 인터페
 | 3.1 | 프로젝트 골격 — `pyproject.toml`(uv, Python 3.12), `src/geoji_ai/`, 설정·startup validation·로깅·헬스 | High | S |
 | 3.2 | JSON Schema 7종 + 공통 규칙(알 수 없는 필드 거부, 길이·배열 제한, `schema_version=1`) | Critical | M |
 | 3.3 | pydantic 계약 모듈 + 정본 동등성 테스트 + 모델용 strict 스키마 6종 파생 | Critical | S |
-| 3.4 | fixture — 부록 A HELL 예시·정책 v1/v2 기대값, 합성 snapshot·jury·dossier·banter | High | S |
+| 3.4 | fixture — 부록 A hell 예시·정책 v1/v2 기대값, 합성 snapshot·jury·dossier·banter | High | S |
 | 3.5 | `domain/` 4모듈 — `intensity.py`·`lexicon.py`·`attack_angles.py`·`validation.py`(구조 검증) | High | S |
 | 3.6 | ports 5종 + `fake_llm.py` | Critical | S |
 
@@ -84,18 +84,18 @@ ports/{llm,backend,memory,jobs,ledger}.py ─ 작업 2~6 이 구현할 인터페
 
 | 스키마 | 최상위 | 핵심 필드 · 제약 |
 |---|---|---|
-| `case-snapshot-v1` | `CaseSnapshot` | `post_id`, `author_id`, `post_version ≥ 1`, `reason ≤ 200 code points`, `amount_krw > 0`, `category`, `post_type ∈ SPENT|DEBATING`, `created_at`, `audience{room_ids unique[], audience_version, public_share_enabled}`, `privacy_versions[{scope_key, epoch}]`, `room_snapshots[{room_id, intensity, rule_version}]`, `intake_result | null`, `jury: JurySnapshot | null` |
-| (내포) `JurySnapshot` | | `verdict_id`, `verdict_version ≥ 1`, `result ∈ GUILTY|NOT_GUILTY|APPROVED|REJECTED`, `vote_counts map<string,int≥0>`, `guilty_ratio`, `confirmed_at`, `deadline_at`, `policy{version, allowed_sentences[{code, rank}], fallback_sentence, reason_required}`, `target_intensities unique[]`, `default_intensity`. **`DISMISSED` 는 여기 없다** — 각하는 선고 작업 자체를 만들지 않는다 |
-| `sentencing-v1` | `SentencingDecision` | `sentence`(허용 목록과 **동적** 대조 — 스키마는 문자열, 코드가 검사), `sentencing_reason ≤ 100 | null`, `evidence_labels[]`, `aggravating[]`, `mitigating[]` |
+| `case-snapshot-v1` | `CaseSnapshot` | `post_id`, `author_id`, `post_version ≥ 1`, `reason ≤ 200 code points`, `amount_krw > 0`, `category`, `post_type ∈ spent|considering`, `created_at`, `audience{room_ids unique[], audience_version, public_share_enabled}`, `privacy_versions[{scope_key, epoch}]`, `room_snapshots[{room_id, intensity, rule_version}]`, `intake_result | null`, `jury: JurySnapshot | null` |
+| (내포) `JurySnapshot` | | `verdict_id`, `verdict_version ≥ 1`, `result ∈ guilty|notGuilty|agree|disagree`, `vote_counts map<string,int≥0>`, `guilty_ratio`, `confirmed_at`, `deadline_at`, `policy{version, allowed_sentences[{code, rank}], fallback_sentence, reason_required}`, `target_intensities unique[]`, `default_intensity`. **`dismissed` 는 여기 없다** — 각하는 선고 작업 자체를 만들지 않는다 |
+| `sentencing-v1` | `SentencingDecision` | `sentence`(코드 `probation|oneDay|life`, 허용 목록과 **동적** 대조 — 스키마는 문자열, 코드가 검사), `sentencing_reason ≤ 100 | null`, `evidence_labels[]`, `aggravating[]`, `mitigating[]` |
 | `writer-draft-v1` | `WriterDraft` | `texts: TextDraft[]`(`target_intensities` 와 정확히 일치, 중복 금지), `meme_tag`, `meme_hints{emotion, keywords[]} | null` |
-| (내포) `TextDraft` | | `intensity ∈ MILD|SPICY|HELL`, `headline ≤ 30`, `statement[{text, kind ∈ fact|claim|opinion, evidence_labels[]}]`(2~4문장, 합산 ≤ 200), `banter_strategy`(전략 8종), `selected_candidate_id: UUID | null`, `attack_angle`(서버 지정 6종) |
+| (내포) `TextDraft` | | `intensity ∈ mild|spicy|hell`, `headline ≤ 30`, `statement[{text, kind ∈ fact|claim|opinion, evidence_labels[]}]`(2~4문장, 합산 ≤ 200), `banter_strategy`(전략 8종), `selected_candidate_id: UUID | null`, `attack_angle`(서버 지정 6종) |
 | `evaluation-v1` | `EvaluationReport` | `policy_version ∈ guardrail-v1|guardrail-v2`, `sentence_check{pass, violations[]}`, `sentencing_reason_check{pass, violations[]}`, `texts[{intensity, pass, violations[], problem_sentences[]}]`. `Violation{code, path, evidence_labels[], explanation ≤ 300}` |
 | (enum) `Violation.code` | | `PERSONAL_ATTACK` `IDENTITY_DEGRADATION` `SELF_HARM_LEXICON` `UNGROUNDED_CLAIM` `VERDICT_CONTRADICTION` `INJECTION_FOLLOWED` `UNSAFE_CONTENT` `INTENSITY_MISMATCH` `PROFANITY_OUT_OF_LIST` `SENTENCE_REASON_MISMATCH` `SCHEMA_INVALID` |
 | `finalize-v1` | `FinalizeRequest` | `schema_version`, `job_id`, `generation_id`, `verdict_version`, `expected_text_version`, `dossier_id`, `privacy_versions[]`, `draft_hash`(canonical draft sha256), `sentencing | null`, `draft: WriterDraft`, `evaluation: EvaluationReport`, `evaluation_draft_hash`, `prompt_bundle_version`, `guardrail_policy_version`, `model_ids{sentencing, writer, evaluator}` |
 | `intake-v1` | `IntakeRequest` / `IntakeResult` | 요청 `submission_id`, `payload_hash`, `mode ∈ INITIAL|FINAL_CHECK`, `post_type`, `amount_krw`, `category`, `reason`. 결과 `status ∈ PASS|NEEDS_CLARIFICATION|BLOCKED`, `missing_information[] ∈ WHAT|WHY|CONTEXT`, `message ≤ 60`, `category_review{status ∈ OK|MISMATCH, suggested_category | null, confidence 0..1}`, `injection_detected`, `intake_source ∈ AI|FALLBACK`. **`FINAL_CHECK` 는 `NEEDS_CLARIFICATION` 을 낼 수 없다**(스키마 `if/then`) |
 | `verdict-view-v1` | `VerdictView` | `post_id`, `jury_status`, `sentence_status ∈ PENDING|FINAL`, `text_status ∈ PENDING|GENERATING|TEMPLATE_READY|AI_READY`, `text_version ≥ 0`, `view | null {intensity, headline, statement(문장 배열), sentence, sentence_label, sentencing_reason | null, source ∈ AI|TEMPLATE, meme{tag, image_id, image_url}}`, `poll_after_ms` |
 
-전략 8종: `CHEAPER_ALTERNATIVE` `FREE_ALTERNATIVE` `DIY_REPLACEMENT` `PREMISE_REJECTION` `EXCUSE_STRIPPING` `NECESSITY_APPROVAL` `REPEAT_OFFENSE` `ROOM_RULE_CALLBACK`. 짤 태그 5종: `GUILTY_HEAVY` `GUILTY_LIGHT` `NOT_GUILTY` `APPROVED` `REJECTED`. 공격 각도 6종: `CONVERSION`(환산) `REPETITION`(반복) `EXCUSE_DISSECTION`(변명 해부) `FUTURE_PROPHECY`(미래 예언) `RULE_PERSONIFICATION`(규칙 의인화) `ALTERNATIVE_MOCKERY`(대안 조롱).
+전략 8종: `CHEAPER_ALTERNATIVE` `FREE_ALTERNATIVE` `DIY_REPLACEMENT` `PREMISE_REJECTION` `EXCUSE_STRIPPING` `NECESSITY_APPROVAL` `REPEAT_OFFENSE` `ROOM_RULE_CALLBACK`. 짤 태그 5종: `GUILTY_HEAVY` `GUILTY_LIGHT` `NOT_GUILTY` `APPROVED` `REJECTED`(기획서 값 그대로 — 평결 enum 과 별개, 대문자 유지). 공격 각도 6종: `CONVERSION`(환산) `REPETITION`(반복) `EXCUSE_DISSECTION`(변명 해부) `FUTURE_PROPHECY`(미래 예언) `RULE_PERSONIFICATION`(규칙 의인화) `ALTERNATIVE_MOCKERY`(대안 조롱).
 
 ### 3.3 모델용 strict 스키마 6종 (`contracts/llm_schemas.py`, 계약에서 파생)
 | 역할 | 파생 원본 | 차이 |
@@ -112,11 +112,11 @@ strict 규칙: 모든 키 `required`, `additionalProperties=false`. enum 주입 
 ### 3.4 fixture (`contracts/fixtures/`, proposal2 부록 A)
 | 파일 | 내용 |
 |---|---|
-| `taxi-hell-input.json` | `{"reason": "늦잠자서 출근할 때 택시 탐 9200", "amount_krw": 9200, "intensity": "HELL"}` |
-| `taxi-hell-requested-output.json` | 사용자 지정 HELL 문구 **원문 그대로 보존**(부록 A.2). 평결·형량·과거 이력을 추가하지 않는다 |
+| `taxi-hell-input.json` | `{"reason": "늦잠자서 출근할 때 택시 탐 9200", "amount_krw": 9200, "intensity": "hell"}` |
+| `taxi-hell-requested-output.json` | 사용자 지정 hell 문구 **원문 그대로 보존**(부록 A.2). 평결·형량·과거 이력을 추가하지 않는다 |
 | `taxi-hell-expected-evaluation.guardrail-v1.json` | `pass=false`, `PERSONAL_ATTACK` 1건(`texts[0].statement[0].text`) |
 | `taxi-hell-expected-evaluation.guardrail-v2.json` | `pass=true`, 위반 0. **단 `PROFANITY_OUT_OF_LIST` 여부는 비속어 허용 목록 확정 전까지 열어 둔다**(fixture 에 `open_questions` 필드) |
-| `case-snapshot-taxi.json` · `jury-guilty-75.json` · `jury-rejected.json` · `jury-not-guilty.json` | 합성 백엔드 fixture. 택시 12,000원·`policy.allowed_sentences=[SUSPENDED#1, DAYS_1#2]`·`fallback_sentence=DAYS_1` 등 |
+| `case-snapshot-taxi.json` · `jury-guilty-75.json` · `jury-rejected.json` · `jury-not-guilty.json` | 합성 백엔드 fixture. 택시 12,000원·`policy.allowed_sentences=[probation#1, oneDay#2]`·`fallback_sentence=oneDay` 등 |
 | `dossier-taxi.json` | `scripts/probe_writer_latency.py:71-103` 의 `CASE.dossier`(F0~F6) + `label_map` |
 | `banter-taxi.json` | 같은 스크립트의 후보 4개 + UUID |
 | `templates-v1.json` | 결과별 사전 검수 템플릿(headline·statement·sentencing_reason 치환문) — **백엔드 watchdog 과 공유**(`10-backend-contract.md` §10) |
@@ -124,7 +124,7 @@ strict 규칙: 모든 키 `required`, `additionalProperties=false`. enum 주입 
 ### 3.5 domain 4모듈
 | 모듈 | 내용 |
 |---|---|
-| `intensity.py` | `Intensity` enum ↔ 표시명(순한맛·매운맛·지옥맛) 매핑 **단일 지점**(D-21). 다른 곳에서 한글 문자열을 쓰지 않는다 |
+| `intensity.py` | `Intensity` enum(`mild`·`spicy`·`hell`, 9/8 확정 프론트 값) ↔ 표시명(순한맛·매운맛·지옥맛) 매핑 **단일 지점**(D-21). 다른 곳에서 한글 문자열을 쓰지 않는다 |
 | `lexicon.py` | `DEATH_WORDS`(자살·자해·죽어·죽고 싶·죽여·뒤져·뒤지·목을 매·손목·극단적 선택), `PROFANITY`(순한맛·매운맛 0개 검사용 — 미친·미쳤·돌았·지랄·새끼·처먹·처타·처박·처발·개같·개무시·씨발·씨빨·ㅅㅂ·병신·ㅂㅅ·존나·ㅈㄴ·좆·꺼져·닥쳐·또라이·등신·멍청), `HELL_ALLOWED_PROFANITY`(미친·돌았냐·정신 나갔냐·실화냐·어이없네·개같은 선택·지랄·꼴·처타다·헛소리·레전드·새끼), `HELL_ONCE_PER_VERDICT`(새끼·ㅋㅋ), `WORN_PHRASES`(정신 차리십시오 등), `ID_IN_TEXT = r"\bF\d+"`. 강도별 적용 표를 함수로(`applies(intensity, rule)`) |
 | `attack_angles.py` | 6종 + 마무리 방식 문장(스크립트 `:235-242`). `pick(post_id, offset) = crc32(post_id) % 6 + offset`. 모델이 고르지 않는다 |
 | `validation.py` (구조) | `validate_writer_draft(draft, target_intensities, label_map)`: 강도 집합 정확히 일치·중복 없음·길이·라벨 ∈ `label_map`·문장 수 2~4·`kind` enum. `validate_evaluation(report, intensities, policy_version)`: 강도 완전성·검사 필드 완전성·`pass` 불리언·정책 버전 일치. **`false`·누락·파싱 실패는 모두 검수 실패**(proposal2 §5.3 ⑥) |
@@ -175,7 +175,7 @@ class LedgerPort(Protocol):
     async def get_node_result(self, request_hash, versions) -> dict | None
     async def put_node_result(self, call_id, request_hash, versions, output, expires_at) -> None
 ```
-`adapters/fake_llm.py`: 역할별 고정 출력을 fixture 에서 읽고, `FakeScenario` 로 지연·오류(`TIMEOUT`·`RATE_LIMIT`·`REFUSAL`·`max_tokens` 잘림·JSON 파싱 실패·스키마 불일치)·**강도별 실패**(서기 `HELL` 만 실패)·검수관 위반 코드를 주입한다. 호출 기록(`calls[]`)을 남겨 테스트가 호출 횟수·순서를 단언한다.
+`adapters/fake_llm.py`: 역할별 고정 출력을 fixture 에서 읽고, `FakeScenario` 로 지연·오류(`TIMEOUT`·`RATE_LIMIT`·`REFUSAL`·`max_tokens` 잘림·JSON 파싱 실패·스키마 불일치)·**강도별 실패**(서기 `hell` 만 실패)·검수관 위반 코드를 주입한다. 호출 기록(`calls[]`)을 남겨 테스트가 호출 횟수·순서를 단언한다.
 
 ### 3.7 설정 (`core/config.py`, proposal2 §14.1·§19)
 | 필드 | 초기값 | 비고 |
@@ -194,7 +194,7 @@ class LedgerPort(Protocol):
 | `MODEL_CONCURRENCY_LIMIT` | 8 | D-22 |
 | `MAX_TOTAL_PROMPT_TOKENS` · `WRITER_MAX_PROMPT_TOKENS` | 6000 · 8000 | |
 | 출력 토큰 상한 | intake 300 · context 700 · banter 1200 · sentencing 400 · writer 700/강도 · evaluator 800 | 잘리면 스키마 실패로 처리하고 사용량 기록 |
-| 기능 플래그 | `ROOM_COMMENT_STYLE_ENABLED=false` · `PUBLIC_HISTORY_CALLBACK_ENABLED=false` · `REFLECT_ENABLED=false` · `HINDSIGHT_ENABLED=false` | HELL 을 끄는 플래그는 없다 — 정책 버전으로 통제 |
+| 기능 플래그 | `ROOM_COMMENT_STYLE_ENABLED=false` · `PUBLIC_HISTORY_CALLBACK_ENABLED=false` · `REFLECT_ENABLED=false` · `HINDSIGHT_ENABLED=false` | hell 을 끄는 플래그는 없다 — 정책 버전으로 통제 |
 | `WORKER_SLOTS` | `SENTENCE=2, PREPARE=1, BACKGROUND=1` | 작업 2 |
 
 `startup.validate()`(production): 정책 없는 형량 fallback → 오류, 추론 모델 설정 → 오류, 키 누락 → `/health/ready` 503.
@@ -204,28 +204,28 @@ class LedgerPort(Protocol):
 ### 4.1 정량 목표
 | 지표 | 목표 | 측정 |
 |---|---|---|
-| 거부 케이스 | 6종(알 수 없는 필드·HELL 누락·강도 중복·없는 라벨·Report 누락·정책 버전 불일치) 전부 거부 | `tests/contracts/test_reject_cases.py` |
+| 거부 케이스 | 6종(알 수 없는 필드·hell 누락·강도 중복·없는 라벨·Report 누락·정책 버전 불일치) 전부 거부 | `tests/contracts/test_reject_cases.py` |
 | 정본 동등성 | pydantic 모델이 생성한 JSON Schema 와 `contracts/*.schema.json` 의 `required`·enum·길이 제약 동일 | `test_pydantic_equivalence.py` |
-| fixture | 12개 로드·검증 통과, HELL 원문 바이트 동일 | `test_fixtures.py` |
+| fixture | 12개 로드·검증 통과, hell 원문 바이트 동일 | `test_fixtures.py` |
 | fake provider | 시나리오 8종(정상·timeout·429·거부·잘림·파싱·스키마·강도 1개 실패) 재현 | `test_fake_llm.py` |
 | startup | production + 정책 누락 → 기동 실패, `grok-4.6` 서기 → 기동 실패 | `test_startup.py` |
 
 ### 4.2 검증 테스트 시나리오
 - **`tests/contracts/test_reject_cases.py`**
-  - [ ] `WriterDraft` 에 `foo` 필드 → 거부 / `texts` 에 `HELL` 누락(target 3개) → 거부 / `SPICY` 2개 → 거부
+  - [ ] `WriterDraft` 에 `foo` 필드 → 거부 / `texts` 에 `hell` 누락(target 3개) → 거부 / `spicy` 2개 → 거부
   - [ ] `statement[].evidence_labels=["F9"]`, `label_map` 에 F0~F6 → 거부(`validation.validate_writer_draft`)
   - [ ] `EvaluationReport.texts` 에 강도 하나 빠짐 / `sentence_check` 누락 / `pass="yes"` → 거부
   - [ ] `FinalizeRequest.guardrail_policy_version="guardrail-v1"` 인데 설정 `v2` → 거부
   - [ ] `IntakeResult(mode=FINAL_CHECK, status=NEEDS_CLARIFICATION)` → 거부
 - **`tests/unit/test_attack_angles.py`**: 같은 `post_id` → 같은 각도, offset +1 → 다음 각도, 6종 순환
-- **`tests/unit/test_lexicon.py`**: 강도별 적용 표(`SPICY` 에 `PROFANITY` 검사 on, `HELL` 은 허용 목록 검사), `ID_IN_TEXT` 매칭
+- **`tests/unit/test_lexicon.py`**: 강도별 적용 표(`spicy` 에 `PROFANITY` 검사 on, `hell` 은 허용 목록 검사), `ID_IN_TEXT` 매칭
 - **`tests/unit/test_intensity.py`**: enum ↔ 표시명 왕복, 알 수 없는 값 거부
 - **`tests/unit/test_fake_llm.py`**: 시나리오 8종 + `calls[]` 기록
 
 ### 4.3 동작 확인 가이드 (수동)
 ```bash
 uv sync && uv run pytest tests/contracts tests/unit -q
-uv run python -c "from geoji_ai.contracts.llm_schemas import writer_schema; import json; print(json.dumps(writer_schema(['SPICY'], ['CONVERSION']), ensure_ascii=False)[:400])"
+uv run python -c "from geoji_ai.contracts.llm_schemas import writer_schema; import json; print(json.dumps(writer_schema(['spicy'], ['CONVERSION']), ensure_ascii=False)[:400])"
 uv run uvicorn geoji_ai.api.app:app --port 8100 & curl -s localhost:8100/health/live
 ```
 
@@ -245,7 +245,7 @@ uv run uvicorn geoji_ai.api.app:app --port 8100 & curl -s localhost:8100/health/
 | CT-04 | fixture 12개 | 부록 A 4개 + 합성 8개 + `templates-v1.json` | contract | 0.25d | CT-02 |
 | CT-05 | domain 4모듈 | intensity·lexicon·attack_angles·validation(구조) + 테스트 | domain | 0.5d | CT-03 |
 | CT-06 | ports·fake provider | Protocol 5종, `fake_llm.py` 시나리오 8종 | ports | 0.5d | CT-03 |
-| CT-07 | 백엔드 회신 반영 | D-20·D-21·enum 매핑·CaseSnapshot 필드 회신을 계약에 반영, `schema_version` 유지 | contract | 0.25d | 백엔드 9/9 |
+| CT-07 | 백엔드 회신 반영 | ~~D-20·D-21·enum 매핑~~(9/8 완료 — 이 문서의 enum 을 프론트 값으로 치환) · CaseSnapshot 필드 회신을 계약에 반영, `schema_version` 유지 | contract | 0.25d | 백엔드 9/9 |
 
 **CT-01** — [ ] `uv init`·의존성 / [ ] `config.py` §3.7 / [ ] `startup.validate` 3검사 / [ ] structlog + `trace_id` / [ ] `/health/live`
 **CT-02** — [ ] 7 파일 / [ ] `additionalProperties:false`·길이·enum / [ ] `IntakeResult` `if/then` / [ ] 거부 케이스 6종 테스트

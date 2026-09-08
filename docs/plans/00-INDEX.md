@@ -48,7 +48,7 @@
 | 18 | 프롬프트 5종 파일·강도 분리·번들 버전 | High | 단기 | S | 05 | — |
 | 19 | 벤더 어댑터 완성·오류 분류·벤더 장애 분리 | Critical | M3 | M | 06 | #8 |
 | 20 | 예산·원장(`llm_calls`·`case_budgets`·UNKNOWN)·`node_results` 재사용 | Critical | M3 | M | 06 | #10 |
-| 21 | 서기 v6(순한맛·`DEBATING`)·5종 튜닝 | Critical | M3 | M | 06 | #18 |
+| 21 | 서기 v6(순한맛·`considering`)·5종 튜닝 | Critical | M3 | M | 06 | #18 |
 | 22 | 골든셋 50 + 회귀 평가기 + judge + 정책 v1/v2 | Critical | M3 | M | 06 | #19 |
 | 23 | 강도 3종 × 50건 사람 검수 + **D-07 비준** | Critical | M3 | S(+팀 2일) | 06 | #21, #22 |
 | 24 | 검수관 재현율 → `MODEL_EVALUATOR_HELL` | High | M3 | S | 06 | #22 |
@@ -258,7 +258,7 @@ flowchart LR
 | §19 경로 | `services/ai/…` | 이 저장소 루트 = `services/ai/`. 모노레포가 아니면 접두 없이 | 01 |
 | §17 짤 "서버가 고른다" | 주체 모호 | **백엔드 finalize** 10 단계에서 | 08, 10 §11 |
 | §7.4 UNKNOWN | "예약액을 바로 환급하지 않는다" 만 | 24h 뒤 보수적 확정 sweep 신설 | 06, 08 §3.2 |
-| §6.2 `DISMISSED` | 각하는 job 없음 | §3 규약에 명시 + 시나리오 B 는 `REJECTED` | 05, 10 §3 |
+| §6.2 `dismissed` | 각하는 job 없음 | §3 규약에 명시 + 시나리오 B 는 `disagree` | 05, 10 §3 |
 
 ### 8.4 실행 전 결정이 필요한 사항 (팀 · 제품 오너 · 백엔드)
 - [x] **D-20 공유 Postgres** — 9/8 확정: Supabase 인스턴스 공유(10 §15.2). 서버에 재판 흐름 없음 → 10 §2~§9 전부 신규

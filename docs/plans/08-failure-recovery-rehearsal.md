@@ -95,13 +95,13 @@
 | 시나리오 | 절차 | 확인 | 목표 |
 |---|---|---|---|
 | A 사유 심문 | "그냥" 등록 → 바텀시트 → 보완(`FINAL_CHECK`) → 등록 | 질문 1문장·1회, 중복 post 없음, PREPARE job 1개 | intake ≤ 2.5초 |
-| B 거지방식 판결 | 30분 방, 3명 투표 **`REJECTED`(부결)** → 판결 화면 → 공유 카드 | 양형 0호출·서기+검수, `texts` 방 강도 행, 짤 선택, 카드 `PUBLIC` 근거만 | 마지막 표 → 첫 저장 ≤ 6초 |
+| B 거지방식 판결 | 30분 방, 3명 투표 **`disagree`(부결)** → 판결 화면 → 공유 카드 | 양형 0호출·서기+검수, `texts` 방 강도 행, 짤 선택, 카드 `PUBLIC` 근거만 | 마지막 표 → 첫 저장 ≤ 6초 |
 | C 개인화 | 스타벅스 3번째 → 판결 → trace 화면 | `PRIOR`·반복 AGGREGATE 라벨 인용, recall 출처 표시 | ≤ 8초 |
 | 장애 1 xAI | `XAI_API_KEY` 무효 → 유죄 | 형량 AI 정상, 문구 TEMPLATE, `VENDOR_UNAVAILABLE`, round1 예약 | ≤ 10초 |
 | 장애 2 OpenAI | `OPENAI_API_KEY` 무효 | 양형 RULE, 문구 TEMPLATE(검수 불가) | ≤ 10초 |
 | 예산 초과 | `WRITER_NODE_TIMEOUT_SECONDS=0.1` | `DEADLINE_EXCEEDED`/TEMPLATE, 응답 ≤ deadline+0.5s | |
 | 삭제 | 판결 뒤 게시물 삭제 | 조회 즉시 차단·템플릿, retry 저장 0, `invalidated_evidence_total` +1 | 즉시 |
-- 시나리오 B 는 `DISMISSED`(정족수 미달)가 아니라 `REJECTED`(부결)다(proposal2 §3 #9)
+- 시나리오 B 는 `dismissed`(정족수 미달)가 아니라 `disagree`(부결)다(proposal2 §3 #9)
 
 ### 3.6 runbook · 동결 (`docs/runbook.md`)
 - 키·결제 잔액, 심사 14일 × 일 200건 × 40원 ≈ 11만 원 여유. 비용 경고 초과 시 `IMMEDIATE_REPAIR_MAX=0`·`TEXT_RETRY_ROUNDS=1` 로 낮춘다

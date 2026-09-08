@@ -39,7 +39,7 @@ Frontend ──▶ Main Backend ── 내부 HTTP ──▶ AI API (FastAPI)  :
 - **워커는 업무 테이블을 직접 쓰지 않는다.** 최종 저장 권한은 백엔드 내부 API 에만 있다(결정 17)
 - role 분리: `ai_api`(심문용 최소 권한 — DB 는 `ai.case_budgets`·`ai.llm_calls` 쓰기만), `ai_worker`(`ai` 스키마 읽기·쓰기, 단 `jobs` INSERT 불가), `backend`(업무 테이블 전부 + `ai.jobs` INSERT/UPDATE + `ai.privacy_epochs`·`ai.verdict_commit_records`·`ai.text_evidence_refs` 쓰기 + 무효화 SQL 대상 `ai.evidence`·`ai.dossiers`·`ai.trial_prep`·`ai.memory_facts`·`ai.node_results` UPDATE)
 - 내부 API 인증: `Authorization: Bearer <SERVICE_AUTH_TOKEN>`. 요청에 `X-Trace-Id`·`X-Request-Id`·`X-Job-Id`·`X-Generation-Id`. 로그에 토큰 금지. **외부 사용자가 임의 `user_id`·`room_id` 로 조회하는 엔드포인트로 노출하지 않는다**
-- 공통 규칙(§6.1): ID 는 문자열(신규 AI 테이블 UUID, 기존 업무 ID 는 opaque text). 금액 `amount_krw` 양의 정수. 시각 RFC3339 UTC(`timestamptz`), 화면에서만 KST. 알 수 없는 필드 거부, `schema_version=1`. enum 은 **프론트 값이 표준**(9/8 확정, §15.2 D-21): 강도 `mild|spicy|hell`, 평결 `guilty|notGuilty|agree|disagree|dismissed`, 게시물 `spent|considering`, 형량 `probation|oneDay|life`. 이 문서의 다른 절에 남은 대문자 표기(`MILD`·`GUILTY`·`SPENT` 등)는 CT-07 에서 일괄 치환
+- 공통 규칙(§6.1): ID 는 문자열(신규 AI 테이블 UUID, 기존 업무 ID 는 opaque text). 금액 `amount_krw` 양의 정수. 시각 RFC3339 UTC(`timestamptz`), 화면에서만 KST. 알 수 없는 필드 거부, `schema_version=1`. enum 은 **프론트 값이 표준**(9/8 확정, §15.2 D-21): 강도 `mild|spicy|hell`, 평결 `guilty|notGuilty|agree|disagree|dismissed`, 게시물 `spent|considering`, 형량 `probation|oneDay|life`. 이 문서의 enum 표기도 9/8 CT-07 에서 프론트 값으로 치환 완료(짤 태그 `GUILTY_HEAVY` 등 5종만 기획서 대문자 유지)
 
 ## 2. DB (proposal2 §7.1)
 
@@ -66,7 +66,7 @@ Frontend ──▶ Main Backend ── 내부 HTTP ──▶ AI API (FastAPI)  :
 
 | 업무 트랜잭션 | kind / event_type | dedupe_key | priority | max_attempts | deadline_at | payload |
 |---|---|---|---:|---:|---|---|
-| 게시물 저장(`SPENT`·`DEBATING` 만, `NO_SPEND` 제외) | `PREPARE` / `post.created` | `prepare:{post_id}:{post_version}:{audience_version}` | 30 | 2 | null | `{post_id, post_version, audience_version}` |
+| 게시물 저장(`spent`·`considering` 만, `NO_SPEND` 제외) | `PREPARE` / `post.created` | `prepare:{post_id}:{post_version}:{audience_version}` | 30 | 2 | null | `{post_id, post_version, audience_version}` |
 | 배심원 평결 확정(전원 투표 즉시 or 마감 스캔) | `SENTENCE` / `verdict.confirmed` | `sentence:{verdict_id}:{verdict_version}` | 100 | 2 | `confirmed_at + 10s` | `{verdict_id, verdict_version, post_id}` |
 | 판결 최초 저장(finalize 또는 watchdog) | `RETAIN` / `sentence.finalized` | `retain:verdict:{verdict_id}:{verdict_version}` | 10 | 5 | null | `{event:"sentence.finalized", verdict_id, verdict_version}` |
 | 템플릿 저장·재시도 필요 | `TEXT_RETRY` / `verdict.text_retry` | `text-retry:{verdict_id}:{verdict_version}:{round}` | 50 | 1 | round 시작 + 20s | `{verdict_id, verdict_version, round, intensities[]}` |
@@ -80,7 +80,7 @@ VALUES (gen_random_uuid(), gen_random_uuid(), 'verdict.confirmed', 'SENTENCE', '
 ON CONFLICT (dedupe_key) DO NOTHING;   -- 같은 업무 트랜잭션 안. commit 뒤 워커가 250ms 안에 집는다
 ```
 - `payload` 에는 **참조(ID·version)만.** 사유·댓글을 작업마다 복제하지 않는다
-- `DISMISSED`(정족수 미달 각하)는 **선고 작업을 만들지 않는다.** `REJECTED`(살까 말까 부결)는 만든다 — 양형관만 건너뛴다
+- `dismissed`(정족수 미달 각하)는 **선고 작업을 만들지 않는다.** `disagree`(살까 말까 부결)는 만든다 — 양형관만 건너뛴다
 - 허용 목록이 비었거나 `fallback_sentence` 가 목록에 없으면 **선고 작업을 만들지 않고** 정책 설정 오류를 알린다(§5.3). 생산 환경에 임의 형량의 묵시적 기본값은 없다
 
 ## 4. 내부 API (proposal2 §9.2, 서비스 인증 필수)
