@@ -7,5 +7,5 @@ __pycache__/
 assets/
 
 #
-docs/
+docs/*
 !docs/plans/
