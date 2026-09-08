@@ -45,11 +45,11 @@
 | 백엔드 | watchdog(250ms)·round 예약(5/10/20분)·`TEXT_RETRY` payload `intensities[]`·무효화 스케줄러 완성(10 §6·§7·§8) | 9/16 |
 | 백엔드 | 짤 점수 선택을 finalize 에서(10 §11): `meme_images` 메타 컬럼, 최근 노출 감점, `meme_image_id` 고정, 후보 없으면 결과별 기본 이미지 | 9/17 |
 | 백엔드 | 시드(10 §12): 방 3·사용자 4·게시물 12·댓글 20, 판결 10건은 **실제 파이프라인 통과**(≈ 250원). 데모 C 사용자의 스타벅스 2건 `post_id` 를 우리 시드에 전달 | 9/17 |
-| 백엔드 | 우리 `/health/live` 를 5분 헬스체크에, 알림 채널 연결 | 9/18 |
+| 백엔드 | 우리 `/health/live` 를 5분 헬스체크에, 디스코드 웹훅 URL 공유(같은 채널에 백엔드 헬스체크 알림도) | 9/18 |
 | 프론트 | 결과별 기본 짤 5장, `view=null` 대기 메시지, 템플릿 노출 후 30초 폴링·재진입 갱신 | 9/18 |
 
 ### 팀 결정 대기
-- 알림 채널·비용 경고 임계(초안 일 5,000원), LangSmith(P1), 짤 제작 담당·수량(10~15), 감정 어휘 6종 확정
+- 짤 제작 담당·수량(10~15). LangSmith 는 P1. (9/8 확정: 알림 = 디스코드 웹훅 `ALERT_DISCORD_WEBHOOK_URL`, 비용 경고 일 5,000원, 감정 어휘 6종 = §3.4 초안 그대로)
 
 ## 3. 기술 상세 설계 (Technical Design)
 
@@ -81,11 +81,11 @@
 | `evaluation_failure_total` | code | 정책 위반·근거 오류·강도 문제 |
 | `case_cost_micro_usd`, `unknown_calls` | vendor | 실지출·과금 불확실 |
 | `invalidated_evidence_total` | — | 삭제·공유 변경 후 오래된 입력 사용 시도 |
-- 알림 초기안(백엔드 채널로): 5분간 queue oldest age 목표 초과 / 재시도 소진 / finalize DB 오류 / 구조적 형량 규칙 위반 저장 시도. **보정 가능한 오류 1건마다 알림을 보내지 않는다.** 비용 경고 일 5,000원(초안)
+- 알림(9/8 확정: **디스코드 웹훅**, `ALERT_DISCORD_WEBHOOK_URL`): 5분간 queue oldest age 목표 초과 / 재시도 소진 / finalize DB 오류 / 구조적 형량 규칙 위반 저장 시도. **보정 가능한 오류 1건마다 알림을 보내지 않는다.** 비용 경고 **일 5,000원**(9/8 확정, `COST_ALERT_KRW_PER_DAY=5000`, `GEOJI_EVAL=1` 평가 실행분은 별도 집계)(초안)
 - `GET /internal/v1/metrics/snapshot`(서비스 인증) — 지표 JSON. 데모 C "관측 화면" 은 백엔드 `GET /posts/{id}/verdict` 의 `view` + 우리 `GET /internal/v1/trials/{post_id}/trace`(dossier 라벨·recall 출처·노드 타임라인, 서비스 인증) 를 프론트가 내부 화면에서 보여준다 — 10 §4.5 `(제안)`
 
 ### 3.4 짤 (proposal2 §17, 10 §11)
-- 서기 `meme_hints.emotion` 어휘 enum(01 스키마): `DISAPPROVAL` `ABSURD_SERIOUSNESS` `SMUG` `PITY` `CELEBRATION` `RESIGNATION`. `keywords` ≤ 5
+- 서기 `meme_hints.emotion` 어휘 enum(01 스키마, **9/8 확정**): `DISAPPROVAL`(한심) `ABSURD_SERIOUSNESS`(진지한 헛소리) `SMUG`(득의양양) `PITY`(측은) `CELEBRATION`(축하) `RESIGNATION`(체념). 태그 대응 — 유죄 무거움 DISAPPROVAL/ABSURD_SERIOUSNESS, 유죄 가벼움 PITY/SMUG, 무죄·동의 CELEBRATION, 기각 RESIGNATION. `keywords` ≤ 5
 - 점수 규칙(백엔드 finalize): 태그 필터 → `+3` 전략 일치 · `+2` 감정 일치 · `+1` 키워드 교집합 · `−5` 같은 사용자 최근 노출 5장 → `crc32(post_id+image_id)` tie-break → `meme_image_id` 고정. 후보 0 → 결과별 기본 이미지
 - 우리 몫: 서기 출력의 `meme_tag` 교정(⑤ 4), 힌트 어휘 준수율(골든셋 자동 검사에 추가)
 
