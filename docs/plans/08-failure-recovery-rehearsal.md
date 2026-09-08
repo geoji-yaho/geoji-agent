@@ -94,7 +94,7 @@
 - 리허설 표(3회 반복, 매회 `first_result_latency`·`cost` 기록):
 | 시나리오 | 절차 | 확인 | 목표 |
 |---|---|---|---|
-| A 사유 심문 | "그냥" 등록 → 바텀시트 → 보완(`FINAL_CHECK`) → 등록 | 질문 1문장·1회, 중복 post 없음, PREPARE job 1개 | intake ≤ 2.5초 |
+| A 무엇을 심문 | "감각적 쾌락 추구" 등록 → 솔직 팝업 → 수정(`FINAL_CHECK`) → 등록 | 팝업 1회, 중복 post 없음, PREPARE job 1개 | intake ≤ 2.5초 |
 | B 거지방식 판결 | 30분 방, 3명 투표 **`disagree`(부결)** → 판결 화면 → 공유 카드 | 양형 0호출·서기+검수, `texts` 방 강도 행, 짤 선택, 카드 `PUBLIC` 근거만 | 마지막 표 → 첫 저장 ≤ 6초 |
 | C 개인화 | 스타벅스 3번째 → 판결 → trace 화면 | `PRIOR`·반복 AGGREGATE 라벨 인용, recall 출처 표시 | ≤ 8초 |
 | 장애 1 xAI | `XAI_API_KEY` 무효 → 유죄 | 형량 AI 정상, 문구 TEMPLATE, `VENDOR_UNAVAILABLE`, round1 예약 | ≤ 10초 |

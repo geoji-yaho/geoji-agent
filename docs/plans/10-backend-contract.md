@@ -47,7 +47,7 @@ Frontend ──▶ Main Backend ── 내부 HTTP ──▶ AI API (FastAPI)  :
 
 | 테이블 | 추가 필드·제약 |
 |---|---|
-| `posts` | `version int`, `audience_version int`, `intake_status`(`PASS`/`UNCLARIFIED`), `intake_source`(`AI`/`FALLBACK`), `submission_id UNIQUE`, `deleted_at`. **`reason NOT NULL`** |
+| `posts` | `version int`, `audience_version int`, `intake_status`(`PASS`/`UNCLARIFIED`), `intake_source`(`AI`/`FALLBACK`), `submission_id UNIQUE`, `deleted_at`. **`item text NOT NULL`(무엇을, ≤ 30) · `reason` NULL 허용(≤ 200)** |
 | `verdicts` | `post_id UNIQUE`, `verdict_version int`, `jury_result`, `policy_snapshot jsonb`(`allowed_sentences[{code,rank}]`, `fallback_sentence`, `reason_required`, `version`), `confirmed_at`, `deadline_at` |
 | `verdicts` | `sentence_status`(`PENDING`/`FINAL`), `sentence`, `sentence_source`(`AI`/`RULE`), `sentencing_reason`, `reason_source`(`AI`/`TEMPLATE`) |
 | `verdicts` | `text_status`(`PENDING`/`GENERATING`/`TEMPLATE_READY`/`AI_READY`), `text_version bigint DEFAULT 0`, `active_generation_id uuid NULL`, `active_job_id uuid NULL` |
@@ -87,7 +87,7 @@ ON CONFLICT (dedupe_key) DO NOTHING;   -- 같은 업무 트랜잭션 안. commit
 
 | API | 소유 | 요청 → 응답 |
 |---|---|---|
-| `POST /internal/v1/intake` | **AI API** | 백엔드가 호출. `{schema_version, submission_id, payload_hash, mode: INITIAL|FINAL_CHECK, post_type, amount_krw, category, reason}` → `IntakeResult{status, missing_information[], message, category_review, injection_detected, intake_source}`. 타임아웃 5초, 실패 = `FALLBACK` 등록 허용 |
+| `POST /internal/v1/intake` | **AI API** | 백엔드가 호출. `{schema_version, submission_id, payload_hash, mode: INITIAL|FINAL_CHECK, post_type, amount_krw, category, item, reason}` → `IntakeResult{status, item_review{status, suggested_item}, message, category_review, injection_detected, intake_source}`. 타임아웃 5초, 실패 = `FALLBACK` 등록 허용 |
 | `GET /internal/v1/ai-jobs/{job_id}/snapshot` | 백엔드 | §4.1 |
 | `POST /internal/v1/ai-jobs/{job_id}/resolve-evidence` | 백엔드 | §4.2 |
 | `POST /internal/v1/verdicts/{id}/begin-generation` | 백엔드 | §4.3 |
@@ -96,7 +96,7 @@ ON CONFLICT (dedupe_key) DO NOTHING;   -- 같은 업무 트랜잭션 안. commit
 
 ### 4.1 snapshot
 - 검증: job 존재 ∧ `RUNNING` ∧ 헤더 `X-Generation-Id` 일치 ∧ lease 유효. 아니면 409
-- 응답 `CaseSnapshot`(01 §3.2): `post{id, author_id, post_version, reason, amount_krw, category, post_type, created_at}`, `audience{room_ids, audience_version, public_share_enabled}`, `privacy_versions[{scope_key, epoch}]`(관련 scope 전부: post·author·각 room), `room_snapshots[{room_id, intensity, rule_version}]`, `intake_result`, `jury`(SENTENCE·TEXT_RETRY 일 때: `verdict_id, verdict_version, result, vote_counts, guilty_ratio, confirmed_at, deadline_at, policy{…}, target_intensities, default_intensity`)
+- 응답 `CaseSnapshot`(01 §3.2): `post{id, author_id, post_version, item, reason, amount_krw, category, post_type, created_at}`, `audience{room_ids, audience_version, public_share_enabled}`, `privacy_versions[{scope_key, epoch}]`(관련 scope 전부: post·author·각 room), `room_snapshots[{room_id, intensity, rule_version}]`, `intake_result`, `jury`(SENTENCE·TEXT_RETRY 일 때: `verdict_id, verdict_version, result, vote_counts, guilty_ratio, confirmed_at, deadline_at, policy{…}, target_intensities, default_intensity`)
 - **`(제안)` RETAIN job 확장**: `sentence.finalized` 면 `verdict_final{sentence, sentence_source, sentencing_reason, reason_source, applied_intensity, banter_strategy}`, `comment.approved` 면 `comment{comment_id, version, room_id, post_id, post_status, author_id, content, created_at}`. 삭제된 원본이면 404 — 워커는 skip
 
 ### 4.2 resolve-evidence
@@ -187,12 +187,12 @@ COMMIT
 
 | API | 요청·응답 | 오류 |
 |---|---|---|
-| `POST /post-submissions` | 사유·금액·종류·카테고리·공유 방 → `{submission_id, status, intake_result}` 또는 `post_id`. 내부에서 `/internal/v1/intake(mode=INITIAL)` | 400 입력, 401, 403 공유 권한, 429 |
+| `POST /post-submissions` | 무엇을(필수 ≤ 30)·사유(선택 ≤ 200)·금액·종류·카테고리·공유 방 → `{submission_id, status, intake_result}` 또는 `post_id`. 내부에서 `/internal/v1/intake(mode=INITIAL)` | 400 입력, 401, 403 공유 권한, 429 |
 | `POST /post-submissions/{id}/complete` | `{action: REVISE|PROCEED, 최종 값, revision}`. `REVISE` 는 `/internal/v1/intake(mode=FINAL_CHECK)` 1회. **`BLOCKED` 를 `PROCEED` 로 우회 불가(409).** 중복 완료는 기존 post 반환 | 409 만료·버전 충돌·차단 |
 | `GET /posts/{id}/verdict?room_id=` | `verdict-view-v1`: `jury_status, sentence_status, text_status, text_version, view|null, poll_after_ms`. 방 강도 행, 없으면 `applied_intensity`(최다 투표 방, 동률 방 생성일). 생성 중 200 + `view=null` | 404 없음/권한 없음 |
 | `GET /posts/{id}/share-card` | 공개 허용 문구·이미지 metadata 만. **Evidence 원문·개인 이력 반환 금지.** `PUBLIC` 근거 문구만 | |
 
-- 제출 상태 `NEW → NEEDS_INPUT → COMPLETED`, `BLOCKED`, `EXPIRED`. 최초 `PASS` 는 `NEW → COMPLETED`. `payload_hash` = 정규화된 타입·금액·사유·카테고리·공유 방 목록. 질문은 제출당 1회(`question_shown`)
+- 제출 상태 `NEW → NEEDS_INPUT → COMPLETED`, `BLOCKED`, `EXPIRED`. 최초 `PASS` 는 `NEW → COMPLETED`. `payload_hash` = 정규화된 타입·금액·무엇을·사유·카테고리·공유 방 목록. 질문은 제출당 1회(`question_shown`)
 - **전달 방식은 폴링으로 확정(9/8, §15.2). Realtime · SSE 없음.** 프론트 폴링: 1초 → 15초 뒤 5초, 화면 이탈 시 취소, `AI_READY` 면 즉시 중단, 템플릿 후 30초 또는 재진입. **`text_version` 이 작은 응답으로 UI 를 덮지 않는다.** 빈 화면 대신 대기 메시지
 - `source=TEMPLATE` 이면 AI 판사 라벨·양형 이유 블록 숨김. 지옥맛 방장 확인 문구: "지옥맛은 반말과 욕설, 인격 조롱이 나옵니다. 멤버 전원이 동의했는지 확인해주세요."
 
@@ -262,6 +262,7 @@ COMMIT
 | 연동 | **하이브리드.** 판결(그래프 B·C·retain·TEXT_RETRY)은 `ai.jobs` 큐 + 워커 + finalize(이 문서). 서버 `AiClient` 3종(상·도전·순찰)은 **동기 HTTP** 로 별도 제공 — P0 범위 밖, M3 이후 여유 시 | `AiClient` HTTP 구현은 AI 파트 API 문서가 나온 뒤 | 동기 엔드포인트 3개는 별도 카드(09 P1 후보) |
 | **D-21** | **프론트 값이 API 표준.** 강도 `mild/spicy/hell`, 평결 `guilty/notGuilty/agree/disagree/dismissed`, 게시물 `spent/considering`, 형량 `probation/oneDay/life`. 짤 태그 5종은 기획서 값(`GUILTY_HEAVY`…) 유지 | `rooms.spice_level` enum 을 `mild/spicy/hell` 로 변경(`hot→spicy`, `direct→hell`). 평결·게시물·형량 enum 도 위 값으로 | 01 계약 enum 전면 교체(CT-07, 0.25d) |
 | 카테고리 | **프론트 11종 고정**: 식비 · 배달 · 카페/간식 · 교통/택시 · 쇼핑/패션 · 뷰티 · 취미/여가 · 술/유흥 · 구독 · 생활 · 기타 | `posts.category` CHECK 제약(`expenses` 도 맞추면 좋음) | 심문관 enum 주입 값 = 이 11종(07 §3.3) |
+| 등록 필드 | **프론트 DESIGN-SPEC S-09 에 맞춤(9/8):** 무엇을 `item` 필수 ≤ 30자, 사유 `reason` 선택 ≤ 200자. 심문(솔직 팝업 S-09b)은 무엇을만 본다. 판결문 본문 `statement` 합산 ≤ 300자(프론트 SPEC) | `posts.item NOT NULL`, `reason` NULL 허용, `verdict_texts.statement` 300자 | 01·07 계약, 05 검증 규칙 |
 | 모델 | **계획서대로 Grok(서기) + OpenAI luna(심문관·양형관·검수관).** 프론트 `SPEC.md` "Claude Haiku 4.5 단독" · `ROADMAP.md` "Grok 은 심사 이후" 는 구버전 | — | 프론트 문서 갱신 요청, 제출 폼 "사용한 AI 도구명" 갱신 |
 | **전달** | **폴링.** Supabase Realtime · SSE 는 안 한다. 프론트가 `GET /posts/{id}/verdict` 를 1초 간격으로, **화면 이탈 시 중단, `text_status=AI_READY` 면 즉시 중단**(`TEMPLATE_READY` 는 §9 의 30초 규칙). Realtime 은 M4 이후 검토하되 그때도 폴링을 재연결 폴백으로 남긴다 | §9 `GET verdict` 그대로. **Realtime publication · RLS 정책 작업 없음** | 프론트 `ROADMAP.md` 미결정 행 닫도록 통보 |
 | 배포 | **백엔드가 관리하는 별도 EC2 1대에 Docker Compose.** AI 파트는 `ai-api` · `ai-worker` 이미지(GHCR) + compose 조각 + 환경변수 목록만 넘긴다 | EC2 생성, compose 실행, 환경변수·벤더 키 주입, Supabase 접속 | Dockerfile 2개 · CI 이미지 빌드 · compose 조각(02) |

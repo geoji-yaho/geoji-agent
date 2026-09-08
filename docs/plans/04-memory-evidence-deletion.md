@@ -38,7 +38,7 @@ RETAIN job (sentence.finalized / comment.approved) ─ snapshot(job) ─ 안전 
 
 ### Out-of-Scope
 - 조서 LLM(`analyze_reason`)·드립 후보·`trial_prep` 상태 전이 — 작업 5. 작업 4 는 코드 Evidence 와 저장까지
-- Hindsight·reflect·`memory_summaries`(P1, 09). 방 댓글 말투 **사용**(`ROOM_COMMENT_STYLE_ENABLED=false` 기본 — D-04 결정 뒤 켠다). retain 은 한다
+- Hindsight·reflect·`memory_summaries`(P1, 09). 방 댓글 말투 **사용**(`ROOM_COMMENT_STYLE_ENABLED=false` — 9/8 D-04 확정으로 P0 제외, P1 09 C). retain 은 한다
 - 원본 삭제·epoch 증가·무효화 스케줄러 **실행**(백엔드, 10 §8). 우리는 검사와 SQL 을 제공한다
 
 ### 다른 파트에 요청 (백엔드·프론트)
@@ -50,7 +50,7 @@ RETAIN job (sentence.finalized / comment.approved) ─ snapshot(job) ─ 안전 
 | 백엔드 | `ai.privacy_epochs` 테이블(004) + `scope_key` 규약: `user:{id}`·`room:{id}`·`post:{id}` | 9/11 |
 
 ### 팀 결정 대기
-- **D-04** 댓글 메모리 고지 — 결정 전까지 `ROOM_COMMENT_STYLE_ENABLED=false`(retain 은 하되 모델에 넣지 않는다)
+- 없음 — D-04 는 9/8 확정: P0 제외, `ROOM_COMMENT_STYLE_ENABLED=false` 유지(retain 은 하되 모델에 넣지 않는다). 고지 문구는 P1 에서
 - Evidence·dossier 보존 기간(초기안: 사건 삭제 시 즉시, 그 외 90일)
 
 ## 3. 기술 상세 설계 (Technical Design)
@@ -184,7 +184,7 @@ uv run python -m geoji_ai.application.build_evidence --snapshot contracts/fixtur
 - [ ] 허용된 30일 이력만 집계되고, 삭제 직후 조회 차단·finalize 거부가 동작(proposal2 §20 작업 4 완료 기준)
 - [ ] 방 누출 0·늦은 retain 0·epoch 불일치 저장 0 테스트 green
 - [ ] 백엔드 `resolve-evidence`·snapshot 확장·`privacy_epochs` 가 9/12 까지 붙어 데모 C 경로가 가짜 없이 돈다
-- [ ] D-04 결정 상태 기록, 플래그 기본값 유지
+- [x] D-04 결정 상태 기록(9/8 P0 제외), 플래그 기본값 `false` 유지
 
 ## 5. 작업 분할 (Task Breakdown — 카드 연동)
 

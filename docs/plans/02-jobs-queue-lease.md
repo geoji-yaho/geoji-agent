@@ -1,7 +1,7 @@
 # 🛠️ [Tech Spec] 기술 명세서: 작업 2 — 영속 큐 `ai.jobs` · claim · lease · heartbeat · 워커 런타임 (9/8~9/9)
 
 > 근거: proposal2 §1(영속성의 기준은 Postgres), §2.2 결정 16·18·22, §7.2 기준 DDL, §8 이벤트·큐·lease(claim 쿼리·lease·재실행·슬롯), §14.1 설정, §14.2 async 주의, §19 실행 단위·role 분리, §20 작업 2 + 먼저 실패시킬 케이스.
-> **선행 문서: 01**(ports·설정·`docker-compose.dev.yml`). **전제 D-20**: 백엔드와 같은 Postgres, 업무 트랜잭션 안에서 `ai.jobs` INSERT. INSERT 지점은 `10-backend-contract.md` §3, 이 문서는 **큐를 소비하는 쪽**만 다룬다.
+> **선행 문서: 01**(ports·설정·`docker-compose.dev.yml`). **전제 D-20(9/8 확정)**: 백엔드와 같은 Supabase Postgres, 업무 트랜잭션 안에서 `ai.jobs` INSERT. INSERT 지점은 `10-backend-contract.md` §3, 이 문서는 **큐를 소비하는 쪽**만 다룬다.
 > 외부 Redis·브로커 없음. LangGraph checkpointer 는 P0 비필수 — 재실행 단위는 job 이고 중간 결과는 `node_results`(작업 6)다.
 
 ## 1. 개요 및 구현 목표
@@ -49,13 +49,13 @@ backend scheduler (10 §7) ─ reaper: lease 만료 → PREPARE/RETAIN 은 attem
 ### 다른 파트에 요청 (백엔드·프론트)
 | 대상 | 요청 | 기한 |
 |---|---|---|
-| 백엔드 | D-20 확인 후 `001_ai_jobs.sql` 을 공유 DB 에 적용할 주체·순서 합의(우리 러너가 `ai` 스키마를 만들고 grants 는 DBA/백엔드가) | 9/8 |
+| 백엔드 | `001_ai_jobs.sql` 을 Supabase 에 적용할 주체·순서 합의(우리 러너가 Session Pooler 로 `ai` 스키마를 만들고 `ai_api`·`ai_worker` role·grants 는 백엔드가). 접속 정보 전달 | 9/9 |
 | 백엔드 | job INSERT 5지점·dedupe_key·priority 표(§3.4) 채택. **업무 변경과 같은 트랜잭션** | 9/10 |
 | 백엔드 | reaper·lease 회수를 백엔드 스케줄러에서 실행(§3.5 SQL 제공). 주기 5초 | 9/13 |
 | 백엔드 | `ai_worker` role 은 `ai` 스키마만, `ai_api` role 은 심문용 최소 권한, `backend` role 은 업무 테이블 + finalize 대상 `ai` 테이블(`verdict_commit_records`·`text_evidence_refs`·`privacy_epochs`) | 9/10 |
 
 ### 팀 결정 대기
-- D-20(9/8). D-22 모델 동시성 상한 8(벤더 rate limit 확인). 배포 구조 — `ai-api`·`ai-worker` 두 프로세스를 Compose 로(Kubernetes 는 기존 운영 환경이 있을 때만)
+- 없음 — 9/8 확정(10 §15): D-20 Supabase 공유, D-22 동시성 8(429 시 하향), 배포는 **백엔드 관리 EC2 1대 + Docker Compose, 우리는 `ai-api`·`ai-worker` 이미지(GHCR) + compose 조각 + 환경변수 목록만**. Kubernetes 없음
 
 ## 3. 기술 상세 설계 (Technical Design)
 
@@ -197,7 +197,7 @@ psql "$DATABASE_URL" -c "select kind,status,attempts,owner_id,lease_until,last_e
 
 ### 최종 완료 기준:
 - [ ] 실제 Postgres 에서 **claim 중복 0, 이전 generation 저장 0**(proposal2 §20 작업 2 완료 기준)
-- [ ] `001_ai_jobs.sql`·role 권한이 공유 DB 에 적용됨(D-20 확인 후)
+- [ ] `001_ai_jobs.sql`·role 권한이 Supabase 에 적용됨(백엔드 grants 회신 후)
 - [ ] 백엔드가 §3.4 규약으로 5지점 INSERT 를 구현하기로 함(10 §3)
 - [ ] 워커가 4 kind 를 claim 하고 스텁으로 `fail(NOT_IMPLEMENTED)` 처리 — 작업 3 이 교체할 준비
 

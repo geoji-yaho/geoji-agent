@@ -71,7 +71,7 @@ flowchart TD
 | 프론트 | 강도별 텍스트는 방 컨텍스트 강도 행, 없으면 `default_intensity` 행. `source=TEMPLATE` 이면 AI 판사 라벨·양형 이유 블록 숨김 | 9/13 |
 
 ### 팀 결정 대기
-- D-19(치환) — 이 문서는 사용자 결정(9/7 밤)대로 템플릿 치환을 구현한다. 팀 확인은 병행
+- 없음 — D-19(치환)는 9/8 확정으로 닫혔다(팀 확인 불필요). D-22 동시성 8 도 확정
 - D-22 동시성 8 — 서기 fan-out 이 강도 수만큼 동시 호출하므로 SENTENCE 슬롯 2 × 최대 3강도 = 6 이 상한 안에 들어야 한다
 
 ## 3. 기술 상세 설계 (Technical Design)
@@ -130,7 +130,7 @@ class SentenceState(TypedDict):
 |---|---|---|
 | 1 | `kind=fact|claim` 인데 `evidence_labels` 비었거나 `label_map` 에 없음 | **문장 삭제.** 남은 문장 < 1 → 검수 실패(`UNGROUNDED_CLAIM`) |
 | 2 | 본문에 `F\d+` 문자열 | **문장째 삭제**(2문장 이상 남을 때), 모자라면 ID 만 제거. headline 도 제거 |
-| 3 | headline > 30 · statement 합산 > 200 · 문장 수 ∉ 2~4 | 검수 실패(`SCHEMA_INVALID`) |
+| 3 | headline > 30 · statement 합산 > 300 · 문장 수 ∉ 2~4 | 검수 실패(`SCHEMA_INVALID`) |
 | 4 | `meme_tag` 가 평결·형량과 모순 | 교정(`guilty`+최고 rank → `GUILTY_HEAVY`, 그 외 유죄 `GUILTY_LIGHT`, 나머지 동명) |
 | 5 | 강도 집합 ≠ `target_intensities`, 중복 | 검수 실패 — join 에서 이미 걸러지지만 재확인 |
 | 6 | `mild`·`spicy` 에 `PROFANITY` / 전 강도 `DEATH_WORDS` / `hell` 목록 밖 욕·같은 욕 2회·`새끼`·`ㅋㅋ` 2회 | 검수 실패(`PROFANITY_OUT_OF_LIST` / `SELF_HARM_LEXICON`) — **서버가 먼저 거르고** 검수관이 변형을 잡는다 |

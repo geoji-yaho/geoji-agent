@@ -59,9 +59,9 @@ prompts/** 변경 ─▶ tests/evaluations/run_regression.py (골든 50사건 ×
 | 백엔드 | 제출 단위 임시 예산 이전(§3.2): `POST /post-submissions/{id}/complete` 가 만든 `post_id` 를 intake 호출의 `submission_id` 와 묶어 알려줄 수 있는가(10 §4.4 `(제안)`) | 9/14 |
 
 ### 팀 결정 대기
-- **D-07 지옥맛 표현 상한**(`guardrail-v2` 기본값 제안). 자료 §3.7. 미비준 시 `GUARDRAIL_POLICY_VERSION=guardrail-v1` 로 전환 — 프롬프트·검수관·fixture 가 함께 바뀐다
-- 드립 라벨링 담당자·검수 인력 3명, xAI·OpenAI 키·결제 주체(실비 발생)
-- D-22 동시성 8 — 실측에서 429 가 나오면 낮춘다
+- **D-07 지옥맛 표현 상한** — 기본값 `guardrail-v2` 는 9/8 확정, 팀 비준만 M3 검수 때. 자료 §3.7. 미비준 시 `GUARDRAIL_POLICY_VERSION=guardrail-v1` 로 전환 — 프롬프트·검수관·fixture 가 함께 바뀐다
+- 드립 라벨링 담당자·검수 인력 3명. (키·결제는 9/8 확정: AI 파트 개인 계정, 팀 정산)
+- D-22 동시성 8(9/8 확정) — 실측에서 429 가 나오면 낮춘다
 
 ## 3. 기술 상세 설계 (Technical Design)
 

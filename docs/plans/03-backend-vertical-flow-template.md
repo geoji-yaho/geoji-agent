@@ -57,7 +57,7 @@ POST /post-submissions ──▶ POST /internal/v1/intake (스텁: PASS, intake_
 
 ### 팀 결정 대기
 - D-23 — 양형관 실측 p90 > 2초일 때: 양형관을 등록 시점으로 되돌리면 확정 평결을 모른 채 양형한다. 대안 = **유죄율 밴드별(50~69/70~89/90~100) 사전 후보 3개**를 PREPARE 에서 만들고 SENTENCE 에서 실제 밴드 것을 고른다(+2.4원, 등록 시점 +3초). 실측 뒤 결정
-- 키·결제 관리 주체(실측이 실비를 쓴다)
+- 없음 — 키·결제는 9/8 확정(AI 파트 개인 계정, 팀 정산. 10 §15.3)
 
 ## 3. 기술 상세 설계 (Technical Design)
 
@@ -92,7 +92,7 @@ POST /post-submissions ──▶ POST /internal/v1/intake (스텁: PASS, intake_
 - 스텁도 heartbeat·generation·`complete` 소유 조건을 그대로 탄다 — 작업 2 의 경합 테스트가 스텁으로 돈다
 
 ### 3.4 intake 스텁·인증
-- `POST /internal/v1/intake` → `IntakeResult{status=PASS, missing_information=[], message="", category_review{OK}, injection_detected=false, intake_source=FALLBACK}` 50ms 이내. `mode=FINAL_CHECK` 도 `PASS`
+- `POST /internal/v1/intake` → `IntakeResult{status=PASS, item_review{status=OK, suggested_item=null}, message=null, category_review{OK}, injection_detected=false, intake_source=FALLBACK}` 50ms 이내. `mode=FINAL_CHECK` 도 `PASS`
 - `api/auth.py`: `SERVICE_AUTH_TOKEN` 상수 비교(timing-safe). 불일치 401. `/health/*` 무인증. 인증 헤더는 로그에 남기지 않는다
 - 제출 단위 임시 예산(proposal2 §7.4)은 작업 6 에서. 스텁은 `llm_calls` 를 쓰지 않는다
 
@@ -109,7 +109,7 @@ POST /post-submissions ──▶ POST /internal/v1/intake (스텁: PASS, intake_
 ### 3.6 luna 실측 (`scripts/probe_writer_latency.py --provider openai --role …`)
 | 역할 | 프롬프트 | 입력 | n | 판정 |
 |---|---|---|---:|---|
-| `intake` | 작업 7 초안(카테고리 enum·판정 기준·다른 사건 예시) | 택시 사유 3종(정상·부실·인젝션) | 5 | p90 ≤ 2.5초 |
+| `intake` | 작업 7 초안(카테고리 enum·판정 기준·다른 사건 예시) | 택시 '무엇을' 3종(정상·과장·인젝션) | 5 | p90 ≤ 2.5초 |
 | `sentencing` | 작업 5 초안(밴드·허용 목록 enum·근거 라벨) | 택시 `CASE` + `jury-guilty-75` | 5 | **p90 ≤ 2.0초** — 초과 시 D-23 |
 | `evaluator` | `prompts/evaluator/guardrail-v2.md` 초안 + 검사표 | 택시 초안 2강도 | 5 | p90 ≤ 3.0초, 재현율은 작업 6 |
 - 결과 `scripts/probe_out/<ts>-openai-<role>.json`(기존 형식). p50/p90·비용·`cached_tokens` 기록. `SENTENCING_NODE_TIMEOUT_SECONDS`·`EVALUATOR_NODE_TIMEOUT_SECONDS` 초기값(3·4)을 실측 p90 + 0.5초로 조정해 `00-INDEX.md` §7·§8.4 에 기록

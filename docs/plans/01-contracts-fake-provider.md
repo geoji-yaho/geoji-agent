@@ -1,7 +1,7 @@
 # 🛠️ [Tech Spec] 기술 명세서: 작업 1 — 계약 · JSON Schema · fake provider · 프로젝트 골격 (9/8~9/9)
 
 > 근거: `docs/proposal/proposal2.md` v2.0(통합 확정본) §6 데이터 계약, §5.1·§5.3 노드 입출력, §12 정책 버전, §13 프롬프트 자산, §14.1 설정, §19 모듈·디렉터리, §20 작업 1 + "먼저 실패시킬 케이스", 부록 A fixture. proposal2 는 git 에 없으므로(`.gitignore` 가 `docs/plans/` 만 추적) 이 문서는 계약을 전부 옮겨 적었다.
-> **전제 (9/7 밤 사용자 결정 4건):** ① proposal2 의 실행 구조(공유 Postgres + `ai.jobs` 큐 + 워커 + 백엔드 finalize)를 P0 그대로 — 9/7 저녁의 "동기 응답·직접 호출·페이로드 전부" 는 폐기. **D-20(공유 Postgres) 은 9/8 까지 백엔드 확인.** ② 계획서는 §20 작업 묶음 1~8 + P1 로 재편 ③ D-19 는 양형 이유 템플릿 치환 ④ 백엔드 몫은 `10-backend-contract.md` 한 장.
+> **전제 (9/7 밤 사용자 결정 4건):** ① proposal2 의 실행 구조(공유 Postgres + `ai.jobs` 큐 + 워커 + 백엔드 finalize)를 P0 그대로 — 9/7 저녁의 "동기 응답·직접 호출·페이로드 전부" 는 폐기. **D-20(공유 Postgres) 은 9/8 확정 — Supabase 인스턴스 공유(10 §15.2).** ② 계획서는 §20 작업 묶음 1~8 + P1 로 재편 ③ D-19 는 양형 이유 템플릿 치환 ④ 백엔드 몫은 `10-backend-contract.md` 한 장.
 > 이 문서가 끝나면 나머지 작업은 **계약 파일을 바꾸지 않고** 구현한다. 계약을 바꿔야 하면 이 문서로 돌아와 `schema_version` 을 올린다.
 
 ## 1. 개요 및 구현 목표
@@ -52,13 +52,13 @@ ports/{llm,backend,memory,jobs,ledger}.py ─ 작업 2~6 이 구현할 인터페
 ### 다른 파트에 요청 (백엔드·프론트)
 | 대상 | 요청 | 기한 |
 |---|---|---|
-| 팀·백엔드 | **D-20** — 백엔드와 같은 Postgres 인스턴스에 `ai` 스키마를 두고, 업무 트랜잭션에서 `ai.jobs` 를 INSERT 할 수 있는가. 아니면 outbox 전달 계층이 먼저 필요하고 §20 일정 전체가 흔들린다(proposal2 부록 D) | **9/8** |
+| 팀·백엔드 | ~~D-20~~ **9/8 확정(10 §15.2): Supabase 인스턴스에 `ai` 스키마.** 남은 요청: `ai_api`·`ai_worker` role·grants 생성, Session Pooler 접속 정보 | 9/9 |
 | 백엔드 | ~~D-21~~ **9/8 확정(10 §15.2): 프론트 값이 표준** — 강도 `mild/spicy/hell`, 평결 `guilty/notGuilty/agree/disagree/dismissed`, 게시물 `spent/considering`, 형량 `probation/oneDay/life`, 카테고리 11종 고정. **이 문서의 대문자 enum 은 CT-07 에서 전부 치환** | 9/9 |
 | 백엔드 | `CaseSnapshot` 을 채울 수 있는지 — `post_version`·`audience_version`·`privacy_versions`·`room_snapshots.rule_version`·`policy{allowed_sentences[{code,rank}], fallback_sentence, reason_required}`·`default_intensity`. 없는 필드는 9/9 까지 회신(`10-backend-contract.md` §4) | 9/9 |
 | 프론트 | `verdict-view-v1` 스키마 검토(폴링 응답 형태, `text_version` 규칙) | 9/10 |
 
 ### 팀 결정 대기
-- D-20(위). D-21(강도 enum). xAI·OpenAI 키·결제 관리 주체
+- 없음 — D-20·D-21·키·결제(AI 파트 개인 계정, 팀 정산)는 9/8 확정(10 §15)
 - `GUARDRAIL_POLICY_VERSION` 기본값 — **9/8 확정 `guardrail-v2`**(D-07 팀 비준은 M3 검수 시, 미비준 시 v1). 작업 1 은 두 버전의 fixture 를 모두 만들고 기본값은 설정으로 둔다
 
 ## 3. 기술 상세 설계 (Technical Design)
@@ -84,15 +84,15 @@ ports/{llm,backend,memory,jobs,ledger}.py ─ 작업 2~6 이 구현할 인터페
 
 | 스키마 | 최상위 | 핵심 필드 · 제약 |
 |---|---|---|
-| `case-snapshot-v1` | `CaseSnapshot` | `post_id`, `author_id`, `post_version ≥ 1`, `reason ≤ 200 code points`, `amount_krw > 0`, `category`, `post_type ∈ spent|considering`, `created_at`, `audience{room_ids unique[], audience_version, public_share_enabled}`, `privacy_versions[{scope_key, epoch}]`, `room_snapshots[{room_id, intensity, rule_version}]`, `intake_result | null`, `jury: JurySnapshot | null` |
+| `case-snapshot-v1` | `CaseSnapshot` | `post_id`, `author_id`, `post_version ≥ 1`, `item ≤ 30 code points`(무엇을, 필수), `reason ≤ 200 code points | null`(사유, 선택), `amount_krw > 0`, `category`, `post_type ∈ spent|considering`, `created_at`, `audience{room_ids unique[], audience_version, public_share_enabled}`, `privacy_versions[{scope_key, epoch}]`, `room_snapshots[{room_id, intensity, rule_version}]`, `intake_result | null`, `jury: JurySnapshot | null` |
 | (내포) `JurySnapshot` | | `verdict_id`, `verdict_version ≥ 1`, `result ∈ guilty|notGuilty|agree|disagree`, `vote_counts map<string,int≥0>`, `guilty_ratio`, `confirmed_at`, `deadline_at`, `policy{version, allowed_sentences[{code, rank}], fallback_sentence, reason_required}`, `target_intensities unique[]`, `default_intensity`. **`dismissed` 는 여기 없다** — 각하는 선고 작업 자체를 만들지 않는다 |
 | `sentencing-v1` | `SentencingDecision` | `sentence`(코드 `probation|oneDay|life`, 허용 목록과 **동적** 대조 — 스키마는 문자열, 코드가 검사), `sentencing_reason ≤ 100 | null`, `evidence_labels[]`, `aggravating[]`, `mitigating[]` |
 | `writer-draft-v1` | `WriterDraft` | `texts: TextDraft[]`(`target_intensities` 와 정확히 일치, 중복 금지), `meme_tag`, `meme_hints{emotion, keywords[]} | null` |
-| (내포) `TextDraft` | | `intensity ∈ mild|spicy|hell`, `headline ≤ 30`, `statement[{text, kind ∈ fact|claim|opinion, evidence_labels[]}]`(2~4문장, 합산 ≤ 200), `banter_strategy`(전략 8종), `selected_candidate_id: UUID | null`, `attack_angle`(서버 지정 6종) |
+| (내포) `TextDraft` | | `intensity ∈ mild|spicy|hell`, `headline ≤ 30`, `statement[{text, kind ∈ fact|claim|opinion, evidence_labels[]}]`(2~4문장, 합산 ≤ 300), `banter_strategy`(전략 8종), `selected_candidate_id: UUID | null`, `attack_angle`(서버 지정 6종) |
 | `evaluation-v1` | `EvaluationReport` | `policy_version ∈ guardrail-v1|guardrail-v2`, `sentence_check{pass, violations[]}`, `sentencing_reason_check{pass, violations[]}`, `texts[{intensity, pass, violations[], problem_sentences[]}]`. `Violation{code, path, evidence_labels[], explanation ≤ 300}` |
 | (enum) `Violation.code` | | `PERSONAL_ATTACK` `IDENTITY_DEGRADATION` `SELF_HARM_LEXICON` `UNGROUNDED_CLAIM` `VERDICT_CONTRADICTION` `INJECTION_FOLLOWED` `UNSAFE_CONTENT` `INTENSITY_MISMATCH` `PROFANITY_OUT_OF_LIST` `SENTENCE_REASON_MISMATCH` `SCHEMA_INVALID` |
 | `finalize-v1` | `FinalizeRequest` | `schema_version`, `job_id`, `generation_id`, `verdict_version`, `expected_text_version`, `dossier_id`, `privacy_versions[]`, `draft_hash`(canonical draft sha256), `sentencing | null`, `draft: WriterDraft`, `evaluation: EvaluationReport`, `evaluation_draft_hash`, `prompt_bundle_version`, `guardrail_policy_version`, `model_ids{sentencing, writer, evaluator}` |
-| `intake-v1` | `IntakeRequest` / `IntakeResult` | 요청 `submission_id`, `payload_hash`, `mode ∈ INITIAL|FINAL_CHECK`, `post_type`, `amount_krw`, `category`, `reason`. 결과 `status ∈ PASS|NEEDS_CLARIFICATION|BLOCKED`, `missing_information[] ∈ WHAT|WHY|CONTEXT`, `message ≤ 60`, `category_review{status ∈ OK|MISMATCH, suggested_category | null, confidence 0..1}`, `injection_detected`, `intake_source ∈ AI|FALLBACK`. **`FINAL_CHECK` 는 `NEEDS_CLARIFICATION` 을 낼 수 없다**(스키마 `if/then`) |
+| `intake-v1` | `IntakeRequest` / `IntakeResult` | 요청 `submission_id`, `payload_hash`, `mode ∈ INITIAL|FINAL_CHECK`, `post_type`, `amount_krw`, `category`, `item`, `reason | null`. 결과 `status ∈ PASS|NEEDS_CLARIFICATION|BLOCKED`, `item_review{status ∈ OK|VAGUE|EXAGGERATED, suggested_item ≤ 30 | null}`, `message ≤ 60 | null`(참고용 — 프론트 솔직 팝업은 고정 문구), `category_review{status ∈ OK|MISMATCH, suggested_category | null, confidence 0..1}`, `injection_detected`, `intake_source ∈ AI|FALLBACK`. **`FINAL_CHECK` 는 `NEEDS_CLARIFICATION` 을 낼 수 없다**(스키마 `if/then`) |
 | `verdict-view-v1` | `VerdictView` | `post_id`, `jury_status`, `sentence_status ∈ PENDING|FINAL`, `text_status ∈ PENDING|GENERATING|TEMPLATE_READY|AI_READY`, `text_version ≥ 0`, `view | null {intensity, headline, statement(문장 배열), sentence, sentence_label, sentencing_reason | null, source ∈ AI|TEMPLATE, meme{tag, image_id, image_url}}`, `poll_after_ms` |
 
 전략 8종: `CHEAPER_ALTERNATIVE` `FREE_ALTERNATIVE` `DIY_REPLACEMENT` `PREMISE_REJECTION` `EXCUSE_STRIPPING` `NECESSITY_APPROVAL` `REPEAT_OFFENSE` `ROOM_RULE_CALLBACK`. 짤 태그 5종: `GUILTY_HEAVY` `GUILTY_LIGHT` `NOT_GUILTY` `APPROVED` `REJECTED`(기획서 값 그대로 — 평결 enum 과 별개, 대문자 유지). 공격 각도 6종: `CONVERSION`(환산) `REPETITION`(반복) `EXCUSE_DISSECTION`(변명 해부) `FUTURE_PROPHECY`(미래 예언) `RULE_PERSONIFICATION`(규칙 의인화) `ALTERNATIVE_MOCKERY`(대안 조롱).
@@ -232,7 +232,7 @@ uv run uvicorn geoji_ai.api.app:app --port 8100 & curl -s localhost:8100/health/
 ### 최종 완료 기준:
 - [ ] `contracts/*.schema.json` 7종 + fixture 12개 커밋, 거부 케이스 6종 green(proposal2 §20 작업 1 완료 기준 "스키마 거부 케이스 통과")
 - [ ] ports 5종 시그니처 고정, `fake_llm.py` 로 작업 5 가 그래프를 돌릴 수 있음
-- [ ] D-20 회신 기록(`00-INDEX.md` §8.4). 미회신이면 9/9 저녁에 하이브리드(동기 전송) 전환 여부를 사용자에게 다시 묻는다
+- [x] D-20 회신 기록(`00-INDEX.md` §8.4, 10 §15) — 9/8 확정
 - [ ] README 에 실행 절차·설정 표
 
 ## 5. 작업 분할 (Task Breakdown — 카드 연동)

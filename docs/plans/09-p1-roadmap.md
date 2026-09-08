@@ -97,7 +97,7 @@
 | G-7 | temperature·headline 다양성 | 06 평가기 `--temperature` 스윕 | S | 리허설에서 반복 관찰 시 |
 | G-8 | D-23 밴드별 사전 후보 | 작업 3 실측 결과가 2초 초과일 때만 — PREPARE 에서 밴드 3개 후보, SENTENCE 에서 선택 | M | 실측 |
 | G-9 | 지옥맛 검수관 terra 상시 여부 | 심사 기간 위반 집계 후 | S | 06 결과 |
-| G-10 | Kubernetes | 팀 운영 환경이 있을 때만. 기본은 Compose | M | 팀 |
+| G-10 | Kubernetes | 9/8 배포 확정은 백엔드 EC2 1대 + Compose. 팀 운영 환경이 생길 때만 | M | 팀 |
 
 ## 4. 완료 기준 (DoD)
 
