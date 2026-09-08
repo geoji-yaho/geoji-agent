@@ -276,8 +276,9 @@ COMMIT
 | D-04 | 방 댓글 말투 예시는 **P0 제외**, `ROOM_COMMENT_STYLE_ENABLED=false` 유지. retain 은 한다 | `resolve-evidence` 의 `style_comments` 는 P0 에서 빈 배열 |
 | D-22 | 모델 동시성 8 로 시작, 429 시 하향 | 없음 |
 | 키·결제 | xAI · OpenAI 키는 **AI 파트 개인 계정**으로 발급·결제, 팀에 정산. 키는 EC2 환경변수로만 전달 | compose 환경변수에 `XAI_API_KEY` · `OPENAI_API_KEY` 주입, 로그 금지 |
+| 알림·비용 | 알림은 **디스코드 웹훅**(우리 `ALERT_DISCORD_WEBHOOK_URL`), 비용 경고 **일 5,000원**. 감정 어휘 6종은 08 §3.4 초안 확정 | 웹훅 URL 공유(같은 채널에 헬스체크 알림), `meme_images.emotions` 값은 이 6종 |
 | AiClient 3종 | 서버의 상 이름·도전 서술·순찰 문구용 동기 엔드포인트는 **P1(심사 이후)**. P0 에서는 `StubAiClient` 유지 | `AiClient` HTTP 구현 착수 시점도 P1 |
 
 ### 15.4 남은 것
 - §14 의 나머지 행(CaseSnapshot 필드, §4.4 · §4.5 · §4.6, §5 10단계)은 그대로 회신 대기
-- D-23(양형관 실측), 검수관 모델은 작업 3·6 실측 뒤. 알림 채널·비용 임계, LangSmith·CI 실비는 미정
+- D-23(양형관 실측), 검수관 모델은 작업 3·6 실측 뒤. LangSmith·CI 실비는 P1
