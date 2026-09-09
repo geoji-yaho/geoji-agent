@@ -1,0 +1,4 @@
+interface:
+  display_name: "B급 손그림 밈"
+  short_description: "사진과 밈을 B급 손그림으로 변환하고 판결카드 검색용 카테고리도 저장"
+  default_prompt: "$b-meme 첨부한 이미지들을 각각 B급 손그림 밈으로 변환해줘. 원본 자막과 표정을 유지하고 결과와 카테고리를 저장해줘."
