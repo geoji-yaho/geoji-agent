@@ -1,11 +1,21 @@
-.env
+# Python
+venv/
 .venv/
 __pycache__/
-# scripts/probe_out/
+*.py[cod]
+.pytest_cache/
 
-#
+# macOS
+.DS_Store
+
+# Secrets
+.env
+
+# Assets & Docs
 assets/
-
-#
 docs/*
 !docs/plans/
+
+# Subproject
+geoji-agent/
+
