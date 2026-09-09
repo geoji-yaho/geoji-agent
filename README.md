@@ -1,77 +1,43 @@
-# 거지방 밈짤 자산 파이프라인
+# Meme Doodle Agent (B급 손그림 밈 변환 에이전트)
 
-밈짤 원본을 판결 화면에 쓸 투명 배경 PNG 자산으로 바꾼다.
-`doc/ai-agent-design-plan.md`의 "판결 짤" 자산 제작 경로에 해당한다.
+임의의 밈/이미지(1단~2단 컷)를 입력받아 **'B급 투박한 손그림(MS Paint doodle style) 짤방 캐릭터 일러스트'**로 자동 변환·생성해 주는 에이전트 패키지입니다.
 
-## 두 가지 스타일
+Linux/macOS 크로스플랫폼 환경 지원 및 다른 AI 에이전트와의 호환성을 고려하여 설계되었습니다.
 
-| 스타일 | 결과 | 쓰는 곳 |
-| --- | --- | --- |
-| `lineart` (기본) | Canny 엣지로 원본 윤곽을 그대로 추적한 선화 | 원본 구도를 최대한 유지해야 할 때 |
-| `doodle` | 실루엣을 몇 개의 굵고 삐뚤빼뚤한 선으로 다시 그린 손그림 | "대충 그린 짤" 톤, 원본과의 유사성을 낮춰야 할 때 |
+---
 
-두 스타일 모두 자막은 macOS Vision OCR로 읽어 깨끗한 폰트로 다시 그리므로,
-그림이 아무리 거칠어져도 글자는 읽을 수 있다.
+## 🚀 직접 테스트해보기 (Quick Start)
 
-## 설치
-
+### 1. 환경 설정 및 의존성 설치
 ```bash
-python3 -m venv venv && ./venv/bin/pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
-## 사용
-
-한 장:
-
+### 2. 단 한 줄로 직접 변환 테스트 실행
 ```bash
-./venv/bin/python cli.py -i inputs/images-3.jpg -o outputs/out.png --style doodle
+# 기본 테스트 실행
+PYTHONPATH=. python main.py sample_meme.jpg -o output_doodle.png
+
+# 원하는 자막 직접 지정해서 변환하기
+PYTHONPATH=. python -m meme_doodle_agent.cli input.png -o output.png -s "행복은 돈으로 살수 없어" "ㅅㅂ 돈이 없으니까"
 ```
 
-폴더 전체 (`<이름>_doodle.png` 로 저장):
-
+### 3. 다른 에이전트 연동용 JSON 출력 테스트
 ```bash
-./venv/bin/python cli.py -i inputs -o outputs_doodle --style doodle
+PYTHONPATH=. python -m meme_doodle_agent.cli input.png --json
 ```
 
-주요 옵션:
-
-- `--detail N` — 내부 형태 개수. `0`이면 윤곽선만 (기본 4)
-- `--wobble F` — 손떨림 정도. `0`이면 매끈한 곡선 (기본 1.0)
-- `--simplify F` — 형태 단순화 정도. 클수록 더 대충 (기본 0.012)
-- `--seed N` — 떨림 고정. 기본값은 입력 경로 해시라 같은 파일은 항상 같은 그림
-- `--thickness N` — 선 굵기(px). doodle은 미지정 시 이미지 크기에 맞춰 자동
-- `--text-mode` — `ocr` / `binarize` / `none` / `auto`
-- `--no-bg-remove` — rembg 배경 제거 건너뛰기 (빠름, 대신 실루엣 품질 하락)
-- `--no-categories` — 카테고리 JSON 사이드카 생략
-
-## 구조
-
-```text
-cli.py                 CLI 진입점
-run_pipeline.py        수집 → 변환 배치 실행
-meme_line_extractor.py 스타일 분기 + lineart(Canny) 렌더러 + 파일/디렉터리 처리
-doodle_renderer.py     doodle 렌더러 (실루엣 → 단순화 → 손떨림 획)
-face_layer.py          Vision 얼굴 랜드마크 (눈·눈썹·코·입)
-text_layer.py          Vision OCR + 자막 재렌더링, 형태학적 글자 채우기
-background.py          rembg 배경 제거 (없으면 원본 유지로 폴백)
-vision_input.py        Vision에 넘길 파일 경로 확보
-meme_categorizer.py    짤별 컨셉/지출 카테고리 JSON 사이드카
-fetch_memes.py         샘플 밈짤 수집
-```
-
-## 테스트
-
+### 4. 전체 단위 테스트(Pytest) 실행
 ```bash
-./venv/bin/python -m pytest -q
+PYTHONPATH=. pytest tests/
 ```
 
-## 알려진 한계
+---
 
-- 얼굴 랜드마크와 OCR은 macOS Vision에 의존한다. 다른 플랫폼에서는 자동으로
-  얼굴 없음 / `binarize` 자막 모드로 폴백하며, doodle 결과의 표정이 사라진다.
-- Vision이 얼굴을 못 찾는 짤(그림체 캐릭터, 옆모습, 작은 얼굴)은 눈·입 없이
-  실루엣 덩어리로만 나온다.
-- 스크린샷·콜라주처럼 rembg가 배경을 분리하지 못하는 원본은 실루엣 품질이 낮다.
-  화면 전체를 두르는 윤곽은 그리지 않고 버린다.
-- 저작권: 선화·손그림 변환이 원저작물과의 실질적 유사성을 자동으로 해소하지
-  않는다. 배포 전 검수는 설계 문서 D-09를 따른다.
+## 📦 모듈 구조 (Architecture)
+
+- `meme_doodle_agent/models.py`: Pydantic 데이터 모델 (`MemeAnalysis`, `MemeConversionRequest`, `MemeConversionResult`)
+- `meme_doodle_agent/prompt_builder.py`: B급 손그림 도돌이 밈 특화 프롬프트 생성기 (`CrudeDoodlePromptBuilder`)
+- `meme_doodle_agent/analyzer.py`: 밈 메타데이터 분석 및 카테고리/태그 분류기 (`MemeCategorizer`, `MemeAnalyzer`)
+- `meme_doodle_agent/agent.py`: 메인 에이전트 오케스트레이터 (`MemeDoodleAgent`)
+- `meme_doodle_agent/cli.py`: CLI 명령어 및 멀티 에이전트 I/O 인터페이스
