@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 340">
+  <!--
+    후보 B: 텅 빈 지갑. 소비의 결과 그 자체를 의인화한다.
+    입이 곧 지갑 아가리라서, 벌리면 안이 비었다는 게 바로 보인다.
+  -->
+  <g fill="none" stroke="#1a1a1a" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- ══ 1. 정색 (DISAPPROVAL) ══ -->
+    <g transform="translate(0,0)">
+      <path d="M74 96 C74 78 86 68 106 68 L214 68 C234 68 246 78 246 96
+               L246 232 C246 250 234 260 214 260 L106 260 C86 260 74 250 74 232 Z"/>
+      <path d="M92 84 L228 84" stroke-dasharray="1 16" stroke-width="6"/>
+      <path d="M92 244 L228 244" stroke-dasharray="1 16" stroke-width="6"/>
+      <path d="M116 140 C124 130 140 130 148 139"/>
+      <path d="M172 139 C180 130 196 130 204 140"/>
+      <!-- 다문 아가리 -->
+      <path d="M124 196 L196 196"/>
+      <!-- 팔 -->
+      <path d="M74 150 C56 156 46 172 46 190"/>
+      <path d="M246 150 C264 156 274 172 274 190"/>
+    </g>
+
+    <!-- ══ 2. 어이없음 — 아가리를 벌렸는데 텅 비었다 ══ -->
+    <g transform="translate(300,0)">
+      <path d="M74 96 C74 78 86 68 106 68 L214 68 C234 68 246 78 246 96
+               L246 232 C246 250 234 260 214 260 L106 260 C86 260 74 250 74 232 Z"/>
+      <path d="M92 84 L228 84" stroke-dasharray="1 16" stroke-width="6"/>
+      <path d="M92 244 L228 244" stroke-dasharray="1 16" stroke-width="6"/>
+      <path d="M112 130 C120 118 138 118 146 129"/>
+      <path d="M174 140 C182 133 196 134 202 141"/>
+      <!-- 벌어진 아가리 -->
+      <path d="M118 186 C132 210 188 210 202 186 C188 178 132 178 118 186 Z"/>
+      <!-- 안이 비었다는 표시: 거미줄 -->
+      <path d="M126 190 L134 198"/><path d="M194 190 L186 198"/>
+      <path d="M74 150 C56 156 46 172 46 190"/>
+      <path d="M246 150 C264 156 274 172 274 190"/>
+    </g>
+
+    <!-- ══ 3. 지옥맛 (HELL) ══ -->
+    <g transform="translate(600,0)">
+      <path d="M74 96 C74 78 86 68 106 68 L214 68 C234 68 246 78 246 96
+               L246 232 C246 250 234 260 214 260 L106 260 C86 260 74 250 74 232 Z"/>
+      <path d="M92 84 L228 84" stroke-dasharray="1 16" stroke-width="6"/>
+      <path d="M92 244 L228 244" stroke-dasharray="1 16" stroke-width="6"/>
+      <path d="M110 124 L150 142"/>
+      <path d="M210 124 L170 142"/>
+      <!-- 크게 벌린 아가리 -->
+      <path d="M116 182 C132 216 188 216 204 182 C188 172 132 172 116 182 Z"/>
+      <path d="M74 144 C54 140 42 152 40 168"/>
+      <path d="M246 144 C266 140 278 152 280 168"/>
+      <!-- 화 -->
+      <path d="M258 74 L272 60"/><path d="M232 58 L236 42"/>
+    </g>
+  </g>
+  <g fill="#1a1a1a" stroke="none">
+    <ellipse cx="132" cy="152" rx="8" ry="9"/><ellipse cx="188" cy="152" rx="8" ry="9"/>
+    <ellipse cx="429" cy="146" rx="8" ry="9"/><ellipse cx="488" cy="152" rx="8" ry="9"/>
+    <ellipse cx="731" cy="152" rx="9" ry="10"/><ellipse cx="789" cy="152" rx="9" ry="10"/>
+  </g>
+</svg>
