@@ -14,6 +14,8 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+import vision_input
+
 try:  # macOS only
     import Vision
     import Quartz
@@ -134,7 +136,52 @@ def _fit_font(draw, text: str, box_w: int, box_h: int, font_path: Optional[str])
     return best
 
 
+def resolve_mode(text_mode: str) -> str:
+    """Turns "auto" into a concrete strategy and rejects unknown ones."""
+    if text_mode == "auto":
+        return "ocr" if VISION_AVAILABLE else "binarize"
+    if text_mode not in ("ocr", "binarize", "none"):
+        raise ValueError(f"Unknown text_mode: {text_mode}")
+    return text_mode
+
+
+def recognize(image, pil_image: Image.Image, source_path: Optional[str] = None) -> List[TextBox]:
+    """OCR needs a file on disk; materialize one when the caller passed pixels."""
+    with vision_input.as_file(image, pil_image, source_path) as path:
+        return recognize_text(path)
+
+
 # --------------------------------------------------------------- morphological fill
+
+
+def build_text_mask(gray: np.ndarray, scale: int = 3) -> Optional[np.ndarray]:
+    """
+    Detects text lines and fills their glyph bodies, working on an upscaled copy so
+    thin strokes survive. Returns None when nothing text-like was found.
+    """
+    scale = max(1, scale)
+    height, width = gray.shape
+    big = cv2.resize(gray, (width * scale, height * scale), interpolation=cv2.INTER_LANCZOS4)
+
+    mask = np.zeros(big.shape, np.uint8)
+    found = False
+    for x, y, w, h in detect_text_regions(big):
+        pad = max(2, h // 8)
+        x0, y0 = max(0, x - pad), max(0, y - pad)
+        x1, y1 = min(big.shape[1], x + w + pad), min(big.shape[0], y + h + pad)
+        glyphs = binarize_text_region(big[y0:y1, x0:x1], h)
+        if glyphs is not None:
+            mask[y0:y1, x0:x1] |= glyphs
+            found = True
+
+    if not found:
+        return None
+
+    mask = cv2.morphologyEx(
+        mask, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    )
+    mask = cv2.resize(mask, (width, height), interpolation=cv2.INTER_AREA)
+    return (mask > 55).astype(np.uint8) * 255
 
 
 def detect_text_regions(gray: np.ndarray) -> List[Tuple[int, int, int, int]]:

@@ -1,19 +1,17 @@
 import os
-import tempfile
 from typing import Tuple, Union, Optional
 import numpy as np
 from PIL import Image
 import cv2
 
-import text_layer
+import background
 import meme_categorizer
+import text_layer
+from doodle_renderer import DoodleRenderer
 
-try:
-    from rembg import remove as rembg_remove
-    REMBG_AVAILABLE = True
-except (ImportError, SystemExit, Exception):
-    REMBG_AVAILABLE = False
+REMBG_AVAILABLE = background.REMBG_AVAILABLE
 
+STYLES = ("lineart", "doodle")
 
 
 class MemeLineExtractor:
@@ -23,19 +21,14 @@ class MemeLineExtractor:
 
     def __init__(self, use_rembg_if_available: bool = True):
         self.use_rembg = use_rembg_if_available and REMBG_AVAILABLE
+        self.doodle = DoodleRenderer(use_rembg_if_available=use_rembg_if_available)
 
     def remove_background(self, image: Image.Image) -> Image.Image:
         """
         Removes background from PIL Image using rembg if available.
         Returns RGBA PIL Image.
         """
-        if not self.use_rembg or not REMBG_AVAILABLE:
-            if image.mode != "RGBA":
-                return image.convert("RGBA")
-            return image
-        
-        # Ensure RGBA mode for rembg
-        return rembg_remove(image)
+        return background.remove_background(image, self.use_rembg)
 
     def extract_lines(
         self,
@@ -83,10 +76,10 @@ class MemeLineExtractor:
         """
         pil_img = self._load_image(image)
 
-        mode = self._resolve_text_mode(text_mode)
+        mode = text_layer.resolve_mode(text_mode)
         text_boxes = []
         if mode == "ocr":
-            text_boxes = self._recognize(image, pil_img, source_path)
+            text_boxes = text_layer.recognize(image, pil_img, source_path)
             if not text_boxes and not text_layer.VISION_AVAILABLE:
                 mode = "binarize"
 
@@ -131,7 +124,7 @@ class MemeLineExtractor:
         # Build a filled-glyph mask instead of letting Canny trace glyph outlines
         text_mask = None
         if mode == "binarize":
-            text_mask = self._build_text_mask(gray_sharp, text_scale)
+            text_mask = text_layer.build_text_mask(gray_sharp, text_scale)
 
         # Fill text strokes using Morphological Closing (bridges inner gaps in text)
         if fill_text:
@@ -175,53 +168,6 @@ class MemeLineExtractor:
 
         return result
 
-    def _resolve_text_mode(self, text_mode: str) -> str:
-        if text_mode == "auto":
-            return "ocr" if text_layer.VISION_AVAILABLE else "binarize"
-        if text_mode not in ("ocr", "binarize", "none"):
-            raise ValueError(f"Unknown text_mode: {text_mode}")
-        return text_mode
-
-    def _recognize(self, image, pil_img: Image.Image, source_path: Optional[str]):
-        """OCR needs a file on disk; materialize one when the caller passed pixels."""
-        path = source_path or (image if isinstance(image, str) else None)
-        if path is not None:
-            return text_layer.recognize_text(path)
-
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-            tmp_path = tmp.name
-        try:
-            pil_img.convert("RGB").save(tmp_path)
-            return text_layer.recognize_text(tmp_path)
-        finally:
-            os.unlink(tmp_path)
-
-    def _build_text_mask(self, gray: np.ndarray, scale: int) -> Optional[np.ndarray]:
-        """Detects text lines and fills their glyph bodies, working on an upscaled copy."""
-        scale = max(1, scale)
-        height, width = gray.shape
-        big = cv2.resize(gray, (width * scale, height * scale), interpolation=cv2.INTER_LANCZOS4)
-
-        mask = np.zeros(big.shape, np.uint8)
-        found = False
-        for x, y, w, h in text_layer.detect_text_regions(big):
-            pad = max(2, h // 8)
-            x0, y0 = max(0, x - pad), max(0, y - pad)
-            x1, y1 = min(big.shape[1], x + w + pad), min(big.shape[0], y + h + pad)
-            glyphs = text_layer.binarize_text_region(big[y0:y1, x0:x1], h)
-            if glyphs is not None:
-                mask[y0:y1, x0:x1] |= glyphs
-                found = True
-
-        if not found:
-            return None
-
-        mask = cv2.morphologyEx(
-            mask, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        )
-        mask = cv2.resize(mask, (width, height), interpolation=cv2.INTER_AREA)
-        return (mask > 55).astype(np.uint8) * 255
-
     def process_file(
         self,
         input_path: str,
@@ -239,32 +185,59 @@ class MemeLineExtractor:
         text_scale: int = 3,
         font_path: Optional[str] = None,
         write_categories: bool = True,
+        style: str = "lineart",
+        detail: int = 4,
+        wobble: float = 1.0,
+        simplify: float = 0.012,
+        seed: Optional[int] = None,
     ) -> str:
         """
-        Reads an image from input_path, extracts lines, and saves to output_path.
+        Reads an image from input_path, renders it, and saves to output_path.
+
+        `style` picks the renderer: "lineart" traces edges with Canny, "doodle"
+        redraws the subject as a few thick hand-drawn strokes (see doodle_renderer).
+        The `detail`/`wobble`/`simplify`/`seed` arguments only apply to "doodle".
 
         When `write_categories` is set, a `<output>.json` sidecar with suggested
         expense categories is written alongside the PNG (see meme_categorizer).
         """
+        if style not in STYLES:
+            raise ValueError(f"Unknown style: {style}. Expected one of {STYLES}.")
         if not os.path.exists(input_path):
             raise FileNotFoundError(f"Input file not found: {input_path}")
 
-        lines_img = self.extract_lines(
-            image=input_path,
-            remove_bg=remove_bg,
-            line_color=line_color,
-            thickness=thickness,
-            threshold1=threshold1,
-            threshold2=threshold2,
-            blur_size=blur_size,
-            use_adaptive=use_adaptive,
-            fill_text=fill_text,
-            text_kernel_size=text_kernel_size,
-            text_mode=text_mode,
-            text_scale=text_scale,
-            font_path=font_path,
-            source_path=input_path,
-        )
+        if style == "doodle":
+            lines_img = self.doodle.render(
+                image=input_path,
+                remove_bg=remove_bg,
+                line_color=line_color,
+                thickness=thickness if thickness > 1 else None,
+                detail=detail,
+                wobble=wobble,
+                simplify=simplify,
+                seed=seed,
+                text_mode=text_mode,
+                text_scale=text_scale,
+                font_path=font_path,
+                source_path=input_path,
+            )
+        else:
+            lines_img = self.extract_lines(
+                image=input_path,
+                remove_bg=remove_bg,
+                line_color=line_color,
+                thickness=thickness,
+                threshold1=threshold1,
+                threshold2=threshold2,
+                blur_size=blur_size,
+                use_adaptive=use_adaptive,
+                fill_text=fill_text,
+                text_kernel_size=text_kernel_size,
+                text_mode=text_mode,
+                text_scale=text_scale,
+                font_path=font_path,
+                source_path=input_path,
+            )
 
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         lines_img.save(output_path, format="PNG")
@@ -302,6 +275,7 @@ class MemeLineExtractor:
             raise NotADirectoryError(f"Input directory not found: {input_dir}")
 
         os.makedirs(output_dir, exist_ok=True)
+        suffix = "doodle" if kwargs.get("style") == "doodle" else "lineart"
         count = 0
         taken = set()
 
@@ -312,7 +286,7 @@ class MemeLineExtractor:
                     target_dir = os.path.join(output_dir, rel_path)
                     os.makedirs(target_dir, exist_ok=True)
 
-                    out_path = self._output_path(target_dir, file, taken)
+                    out_path = self._output_path(target_dir, file, taken, suffix)
                     in_path = os.path.join(root, file)
 
                     try:
@@ -323,7 +297,7 @@ class MemeLineExtractor:
 
         return count
 
-    def _output_path(self, target_dir: str, filename: str, taken: set) -> str:
+    def _output_path(self, target_dir: str, filename: str, taken: set, suffix: str = "lineart") -> str:
         """
         Builds a collision-free output path.
 
@@ -335,12 +309,12 @@ class MemeLineExtractor:
         stem, ext = os.path.splitext(filename)
         ext = ext.lstrip(".").lower()
 
-        candidate = os.path.normpath(os.path.join(target_dir, f"{stem}_lineart.png"))
-        suffix = 0
+        candidate = os.path.normpath(os.path.join(target_dir, f"{stem}_{suffix}.png"))
+        collision = 0
         while candidate in taken:
-            suffix += 1
-            tag = ext if suffix == 1 else f"{ext}_{suffix}"
-            candidate = os.path.normpath(os.path.join(target_dir, f"{stem}_{tag}_lineart.png"))
+            collision += 1
+            tag = ext if collision == 1 else f"{ext}_{collision}"
+            candidate = os.path.normpath(os.path.join(target_dir, f"{stem}_{tag}_{suffix}.png"))
 
         taken.add(candidate)
         return candidate
