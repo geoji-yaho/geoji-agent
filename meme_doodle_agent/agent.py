@@ -12,6 +12,7 @@ from meme_doodle_agent.models import (
 )
 from meme_doodle_agent.analyzer import MemeAnalyzer
 from meme_doodle_agent.prompt_builder import CrudeDoodlePromptBuilder
+from meme_doodle_agent.generator import MemeImageGenerator
 
 
 class MemeDoodleAgent:
@@ -23,10 +24,11 @@ class MemeDoodleAgent:
         self.output_dir = output_dir
         self.analyzer = MemeAnalyzer()
         self.prompt_builder = CrudeDoodlePromptBuilder()
+        self.generator = MemeImageGenerator()
         os.makedirs(self.output_dir, exist_ok=True)
 
     def process_request(self, request: MemeConversionRequest) -> MemeConversionResult:
-        """Process a conversion request end-to-end and save to output directory."""
+        """Process a conversion request end-to-end and physically generate image on disk."""
         try:
             # 1. Image / Metadata Analysis
             analysis = self._analyze_image(request.image_path, request.custom_subtitles)
@@ -42,9 +44,12 @@ class MemeDoodleAgent:
             if output_parent:
                 os.makedirs(output_parent, exist_ok=True)
 
+            # 4. Physically generate and save the image file to disk
+            actual_output_path = self.generator.generate(generated_prompt, analysis, output_path)
+
             return MemeConversionResult(
                 success=True,
-                output_path=output_path,
+                output_path=actual_output_path,
                 analysis=analysis,
                 generated_prompt=generated_prompt,
                 category=analysis.category,
