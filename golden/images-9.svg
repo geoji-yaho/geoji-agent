@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 225 225">
+  <!--
+    Golden case: 플랑크톤 (inputs/images-9.jpg)
+    Another total failure for edge detection: a flat cartoon frame with no human
+    face. A model that recognizes the character draws the one-eyed silhouette and
+    the chocolate-bar building it is shoving.
+    Picture only. Caption strip (y≈160-200) is left empty.
+  -->
+  <g fill="none" stroke="#141414" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- 초코바 건물: 톱니 모서리 -->
+    <path d="M118 30 L126 22 L134 30 L142 22 L150 30 L158 22 L166 30 L174 22
+             L182 30 L188 26 L188 140 L180 148 L172 140 L164 148 L156 140
+             L148 148 L140 140 L132 148 L124 140 L118 146 Z"/>
+    <!-- 건물에 적힌 P -->
+    <path d="M140 52 L140 118"/>
+    <path d="M140 52 C162 50 170 62 168 74 C166 86 154 90 140 88"/>
+
+    <!-- 플랑크톤 몸통 -->
+    <path d="M62 108 C60 92 70 82 84 82 C99 82 108 92 107 108
+             C106 128 98 144 84 145 C70 146 63 128 62 108 Z"/>
+
+    <!-- 더듬이 -->
+    <path d="M72 84 C68 70 62 60 54 54"/>
+    <path d="M96 83 C99 69 104 60 111 55"/>
+
+    <!-- 다리: 건물을 미는 자세 -->
+    <path d="M104 112 C116 114 126 118 132 124"/>
+    <path d="M103 126 C114 130 122 136 127 142"/>
+    <path d="M70 145 C66 158 62 166 56 172"/>
+    <path d="M92 145 C94 156 98 164 104 170"/>
+  </g>
+
+  <!-- 외눈 -->
+  <g fill="none" stroke="#141414" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="85" cy="103" rx="17" ry="14"/>
+  </g>
+  <g fill="#141414" stroke="none">
+    <ellipse cx="87" cy="104" rx="6" ry="6.5"/>
+  </g>
+
+  <!-- 이 악문 입 -->
+  <g fill="none" stroke="#141414" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M74 126 C81 132 92 132 98 125"/>
+  </g>
+</svg>
