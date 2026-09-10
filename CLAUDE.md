@@ -1,12 +1,12 @@
 # CLAUDE.md
 
-떼거지(친구들이 내 지출을 재판하는 소비 절제 커뮤니티)의 AI 파트. 지출이 등록되면 심문관·조서·양형관·서기·검수관 다섯 역할이 판결문을 만들고, 그 역할을 이 저장소가 구현한다. GitHub 이름은 `geoji-agent`, 로컬 디렉터리는 `geojibang`. 원티드 AI Championship 2026 출품작이고 제출 마감은 2026-09-20, 심사는 9/21부터 10/5까지다. 백엔드 `geoji-server`와 프론트 `geoji-web`는 별도 저장소이다. 개발 언어는 Python이고 산출물은 Docker 이미지다. 이미지를 백엔드 담당자에게 넘기면 그쪽 AWS 계정의 EC2에 올린다. 우리는 이미지와 compose 조각까지만 책임진다.
+떼거지(친구들이 내 지출을 재판하는 소비 절제 커뮤니티)의 AI 파트. 지출이 등록되면 심문관·조서·양형관·서기·검수관 다섯 역할이 판결문을 만들고, 그 역할을 이 저장소가 구현한다. 저장소 이름은 `geoji-agent`이고 로컬에서는 `geojibang/` 워크스페이스 안에 있다. 원티드 AI Championship 2026 출품작이고 제출 마감은 2026-09-20, 심사는 9/21부터 10/5까지다. 백엔드 `../geoji-server`와 프론트 `../geoji-web`는 같은 워크스페이스의 형제 저장소다. 개발 언어는 Python이고 산출물은 Docker 이미지다. 이미지를 백엔드 담당자에게 넘기면 그쪽 AWS 계정의 EC2에 올린다. 우리는 이미지와 compose 조각까지만 책임진다.
 
 ## 규칙
 
 - 문서와 주석, 커밋 메시지, 응답은 한국어. 코드 식별자는 영어
 - 정본은 `docs/plans/`다. 문서는 `10 §15.2`, `01 CT-07`처럼 번호와 절로 부른다. 골격과 결정 기록 절차는 `.claude/rules/plans-format.md`
-- Git: `.claude/rules/git-workflow.md`. `type(scope): 한국어 제목`, 계획서 갱신은 `docs(plans)`. `geoji-server/`, `geoji-web/`, `.env`는 `git add` 하지 않는다
+- Git: `.claude/rules/git-workflow.md`. `type(scope): 한국어 제목`, 계획서 갱신은 `docs(plans)`. `.env`는 `git add` 하지 않는다
 - 용어: `.claude/rules/domain-vocabulary.md`. enum은 프론트 값이 표준이다(D-21)
 - 코드: `.claude/rules/code-layout.md`. uv와 Python 3.12, `api/workers → application → domain/ports`
 - 테스트와 모델 호출: `.claude/rules/testing.md`. 테스트는 fake provider만, 프롬프트 변경은 골든셋 회귀와 사람 검수
@@ -16,7 +16,7 @@
 
 에이전트가 읽는 룰·스킬·서브에이전트·슬래시 커맨드·훅은 `.claude/` 에 있다. 목록과 추가하는 법은 `.claude/README.md`.
 
-<!-- TODO 하네스 스킬이 생기면 여기서 "무엇을 만들 때 어느 스킬로 진행하는지" 한 줄 -->
+계획서의 카드나 절을 코드로 만들 때는 `geoji-harness` 스킬로 진행한다. 명세 대조, 구현, 코드 검토와 테스트 검증을 서브에이전트 넷이 나눠 맡는다. 단순 질문과 한 줄 수정, 문서 작업, 커밋에는 쓰지 않는다.
 
 ## 기준 문서
 

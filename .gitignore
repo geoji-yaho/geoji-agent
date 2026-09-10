@@ -9,3 +9,6 @@ assets/
 #
 docs/*
 !docs/plans/
+# 하네스 중간 산출물
+_workspace/
+_workspace_prev/

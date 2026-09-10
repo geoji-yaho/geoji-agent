@@ -20,6 +20,5 @@ description: 브랜치 전략과 커밋 메시지 형식, git add 하지 않는 
 
 ## git add 하지 않는 것
 
-- `geoji-server/`, `geoji-web/`. 형제 저장소의 로컬 clone이라 의도적으로 untracked
 - `.env`. 키 이름만 `.env.example`에 둔다
 - `docs/` 중 추적하는 것은 `docs/plans/`뿐이다(`.gitignore`)

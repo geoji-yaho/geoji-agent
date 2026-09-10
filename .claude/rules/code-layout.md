@@ -33,10 +33,15 @@ src/geoji_ai/api/               FastAPI. /health/live, /health/ready
 src/geoji_ai/workers/           ai.jobs 워커
 src/geoji_ai/core/              config, logging, startup
 database/migrations/001~005     001~003 AI 소유. 004 초안은 여기 두고 백엔드로 이관
+prompts/                        프롬프트 파일. 코드 문자열에 넣지 않는다. 05 §3.6·06 §3.3
+prompts/writer/{common,mild,spicy,hell}-vN.md   강도별 시스템 프롬프트. 공통 + 그 강도 섹션만 합친다
+prompts/{context,banter,sentencing}-vN.md       조서·드립·양형관
+prompts/evaluator/guardrail-vN.md               검수관. 정책 버전과 같이 간다
 tests/                          testing.md 참조
 scripts/probe_*.py              실측 스크립트. 결과는 scripts/probe_out/에 커밋
 ```
 
+- `PROMPT_BUNDLE_VERSION`은 `prompts/` 파일 해시로 만든다. 프롬프트를 바꾸면 `-vN` 파일을 새로 만들고 옛 버전은 남긴다. 회귀가 두 버전을 비교한다
 - 계획서가 말하는 경로가 아직 없으면 그 계획서 §3 표의 파일명 그대로 만든다. 이름을 바꾸면 계획서도 같이 고친다
 
 ## 의존 방향
