@@ -1,0 +1,8 @@
+# 줄바꿈은 저장소와 체크아웃 모두 LF. prompts/ 해시가 OS 마다 달라지지 않게 한다
+* text=auto eol=lf
+
+# 바이너리
+*.png binary
+*.jpg binary
+*.gif binary
+*.webp binary
