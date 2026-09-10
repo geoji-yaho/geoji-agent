@@ -1,3 +1,0 @@
-# 골든케이스 샘플 렌더 전용. 메인 파이프라인은 이 패키지 없이 동작한다.
-# native cairo 의존이라 메인 requirements.txt에는 넣지 않는다.
-cairosvg>=2.7.0
