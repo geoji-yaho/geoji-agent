@@ -33,6 +33,16 @@ uv run ruff format .
 uv run pytest -q
 ```
 
+## 계약 정본
+
+`contracts/*.schema.json` 7종이 계약 정본이고 백엔드·프론트가 읽는다. 파일은 pydantic 미러
+(`src/geoji_ai/contracts/`)에서 생성한다. **정본 JSON 을 손으로 고치지 않는다.** 미러를 고치고
+재생성한다. 테스트가 "재생성 = 커밋본" 을 단언한다.
+
+```bash
+uv run python tools/gen_contracts.py
+```
+
 ## 설정
 
 환경변수 이름 = 필드 이름이다. 값은 `.env`(커밋하지 않는다) 또는 환경에서 온다.
