@@ -1,0 +1,33 @@
+{
+  "verdict_id": "5c2e8b71-9d34-4a6f-8b12-7e0f3a9c5d82",
+  "verdict_version": 1,
+  "result": "disagree",
+  "vote_counts": {
+    "agree": 1,
+    "disagree": 3
+  },
+  "guilty_ratio": 0.75,
+  "confirmed_at": "2026-09-07T09:20:00Z",
+  "deadline_at": "2026-09-07T09:30:00Z",
+  "policy": {
+    "version": "policy-v1",
+    "allowed_sentences": [
+      {
+        "code": "probation",
+        "rank": 1
+      },
+      {
+        "code": "oneDay",
+        "rank": 2
+      }
+    ],
+    "fallback_sentence": "oneDay",
+    "reason_required": true
+  },
+  "target_intensities": [
+    "mild",
+    "spicy",
+    "hell"
+  ],
+  "default_intensity": "spicy"
+}

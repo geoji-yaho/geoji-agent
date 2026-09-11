@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "intake-v1.schema.json",
+  "title": "IntakeRequest / IntakeResult",
+  "$defs": {
+    "IntakeRequest": {
+      "additionalProperties": false,
+      "description": "제출 직전 심문관 호출 요청(10 §4).",
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "submission_id": {
+          "type": "string"
+        },
+        "payload_hash": {
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "INITIAL",
+            "FINAL_CHECK"
+          ],
+          "type": "string"
+        },
+        "post_type": {
+          "enum": [
+            "spent",
+            "considering"
+          ],
+          "type": "string"
+        },
+        "amount_krw": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "category": {
+          "enum": [
+            "식비",
+            "배달",
+            "카페/간식",
+            "교통/택시",
+            "쇼핑/패션",
+            "뷰티",
+            "취미/여가",
+            "술/유흥",
+            "구독",
+            "생활",
+            "기타"
+          ],
+          "type": "string"
+        },
+        "item": {
+          "maxLength": 30,
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "submission_id",
+        "payload_hash",
+        "mode",
+        "post_type",
+        "amount_krw",
+        "category",
+        "item",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "CategoryReview": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "OK",
+            "MISMATCH"
+          ],
+          "type": "string"
+        },
+        "suggested_category": {
+          "anyOf": [
+            {
+              "enum": [
+                "식비",
+                "배달",
+                "카페/간식",
+                "교통/택시",
+                "쇼핑/패션",
+                "뷰티",
+                "취미/여가",
+                "술/유흥",
+                "구독",
+                "생활",
+                "기타"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "status",
+        "suggested_category",
+        "confidence"
+      ],
+      "type": "object"
+    },
+    "ItemReview": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "OK",
+            "VAGUE",
+            "EXAGGERATED"
+          ],
+          "type": "string"
+        },
+        "suggested_item": {
+          "anyOf": [
+            {
+              "maxLength": 30,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "suggested_item"
+      ],
+      "type": "object"
+    },
+    "IntakeResult": {
+      "additionalProperties": false,
+      "description": "심문관 결과. `FINAL_CHECK` 는 `NEEDS_CLARIFICATION` 을 낼 수 없다(01 §3.2).",
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "mode": {
+          "enum": [
+            "INITIAL",
+            "FINAL_CHECK"
+          ],
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "NEEDS_CLARIFICATION",
+            "BLOCKED"
+          ],
+          "type": "string"
+        },
+        "item_review": {
+          "$ref": "#/$defs/ItemReview"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "maxLength": 60,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "category_review": {
+          "$ref": "#/$defs/CategoryReview"
+        },
+        "injection_detected": {
+          "type": "boolean"
+        },
+        "intake_source": {
+          "enum": [
+            "AI",
+            "FALLBACK"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "mode",
+        "status",
+        "item_review",
+        "message",
+        "category_review",
+        "injection_detected",
+        "intake_source"
+      ],
+      "type": "object",
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "FINAL_CHECK"
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "enum": [
+              "PASS",
+              "BLOCKED"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/IntakeRequest"
+    },
+    {
+      "$ref": "#/$defs/IntakeResult"
+    }
+  ]
+}

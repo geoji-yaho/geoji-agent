@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "policy_version": "guardrail-v2",
+  "sentence_check": {
+    "pass": true,
+    "violations": []
+  },
+  "sentencing_reason_check": {
+    "pass": true,
+    "violations": []
+  },
+  "texts": [
+    {
+      "intensity": "mild",
+      "pass": true,
+      "violations": [],
+      "problem_sentences": []
+    },
+    {
+      "intensity": "spicy",
+      "pass": true,
+      "violations": [],
+      "problem_sentences": []
+    },
+    {
+      "intensity": "hell",
+      "pass": true,
+      "violations": [],
+      "problem_sentences": []
+    }
+  ]
+}

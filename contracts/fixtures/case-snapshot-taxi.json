@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "post_id": "post-taxi-20260907-0852",
+  "author_id": "user-01H8Z9QK",
+  "post_version": 1,
+  "item": "택시",
+  "reason": "늦잠 자서 택시 탐",
+  "amount_krw": 12000,
+  "category": "교통/택시",
+  "post_type": "spent",
+  "created_at": "2026-09-07T08:52:00Z",
+  "audience": {
+    "room_ids": [
+      "room-ddegeoji-01"
+    ],
+    "audience_version": 1,
+    "public_share_enabled": false
+  },
+  "privacy_versions": [
+    {
+      "scope_key": "user:user-01H8Z9QK",
+      "epoch": 1
+    },
+    {
+      "scope_key": "room:room-ddegeoji-01",
+      "epoch": 1
+    }
+  ],
+  "room_snapshots": [
+    {
+      "room_id": "room-ddegeoji-01",
+      "intensity": "spicy",
+      "rule_version": 1
+    }
+  ],
+  "intake_result": null,
+  "jury": {
+    "verdict_id": "7a1d9c40-3b52-4e18-9f0a-2c6d8b4e1f31",
+    "verdict_version": 1,
+    "result": "guilty",
+    "vote_counts": {
+      "guilty": 3,
+      "notGuilty": 1
+    },
+    "guilty_ratio": 0.75,
+    "confirmed_at": "2026-09-07T09:20:00Z",
+    "deadline_at": "2026-09-07T09:30:00Z",
+    "policy": {
+      "version": "policy-v1",
+      "allowed_sentences": [
+        {
+          "code": "probation",
+          "rank": 1
+        },
+        {
+          "code": "oneDay",
+          "rank": 2
+        }
+      ],
+      "fallback_sentence": "oneDay",
+      "reason_required": true
+    },
+    "target_intensities": [
+      "mild",
+      "spicy",
+      "hell"
+    ],
+    "default_intensity": "spicy"
+  }
+}

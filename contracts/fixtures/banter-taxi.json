@@ -1,0 +1,39 @@
+{
+  "candidates": [
+    {
+      "id": "2c7b5e90-1a43-4d6f-9b28-5e0c3a7f1d40",
+      "text": "지하철이 있었잖아요. 알람을 12개 맞추세요.",
+      "strategy": "PREMISE_REJECTION",
+      "intensity": "spicy",
+      "evidence_labels": []
+    },
+    {
+      "id": "8d3f1a62-6c95-4b07-8e41-9a2d5f3b7c18",
+      "text": "지난주에도 늦잠, 이번 주도 늦잠. 택시가 아니라 이불이 문제입니다.",
+      "strategy": "REPEAT_OFFENSE",
+      "intensity": "spicy",
+      "evidence_labels": [
+        "F2",
+        "F3"
+      ]
+    },
+    {
+      "id": "4e9c0b57-2f18-4a63-9d70-6b1e8c4a2f95",
+      "text": "택시 월 1회 규칙은 권장사항이 아닙니다. 이번 달 4회째입니다.",
+      "strategy": "ROOM_RULE_CALLBACK",
+      "intensity": "hell",
+      "evidence_labels": [
+        "F4"
+      ]
+    },
+    {
+      "id": "6a5d2f83-4b70-4e19-8c26-0f7a9b3e5d14",
+      "text": "31,000원이면 알람 시계 세 개입니다. 하나만 사세요.",
+      "strategy": "CHEAPER_ALTERNATIVE",
+      "intensity": "hell",
+      "evidence_labels": [
+        "F1"
+      ]
+    }
+  ]
+}

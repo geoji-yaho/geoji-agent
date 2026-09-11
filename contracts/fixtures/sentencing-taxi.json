@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "sentence": "oneDay",
+  "sentencing_reason": "유죄율 75%로 실형 범위이나, 이번 달 예산 소진율이 아직 41%라 무기징역까지는 가지 않는다.",
+  "reason_source": "AI",
+  "evidence_labels": ["F1", "F5"],
+  "aggravating": [],
+  "mitigating": []
+}

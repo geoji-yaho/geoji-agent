@@ -1,0 +1,23 @@
+# 로컬 개발용 Postgres 하나. 작업 2 의 `ai.jobs` 큐와 통합 테스트가 쓴다(02 §4.3).
+# 운영은 Supabase 관리형 Postgres 다(D-20, 10 §15.2). 이 파일은 로컬 전용이다.
+services:
+  postgres:
+    image: postgres:16
+    container_name: geoji-ai-postgres
+    environment:
+      # 로컬 전용 값이다. 운영 자격 증명은 여기 두지 않는다.
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:

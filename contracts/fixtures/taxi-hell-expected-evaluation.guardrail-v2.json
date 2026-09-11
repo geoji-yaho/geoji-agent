@@ -1,0 +1,25 @@
+{
+  "expected": {
+    "schema_version": 1,
+    "policy_version": "guardrail-v2",
+    "sentence_check": {
+      "pass": true,
+      "violations": []
+    },
+    "sentencing_reason_check": {
+      "pass": true,
+      "violations": []
+    },
+    "texts": [
+      {
+        "intensity": "hell",
+        "pass": true,
+        "violations": [],
+        "problem_sentences": []
+      }
+    ]
+  },
+  "open_questions": [
+    "비속어는 닫힌 허용 목록 검사 대상이다. '들어쳐먹을래'는 목록 밖 변형이므로 PROFANITY_OUT_OF_LIST 후보이며, 목록 확정 후 기대값을 고정한다."
+  ]
+}

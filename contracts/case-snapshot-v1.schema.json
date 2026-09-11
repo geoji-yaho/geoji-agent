@@ -1,0 +1,475 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "case-snapshot-v1.schema.json",
+  "title": "CaseSnapshot",
+  "$defs": {
+    "AllowedSentence": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/SentenceCode"
+        },
+        "rank": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "code",
+        "rank"
+      ],
+      "type": "object"
+    },
+    "Audience": {
+      "additionalProperties": false,
+      "properties": {
+        "room_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "audience_version": {
+          "type": "integer"
+        },
+        "public_share_enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "room_ids",
+        "audience_version",
+        "public_share_enabled"
+      ],
+      "type": "object"
+    },
+    "CategoryReview": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "OK",
+            "MISMATCH"
+          ],
+          "type": "string"
+        },
+        "suggested_category": {
+          "anyOf": [
+            {
+              "enum": [
+                "식비",
+                "배달",
+                "카페/간식",
+                "교통/택시",
+                "쇼핑/패션",
+                "뷰티",
+                "취미/여가",
+                "술/유흥",
+                "구독",
+                "생활",
+                "기타"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "status",
+        "suggested_category",
+        "confidence"
+      ],
+      "type": "object"
+    },
+    "IntakeResult": {
+      "additionalProperties": false,
+      "description": "심문관 결과. `FINAL_CHECK` 는 `NEEDS_CLARIFICATION` 을 낼 수 없다(01 §3.2).",
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "mode": {
+          "enum": [
+            "INITIAL",
+            "FINAL_CHECK"
+          ],
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "NEEDS_CLARIFICATION",
+            "BLOCKED"
+          ],
+          "type": "string"
+        },
+        "item_review": {
+          "$ref": "#/$defs/ItemReview"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "maxLength": 60,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "category_review": {
+          "$ref": "#/$defs/CategoryReview"
+        },
+        "injection_detected": {
+          "type": "boolean"
+        },
+        "intake_source": {
+          "enum": [
+            "AI",
+            "FALLBACK"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "mode",
+        "status",
+        "item_review",
+        "message",
+        "category_review",
+        "injection_detected",
+        "intake_source"
+      ],
+      "type": "object",
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "FINAL_CHECK"
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "enum": [
+              "PASS",
+              "BLOCKED"
+            ]
+          }
+        }
+      }
+    },
+    "Intensity": {
+      "enum": [
+        "mild",
+        "spicy",
+        "hell"
+      ],
+      "type": "string"
+    },
+    "ItemReview": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "OK",
+            "VAGUE",
+            "EXAGGERATED"
+          ],
+          "type": "string"
+        },
+        "suggested_item": {
+          "anyOf": [
+            {
+              "maxLength": 30,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "suggested_item"
+      ],
+      "type": "object"
+    },
+    "JurySnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "verdict_id": {
+          "type": "string"
+        },
+        "verdict_version": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "result": {
+          "$ref": "#/$defs/VerdictResult"
+        },
+        "vote_counts": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          }
+        },
+        "guilty_ratio": {
+          "type": "number"
+        },
+        "confirmed_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "deadline_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "policy": {
+          "$ref": "#/$defs/SentencingPolicy"
+        },
+        "target_intensities": {
+          "items": {
+            "$ref": "#/$defs/Intensity"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "default_intensity": {
+          "$ref": "#/$defs/Intensity"
+        }
+      },
+      "required": [
+        "verdict_id",
+        "verdict_version",
+        "result",
+        "vote_counts",
+        "guilty_ratio",
+        "confirmed_at",
+        "deadline_at",
+        "policy",
+        "target_intensities",
+        "default_intensity"
+      ],
+      "type": "object"
+    },
+    "PrivacyVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "scope_key": {
+          "type": "string"
+        },
+        "epoch": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "scope_key",
+        "epoch"
+      ],
+      "type": "object"
+    },
+    "RoomSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "room_id": {
+          "type": "string"
+        },
+        "intensity": {
+          "$ref": "#/$defs/Intensity"
+        },
+        "rule_version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "room_id",
+        "intensity",
+        "rule_version"
+      ],
+      "type": "object"
+    },
+    "SentenceCode": {
+      "enum": [
+        "probation",
+        "oneDay",
+        "life"
+      ],
+      "type": "string"
+    },
+    "SentencingPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "allowed_sentences": {
+          "items": {
+            "$ref": "#/$defs/AllowedSentence"
+          },
+          "type": "array"
+        },
+        "fallback_sentence": {
+          "$ref": "#/$defs/SentenceCode"
+        },
+        "reason_required": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "version",
+        "allowed_sentences",
+        "fallback_sentence",
+        "reason_required"
+      ],
+      "type": "object"
+    },
+    "VerdictResult": {
+      "description": "배심원 평결. 각하(`dismissed`)는 선고 작업을 만들지 않으므로 여기 없다.",
+      "enum": [
+        "guilty",
+        "notGuilty",
+        "agree",
+        "disagree"
+      ],
+      "type": "string"
+    },
+    "CaseSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "post_id": {
+          "type": "string"
+        },
+        "author_id": {
+          "type": "string"
+        },
+        "post_version": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "item": {
+          "maxLength": 30,
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount_krw": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "category": {
+          "enum": [
+            "식비",
+            "배달",
+            "카페/간식",
+            "교통/택시",
+            "쇼핑/패션",
+            "뷰티",
+            "취미/여가",
+            "술/유흥",
+            "구독",
+            "생활",
+            "기타"
+          ],
+          "type": "string"
+        },
+        "post_type": {
+          "enum": [
+            "spent",
+            "considering"
+          ],
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "audience": {
+          "$ref": "#/$defs/Audience"
+        },
+        "privacy_versions": {
+          "items": {
+            "$ref": "#/$defs/PrivacyVersion"
+          },
+          "type": "array"
+        },
+        "room_snapshots": {
+          "items": {
+            "$ref": "#/$defs/RoomSnapshot"
+          },
+          "type": "array"
+        },
+        "intake_result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IntakeResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "jury": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JurySnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "post_id",
+        "author_id",
+        "post_version",
+        "item",
+        "reason",
+        "amount_krw",
+        "category",
+        "post_type",
+        "created_at",
+        "audience",
+        "privacy_versions",
+        "room_snapshots",
+        "intake_result",
+        "jury"
+      ],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/CaseSnapshot"
+}

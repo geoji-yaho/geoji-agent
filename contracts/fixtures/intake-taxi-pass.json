@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "mode": "INITIAL",
+  "status": "PASS",
+  "item_review": {
+    "status": "OK",
+    "suggested_item": null
+  },
+  "message": null,
+  "category_review": {
+    "status": "OK",
+    "suggested_category": null,
+    "confidence": 0.9
+  },
+  "injection_detected": false,
+  "intake_source": "AI"
+}
