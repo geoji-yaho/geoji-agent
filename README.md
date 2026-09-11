@@ -64,7 +64,7 @@ uv run python tools/gen_contracts.py
 | `MODEL_WRITER` | `grok-4.20-0309-non-reasoning` | 서기·드립. 추론 모델(`grok-4.6`·`4.5`·`4.3`)이면 기동 실패 |
 | `MODEL_EVALUATOR_HELL` | `gpt-5.6-luna` | 지옥맛 검수관 |
 | `PROMPT_BUNDLE_VERSION` | `bundle-v1` | `prompts/` 파일 해시로 만든다 |
-| `GUARDRAIL_POLICY_VERSION` | `guardrail-v2` | `guardrail-v1` \| `guardrail-v2`(D-07). production 에서 비면 기동 실패 |
+| `GUARDRAIL_POLICY_VERSION` | `guardrail-v2` | `guardrail-v1` \| `guardrail-v2`(D-07). **production 에서는 환경변수에 직접 적어야 한다.** 안 적고 기본값에 기대면 기동 실패 |
 | `INTAKE_TIMEOUT_SECONDS` | `4` | 심문관 |
 | `FIRST_RESULT_TARGET_SECONDS` | `10` | 첫 결과 목표 |
 | `REPAIR_PATH_BUDGET_SECONDS` | `15` | 복구 경로 예산 |
@@ -101,7 +101,7 @@ uv run python tools/gen_contracts.py
 
 ### 기동 검사 (`core/startup.py`)
 
-1. production 인데 `GUARDRAIL_POLICY_VERSION` 이 허용 목록 밖이면 `StartupError`.
+1. production 인데 `GUARDRAIL_POLICY_VERSION` 을 환경변수로 직접 적지 않았으면(기본값 의존) `StartupError`. 목록 밖 값은 설정 생성 단계에서 이미 거부된다.
 2. `MODEL_WRITER` 가 `grok-4.6`·`grok-4.5`·`grok-4.3` 이면 `StartupError`(환경 무관).
 3. `OPENAI_API_KEY`·`XAI_API_KEY` 가 비면 기동은 되고 `/health/ready` 가 503 을 낸다.
 

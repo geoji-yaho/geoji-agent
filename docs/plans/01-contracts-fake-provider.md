@@ -199,7 +199,7 @@ class LedgerPort(Protocol):
 | 기능 플래그 | `ROOM_COMMENT_STYLE_ENABLED=false` · `PUBLIC_HISTORY_CALLBACK_ENABLED=false` · `REFLECT_ENABLED=false` · `HINDSIGHT_ENABLED=false` | hell 을 끄는 플래그는 없다 — 정책 버전으로 통제 |
 | `WORKER_SLOTS` | `SENTENCE=2, PREPARE=1, BACKGROUND=1` | 작업 2 |
 
-`startup.validate()`(production): 정책 없는 형량 fallback → 오류, 추론 모델 설정 → 오류, 키 누락 → `/health/ready` 503.
+`startup.validate()`(production): 정책 없는 형량 fallback → 오류(**9/11 확정: "없다" = 환경변수에 `GUARDRAIL_POLICY_VERSION` 을 직접 적지 않고 코드 기본값에 기대는 것. 운영 배포 환경변수 목록에 이 값을 반드시 넣는다. 값은 `guardrail-v2`**), 추론 모델 설정 → 오류, 키 누락 → `/health/ready` 503.
 
 ## 4. 완료 기준 (DoD)
 
