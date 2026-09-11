@@ -96,7 +96,7 @@ ON CONFLICT (dedupe_key) DO NOTHING;   -- 같은 업무 트랜잭션 안. commit
 
 ### 4.1 snapshot
 - 검증: job 존재 ∧ `RUNNING` ∧ 헤더 `X-Generation-Id` 일치 ∧ lease 유효. 아니면 409
-- 응답 `CaseSnapshot`(01 §3.2): `post{id, author_id, post_version, item, reason, amount_krw, category, post_type, created_at}`, `audience{room_ids, audience_version, public_share_enabled}`, `privacy_versions[{scope_key, epoch}]`(관련 scope 전부: post·author·각 room), `room_snapshots[{room_id, intensity, rule_version}]`, `intake_result`, `jury`(SENTENCE·TEXT_RETRY 일 때: `verdict_id, verdict_version, result, vote_counts, guilty_ratio, confirmed_at, deadline_at, policy{…}, target_intensities, default_intensity`)
+- 응답 `CaseSnapshot`(01 §3.2, **평면** — 9/11 정정. `post_id, author_id, post_version, item, reason, amount_krw, category, post_type, created_at` 이 최상위. (원문) `post{id, author_id, post_version, item, reason, amount_krw, category, post_type, created_at}`), `audience{room_ids, audience_version, public_share_enabled}`, `privacy_versions[{scope_key, epoch}]`(관련 scope 전부: post·author·각 room), `room_snapshots[{room_id, intensity, rule_version}]`, `intake_result`, `jury`(SENTENCE·TEXT_RETRY 일 때: `verdict_id, verdict_version, result, vote_counts, guilty_ratio(0..1 소수), confirmed_at, deadline_at, policy{…}, target_intensities, default_intensity`)
 - **`(제안)` RETAIN job 확장**: `sentence.finalized` 면 `verdict_final{sentence, sentence_source, sentencing_reason, reason_source, applied_intensity, banter_strategy}`, `comment.approved` 면 `comment{comment_id, version, room_id, post_id, post_status, author_id, content, created_at}`. 삭제된 원본이면 404 — 워커는 skip
 
 ### 4.2 resolve-evidence
@@ -236,7 +236,7 @@ COMMIT
 | ~~D-20~~ | **확정(§15.2)** — Supabase 인스턴스 공유. 남은 것: role·grants 생성, Session Pooler 접속 정보 | 9/9 |
 | ~~D-21~~ | **확정(§15.2)** — 프론트 값 표준. 남은 것: `rooms.spice_level` 값 변경 | 9/9 |
 | ~~enum 매핑~~ | **확정(§15.2)** — 카테고리 11종 고정 | 9/9 |
-| CaseSnapshot | `post_version`·`audience_version`·`privacy_versions`·`rule_version`·`policy` 를 채울 수 있는가 | 9/9 |
+| CaseSnapshot | `post_version`·`audience_version`·`privacy_versions`·`rule_version`·`policy` 를 채울 수 있는가. **9/11 서버 `d0f9fd5` 확인: 재판 API 는 생겼으나 위 필드·`/internal/v1/*` 전부 없음.** 계약은 01 §3.2 대로 확정, 검증은 03 가짜 백엔드 | 9/9(지남) |
 | §4.4 | 제출 → 게시물 매핑 통지 방식 | 9/14 |
 | §4.5 | trace 조회 프록시 주체 | 9/16 |
 | §4.6 | `generation-failed` 오류 코드 표 채택 | 9/10 |
