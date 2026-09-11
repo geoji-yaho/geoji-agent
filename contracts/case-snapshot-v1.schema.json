@@ -10,6 +10,7 @@
           "$ref": "#/$defs/SentenceCode"
         },
         "rank": {
+          "minimum": 1,
           "type": "integer"
         }
       },
@@ -26,10 +27,12 @@
           "items": {
             "type": "string"
           },
+          "maxItems": 50,
           "type": "array",
           "uniqueItems": true
         },
         "audience_version": {
+          "minimum": 1,
           "type": "integer"
         },
         "public_share_enabled": {
@@ -233,6 +236,8 @@
           }
         },
         "guilty_ratio": {
+          "maximum": 1,
+          "minimum": 0,
           "type": "number"
         },
         "confirmed_at": {
@@ -250,6 +255,8 @@
           "items": {
             "$ref": "#/$defs/Intensity"
           },
+          "maxItems": 3,
+          "minItems": 1,
           "type": "array",
           "uniqueItems": true
         },
@@ -278,6 +285,7 @@
           "type": "string"
         },
         "epoch": {
+          "minimum": 0,
           "type": "integer"
         }
       },
@@ -297,6 +305,7 @@
           "$ref": "#/$defs/Intensity"
         },
         "rule_version": {
+          "minimum": 0,
           "type": "integer"
         }
       },
@@ -325,6 +334,8 @@
           "items": {
             "$ref": "#/$defs/AllowedSentence"
           },
+          "maxItems": 3,
+          "minItems": 1,
           "type": "array"
         },
         "fallback_sentence": {
@@ -422,12 +433,14 @@
           "items": {
             "$ref": "#/$defs/PrivacyVersion"
           },
+          "maxItems": 100,
           "type": "array"
         },
         "room_snapshots": {
           "items": {
             "$ref": "#/$defs/RoomSnapshot"
           },
+          "maxItems": 50,
           "type": "array"
         },
         "intake_result": {

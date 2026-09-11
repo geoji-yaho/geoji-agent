@@ -34,20 +34,26 @@
         },
         "evidence_labels": {
           "items": {
+            "pattern": "^F\\d+$",
             "type": "string"
           },
+          "maxItems": 16,
           "type": "array"
         },
         "aggravating": {
           "items": {
+            "maxLength": 100,
             "type": "string"
           },
+          "maxItems": 20,
           "type": "array"
         },
         "mitigating": {
           "items": {
+            "maxLength": 100,
             "type": "string"
           },
+          "maxItems": 20,
           "type": "array"
         }
       },

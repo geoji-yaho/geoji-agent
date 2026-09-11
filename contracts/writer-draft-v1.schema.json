@@ -39,12 +39,15 @@
       "additionalProperties": false,
       "properties": {
         "emotion": {
+          "maxLength": 30,
           "type": "string"
         },
         "keywords": {
           "items": {
+            "maxLength": 30,
             "type": "string"
           },
+          "maxItems": 10,
           "type": "array"
         }
       },
@@ -68,6 +71,8 @@
       "additionalProperties": false,
       "properties": {
         "text": {
+          "maxLength": 300,
+          "minLength": 1,
           "type": "string"
         },
         "kind": {
@@ -80,8 +85,10 @@
         },
         "evidence_labels": {
           "items": {
+            "pattern": "^F\\d+$",
             "type": "string"
           },
+          "maxItems": 16,
           "type": "array"
         }
       },
@@ -156,6 +163,8 @@
           "items": {
             "$ref": "#/$defs/TextDraft"
           },
+          "maxItems": 3,
+          "minItems": 1,
           "type": "array"
         },
         "meme_tag": {

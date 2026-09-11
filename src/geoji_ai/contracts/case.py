@@ -67,9 +67,11 @@ class Audience(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     room_ids: Annotated[
-        list[str], Field(json_schema_extra={"uniqueItems": True}), AfterValidator(_unique)
+        list[str],
+        Field(max_length=50, json_schema_extra={"uniqueItems": True}),
+        AfterValidator(_unique),
     ]
-    audience_version: int
+    audience_version: Annotated[int, Field(ge=1)]
     public_share_enabled: bool
 
 
@@ -77,7 +79,7 @@ class PrivacyVersion(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scope_key: str
-    epoch: int
+    epoch: Annotated[int, Field(ge=0)]
 
 
 class RoomSnapshot(BaseModel):
@@ -85,21 +87,21 @@ class RoomSnapshot(BaseModel):
 
     room_id: str
     intensity: Intensity
-    rule_version: int
+    rule_version: Annotated[int, Field(ge=0)]
 
 
 class AllowedSentence(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     code: SentenceCode
-    rank: int
+    rank: Annotated[int, Field(ge=1)]
 
 
 class SentencingPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: str
-    allowed_sentences: list[AllowedSentence]
+    allowed_sentences: Annotated[list[AllowedSentence], Field(min_length=1, max_length=3)]
     fallback_sentence: SentenceCode
     reason_required: bool
 
@@ -111,12 +113,14 @@ class JurySnapshot(BaseModel):
     verdict_version: Annotated[int, Field(ge=1)]
     result: VerdictResult
     vote_counts: dict[str, NonNegativeInt]
-    guilty_ratio: float
+    guilty_ratio: Annotated[float, Field(ge=0, le=1)]
     confirmed_at: datetime
     deadline_at: datetime
     policy: SentencingPolicy
     target_intensities: Annotated[
-        list[Intensity], Field(json_schema_extra={"uniqueItems": True}), AfterValidator(_unique)
+        list[Intensity],
+        Field(min_length=1, max_length=3, json_schema_extra={"uniqueItems": True}),
+        AfterValidator(_unique),
     ]
     default_intensity: Intensity
 
@@ -135,7 +139,7 @@ class CaseSnapshot(BaseModel):
     post_type: PostType
     created_at: datetime
     audience: Audience
-    privacy_versions: list[PrivacyVersion]
-    room_snapshots: list[RoomSnapshot]
+    privacy_versions: Annotated[list[PrivacyVersion], Field(max_length=100)]
+    room_snapshots: Annotated[list[RoomSnapshot], Field(max_length=50)]
     intake_result: IntakeResult | None
     jury: JurySnapshot | None

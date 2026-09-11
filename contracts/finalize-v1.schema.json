@@ -37,6 +37,7 @@
           "items": {
             "$ref": "#/$defs/Violation"
           },
+          "maxItems": 20,
           "type": "array"
         }
       },
@@ -70,6 +71,8 @@
           "items": {
             "$ref": "#/$defs/TextEvaluation"
           },
+          "maxItems": 3,
+          "minItems": 1,
           "type": "array"
         }
       },
@@ -94,12 +97,15 @@
       "additionalProperties": false,
       "properties": {
         "emotion": {
+          "maxLength": 30,
           "type": "string"
         },
         "keywords": {
           "items": {
+            "maxLength": 30,
             "type": "string"
           },
+          "maxItems": 10,
           "type": "array"
         }
       },
@@ -146,6 +152,7 @@
           "type": "string"
         },
         "epoch": {
+          "minimum": 0,
           "type": "integer"
         }
       },
@@ -186,20 +193,26 @@
         },
         "evidence_labels": {
           "items": {
+            "pattern": "^F\\d+$",
             "type": "string"
           },
+          "maxItems": 16,
           "type": "array"
         },
         "aggravating": {
           "items": {
+            "maxLength": 100,
             "type": "string"
           },
+          "maxItems": 20,
           "type": "array"
         },
         "mitigating": {
           "items": {
+            "maxLength": 100,
             "type": "string"
           },
+          "maxItems": 20,
           "type": "array"
         }
       },
@@ -218,6 +231,8 @@
       "additionalProperties": false,
       "properties": {
         "text": {
+          "maxLength": 300,
+          "minLength": 1,
           "type": "string"
         },
         "kind": {
@@ -230,8 +245,10 @@
         },
         "evidence_labels": {
           "items": {
+            "pattern": "^F\\d+$",
             "type": "string"
           },
+          "maxItems": 16,
           "type": "array"
         }
       },
@@ -308,12 +325,15 @@
           "items": {
             "$ref": "#/$defs/Violation"
           },
+          "maxItems": 20,
           "type": "array"
         },
         "problem_sentences": {
           "items": {
+            "maxLength": 300,
             "type": "string"
           },
+          "maxItems": 10,
           "type": "array"
         }
       },
@@ -332,12 +352,15 @@
           "$ref": "#/$defs/ViolationCode"
         },
         "path": {
+          "maxLength": 200,
           "type": "string"
         },
         "evidence_labels": {
           "items": {
+            "pattern": "^F\\d+$",
             "type": "string"
           },
+          "maxItems": 16,
           "type": "array"
         },
         "explanation": {
@@ -380,6 +403,8 @@
           "items": {
             "$ref": "#/$defs/TextDraft"
           },
+          "maxItems": 3,
+          "minItems": 1,
           "type": "array"
         },
         "meme_tag": {
@@ -432,9 +457,11 @@
           "items": {
             "$ref": "#/$defs/PrivacyVersion"
           },
+          "maxItems": 100,
           "type": "array"
         },
         "draft_hash": {
+          "pattern": "^[0-9a-f]{64}$",
           "type": "string"
         },
         "sentencing": {
@@ -454,6 +481,7 @@
           "$ref": "#/$defs/EvaluationReport"
         },
         "evaluation_draft_hash": {
+          "pattern": "^[0-9a-f]{64}$",
           "type": "string"
         },
         "prompt_bundle_version": {

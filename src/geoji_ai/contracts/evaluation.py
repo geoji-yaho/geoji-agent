@@ -30,8 +30,8 @@ class Violation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     code: ViolationCode
-    path: str
-    evidence_labels: list[str]
+    path: Annotated[str, Field(max_length=200)]
+    evidence_labels: Annotated[list[Annotated[str, Field(pattern=r"^F\d+$")]], Field(max_length=16)]
     explanation: Annotated[str, Field(max_length=300)]
 
 
@@ -39,7 +39,7 @@ class CheckResult(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     pass_: StrictBool = Field(alias="pass")
-    violations: list[Violation]
+    violations: Annotated[list[Violation], Field(max_length=20)]
 
 
 class TextEvaluation(BaseModel):
@@ -47,8 +47,8 @@ class TextEvaluation(BaseModel):
 
     intensity: Intensity
     pass_: StrictBool = Field(alias="pass")
-    violations: list[Violation]
-    problem_sentences: list[str]
+    violations: Annotated[list[Violation], Field(max_length=20)]
+    problem_sentences: Annotated[list[Annotated[str, Field(max_length=300)]], Field(max_length=10)]
 
 
 class EvaluationReport(BaseModel):
@@ -58,4 +58,4 @@ class EvaluationReport(BaseModel):
     policy_version: PolicyVersion
     sentence_check: CheckResult
     sentencing_reason_check: CheckResult
-    texts: list[TextEvaluation]
+    texts: Annotated[list[TextEvaluation], Field(min_length=1, max_length=3)]

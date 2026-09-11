@@ -67,23 +67,30 @@
           "$ref": "#/$defs/Intensity"
         },
         "headline": {
+          "maxLength": 30,
           "type": "string"
         },
         "statement": {
           "items": {
+            "maxLength": 300,
+            "minLength": 1,
             "type": "string"
           },
+          "maxItems": 4,
+          "minItems": 1,
           "type": "array"
         },
         "sentence": {
           "$ref": "#/$defs/SentenceCode"
         },
         "sentence_label": {
+          "maxLength": 30,
           "type": "string"
         },
         "sentencing_reason": {
           "anyOf": [
             {
+              "maxLength": 100,
               "type": "string"
             },
             {
@@ -158,6 +165,8 @@
           ]
         },
         "poll_after_ms": {
+          "maximum": 60000,
+          "minimum": 0,
           "type": "integer"
         }
       },

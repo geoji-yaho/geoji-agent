@@ -42,16 +42,16 @@ class MemeTag(StrEnum):
 class Statement(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    text: str
+    text: Annotated[str, Field(min_length=1, max_length=STATEMENT_TOTAL_MAX)]
     kind: StatementKind
-    evidence_labels: list[str]
+    evidence_labels: Annotated[list[Annotated[str, Field(pattern=r"^F\d+$")]], Field(max_length=16)]
 
 
 class MemeHints(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    emotion: str
-    keywords: list[str]
+    emotion: Annotated[str, Field(max_length=30)]
+    keywords: Annotated[list[Annotated[str, Field(max_length=30)]], Field(max_length=10)]
 
 
 class TextDraft(BaseModel):
@@ -77,7 +77,7 @@ class WriterDraft(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: Literal[1]
-    texts: list[TextDraft]
+    texts: Annotated[list[TextDraft], Field(min_length=1, max_length=3)]
     meme_tag: MemeTag
     meme_hints: MemeHints | None
 

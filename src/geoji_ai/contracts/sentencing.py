@@ -18,6 +18,6 @@ class SentencingDecision(BaseModel):
     sentence: str
     sentencing_reason: Annotated[str, Field(max_length=100)] | None
     reason_source: ReasonSource
-    evidence_labels: list[str]
-    aggravating: list[str]
-    mitigating: list[str]
+    evidence_labels: Annotated[list[Annotated[str, Field(pattern=r"^F\d+$")]], Field(max_length=16)]
+    aggravating: Annotated[list[Annotated[str, Field(max_length=100)]], Field(max_length=20)]
+    mitigating: Annotated[list[Annotated[str, Field(max_length=100)]], Field(max_length=20)]

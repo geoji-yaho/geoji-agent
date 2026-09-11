@@ -7,7 +7,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from geoji_ai.contracts.case import JuryStatus, SentenceCode
-from geoji_ai.contracts.writer import MemeTag
+from geoji_ai.contracts.writer import HEADLINE_MAX, STATEMENT_MAX, STATEMENT_TOTAL_MAX, MemeTag
 from geoji_ai.domain.intensity import Intensity
 
 SentenceStatus = Literal["PENDING", "FINAL"]
@@ -27,11 +27,14 @@ class VerdictTextView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     intensity: Intensity
-    headline: str
-    statement: list[str]
+    headline: Annotated[str, Field(max_length=HEADLINE_MAX)]
+    statement: Annotated[
+        list[Annotated[str, Field(min_length=1, max_length=STATEMENT_TOTAL_MAX)]],
+        Field(min_length=1, max_length=STATEMENT_MAX),
+    ]
     sentence: SentenceCode
-    sentence_label: str
-    sentencing_reason: str | None
+    sentence_label: Annotated[str, Field(max_length=30)]
+    sentencing_reason: Annotated[str, Field(max_length=100)] | None
     source: ViewSource
     meme: MemeView
 
@@ -46,4 +49,4 @@ class VerdictView(BaseModel):
     text_status: TextStatus
     text_version: Annotated[int, Field(ge=0)]
     view: VerdictTextView | None
-    poll_after_ms: int
+    poll_after_ms: Annotated[int, Field(ge=0, le=60_000)]

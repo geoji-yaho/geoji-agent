@@ -11,6 +11,9 @@ from geoji_ai.contracts.evaluation import EvaluationReport, PolicyVersion
 from geoji_ai.contracts.sentencing import SentencingDecision
 from geoji_ai.contracts.writer import WriterDraft
 
+#: canonical draft 의 sha256 hex(01 §3.2 `draft_hash`).
+SHA256_HEX = r"^[0-9a-f]{64}$"
+
 
 class ModelIds(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -29,12 +32,12 @@ class FinalizeRequest(BaseModel):
     verdict_version: Annotated[int, Field(ge=1)]
     expected_text_version: Annotated[int, Field(ge=0)]
     dossier_id: str
-    privacy_versions: list[PrivacyVersion]
-    draft_hash: str
+    privacy_versions: Annotated[list[PrivacyVersion], Field(max_length=100)]
+    draft_hash: Annotated[str, Field(pattern=SHA256_HEX)]
     sentencing: SentencingDecision | None
     draft: WriterDraft
     evaluation: EvaluationReport
-    evaluation_draft_hash: str
+    evaluation_draft_hash: Annotated[str, Field(pattern=SHA256_HEX)]
     prompt_bundle_version: str
     guardrail_policy_version: PolicyVersion
     model_ids: ModelIds

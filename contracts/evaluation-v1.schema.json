@@ -13,6 +13,7 @@
           "items": {
             "$ref": "#/$defs/Violation"
           },
+          "maxItems": 20,
           "type": "array"
         }
       },
@@ -43,12 +44,15 @@
           "items": {
             "$ref": "#/$defs/Violation"
           },
+          "maxItems": 20,
           "type": "array"
         },
         "problem_sentences": {
           "items": {
+            "maxLength": 300,
             "type": "string"
           },
+          "maxItems": 10,
           "type": "array"
         }
       },
@@ -67,12 +71,15 @@
           "$ref": "#/$defs/ViolationCode"
         },
         "path": {
+          "maxLength": 200,
           "type": "string"
         },
         "evidence_labels": {
           "items": {
+            "pattern": "^F\\d+$",
             "type": "string"
           },
+          "maxItems": 16,
           "type": "array"
         },
         "explanation": {
@@ -128,6 +135,8 @@
           "items": {
             "$ref": "#/$defs/TextEvaluation"
           },
+          "maxItems": 3,
+          "minItems": 1,
           "type": "array"
         }
       },
