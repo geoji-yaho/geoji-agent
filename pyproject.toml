@@ -18,6 +18,9 @@ dependencies = [
     "jsonschema",
 ]
 
+[project.scripts]
+geoji-ai = "geoji_ai.cli:main"
+
 [dependency-groups]
 dev = [
     "pytest",
@@ -46,3 +49,5 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# 실제 Postgres 를 쓰는 테스트 표시(02 §4.2). asyncio_mode = "auto" 라 async 마커는 필요 없다.
+markers = ["integration"]
