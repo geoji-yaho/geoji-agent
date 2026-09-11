@@ -80,7 +80,7 @@ ports/{llm,backend,memory,jobs,ledger}.py ─ 작업 2~6 이 구현할 인터페
 | `docker-compose.dev.yml` | `postgres:16`(작업 2 가 쓴다) |
 
 ### 3.2 JSON Schema 7종 (`contracts/`, proposal2 §6·§10.1·§9.3)
-공통 규칙(§6.1): 모든 객체 `additionalProperties: false`, 문자열 길이·배열 크기 제한, `schema_version` const 1, ID 는 문자열(신규 AI 테이블 UUID, 기존 업무 ID 는 opaque text), 금액 `amount_krw` 양의 정수, 시각 RFC3339 UTC.
+공통 규칙(§6.1): 모든 객체 `additionalProperties: false`, 문자열 길이·배열 크기 제한, `schema_version` const 1, ID 는 문자열(신규 AI 테이블 UUID, 기존 업무 ID 는 opaque text), 금액 `amount_krw` 양의 정수, 시각 RFC3339 UTC. **계획서에 값이 없는 상한은 안전 상한(9/11 확정)**: 라벨 배열 ≤16·항목 패턴 `^F\d+$`, `statement[].text` 1~300, `texts` 1~3, `meme_hints.emotion` ≤30·`keywords` ≤10(항목 ≤30), `aggravating`·`mitigating` ≤20(항목 ≤100), `violations` ≤20, `Violation.path` ≤200, `problem_sentences` ≤10(항목 ≤300), `room_ids` ≤50, `privacy_versions` ≤100, `room_snapshots` ≤50, `allowed_sentences` 1~3·`rank ≥ 1`, `audience_version ≥ 1`·`epoch ≥ 0`·`rule_version ≥ 0`, `guilty_ratio` 0..1, `draft_hash`·`evaluation_draft_hash` `^[0-9a-f]{64}$`, `poll_after_ms` 0~60000, `VerdictView.view.headline` ≤30·`statement` 1~4·`sentencing_reason` ≤100. 정본 JSON 은 미러에서 생성한다(`tools/gen_contracts.py`, 9/11).
 
 | 스키마 | 최상위 | 핵심 필드 · 제약 |
 |---|---|---|
@@ -180,6 +180,7 @@ class LedgerPort(Protocol):
 ### 3.7 설정 (`core/config.py`, proposal2 §14.1·§19)
 | 필드 | 초기값 | 비고 |
 |---|---|---|
+| `APP_ENV` | `development` | `development` \| `production`(9/11 확정). production 이면 `startup.validate()` 가 정책 명시를 요구한다. `config.is_production()` 한 곳만 읽는다 |
 | `DATABASE_URL`, `BACKEND_INTERNAL_URL`, `SERVICE_AUTH_TOKEN` | — | 비밀값은 환경 주입. 로그·git 기록 금지 |
 | `OPENAI_API_KEY`, `XAI_API_KEY`, `XAI_BASE_URL` | — / `https://api.x.ai/v1` | |
 | `MODEL_JUDGMENT` · `MODEL_WRITER` · `MODEL_EVALUATOR_HELL` | `gpt-5.6-luna` · `grok-4.20-0309-non-reasoning` · `gpt-5.6-luna` | 서기·드립에 추론 모델(`grok-4.6`·`4.5`·`4.3`) 금지 — startup 오류 |
