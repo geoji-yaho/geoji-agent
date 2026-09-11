@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from geoji_ai.api import health
 from geoji_ai.api.app import create_app
 from geoji_ai.core.config import SECRET_FIELDS, Settings, is_production, redact
 from geoji_ai.core.startup import (
@@ -62,6 +63,16 @@ def test_기본값이_계획서_표와_같다():
     # 비밀값은 기본값이 없다.
     assert settings.DATABASE_URL.get_secret_value() == ""
     assert settings.SERVICE_AUTH_TOKEN.get_secret_value() == ""
+
+
+def test_큐_워커_설정_기본값이_계획서와_같다():
+    # 작업 2 가 더한 두 필드. 값은 02 §3.3(종료 10초)·§3.5(reaper 5초).
+    settings = Settings(_env_file=None)
+    assert settings.WORKER_POLL_MS == 250
+    assert settings.JOB_LEASE_SECONDS == 15
+    assert settings.HEARTBEAT_SECONDS == 5
+    assert settings.WORKER_SHUTDOWN_DEADLINE_SECONDS == 10
+    assert settings.REAPER_INTERVAL_SECONDS == 5
 
 
 def test_production_판별은_한_함수만_한다():
@@ -177,15 +188,36 @@ def test_health_live_는_200():
     assert response.json() == {"status": "ok"}
 
 
-def test_키가_다_있으면_ready_200():
-    with TestClient(create_app(make_settings())) as client:
+# `/health/ready` 의 DB 검사(작업 2). 단위 테스트는 실제 DB 를 부르지 않는다 —
+# `check_db_reachable` 을 monkeypatch 하고, 실제 접속은 통합 테스트가 본다.
+FAKE_DB_URL = "postgresql+asyncpg://user:pw@localhost:5432/geoji"
+
+
+@pytest.fixture
+def db_reachable(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """DB 가 닿는다고 답한다. 넘어온 URL 을 모아 둔다."""
+    calls: list[str] = []
+
+    async def _check(url: str, timeout_s: float = health.DB_CHECK_TIMEOUT_SECONDS) -> bool:
+        calls.append(url)
+        return True
+
+    monkeypatch.setattr(health, "check_db_reachable", _check)
+    return calls
+
+
+def test_키가_다_있으면_ready_200(db_reachable: list[str]):
+    settings = make_settings(DATABASE_URL=FAKE_DB_URL)
+    with TestClient(create_app(settings)) as client:
         response = client.get("/health/ready")
     assert response.status_code == 200
     assert response.json()["missing"] == []
+    # DB 검사를 실제로 거쳤다.
+    assert db_reachable == [FAKE_DB_URL]
 
 
-def test_키가_없으면_ready_503():
-    settings = make_settings(OPENAI_API_KEY="", XAI_API_KEY="")
+def test_키가_없으면_ready_503(db_reachable: list[str]):
+    settings = make_settings(OPENAI_API_KEY="", XAI_API_KEY="", DATABASE_URL=FAKE_DB_URL)
     with TestClient(create_app(settings)) as client:
         live = client.get("/health/live")
         ready = client.get("/health/ready")
@@ -195,6 +227,46 @@ def test_키가_없으면_ready_503():
     body = ready.json()
     assert body["status"] == "not_ready"
     assert body["missing"] == ["OPENAI_API_KEY", "XAI_API_KEY"]
+    # 키가 없으면 DB 는 보지도 않는다.
+    assert db_reachable == []
+
+
+def test_DATABASE_URL_이_비면_missing_에_들어간다(db_reachable: list[str]):
+    # 벤더 키는 다 있고 DB 주소만 없다. 벤더 키가 앞, DB 가 뒤다.
+    with TestClient(create_app(make_settings())) as client:
+        ready = client.get("/health/ready")
+    assert ready.status_code == 503
+    body = ready.json()
+    assert body["status"] == "not_ready"
+    assert body["missing"] == ["DATABASE_URL"]
+    assert db_reachable == []
+
+
+def test_키가_없고_DATABASE_URL_도_없으면_셋_다_missing():
+    settings = make_settings(OPENAI_API_KEY="", XAI_API_KEY="")
+    with TestClient(create_app(settings)) as client:
+        ready = client.get("/health/ready")
+    assert ready.status_code == 503
+    assert ready.json()["missing"] == ["OPENAI_API_KEY", "XAI_API_KEY", "DATABASE_URL"]
+
+
+def test_DB_에_닿지_못하면_ready_503(monkeypatch: pytest.MonkeyPatch):
+    async def _unreachable(url: str, timeout_s: float = health.DB_CHECK_TIMEOUT_SECONDS) -> bool:
+        return False
+
+    monkeypatch.setattr(health, "check_db_reachable", _unreachable)
+    settings = make_settings(DATABASE_URL=FAKE_DB_URL)
+    with TestClient(create_app(settings)) as client:
+        live = client.get("/health/live")
+        ready = client.get("/health/ready")
+    # 프로세스는 살아 있다. DB 만 못 닿는다.
+    assert live.status_code == 200
+    assert ready.status_code == 503
+    assert ready.json() == {"status": "not_ready", "db": "unreachable"}
+
+
+def test_DB_검사_타임아웃은_2초다():
+    assert health.DB_CHECK_TIMEOUT_SECONDS == 2.0
 
 
 def test_앱_생성도_기동_검사를_돈다():
