@@ -26,6 +26,8 @@ CLAUDE.md              늘 지켜야 하는 것. 세션마다 로드
 | 대상 도구   | Claude Code                                            |
 | requiredEnv | 없음. 이 스킬셋은 Claude Code 구독만 있으면 돈다. `XAI_API_KEY`·`OPENAI_API_KEY` 는 서비스가 쓰는 키라 `.env.example` 에 둔다 |
 | 의존 플러그인 | 없음. `ecc` 는 9/7 켰다가 9/9 뺐다(커밋 a69296c) |
+| 병렬 실행   | orca(데스크톱 앱, `orca` CLI). 전역 스킬 `orca-cli`·`orchestration` 은 orca 가 설치한다. 워크트리는 `~/orca/workspaces/geoji-agent/` 아래. 코디네이터는 `/orca-plan`, 워커는 `geoji-harness` 의 "orca 워커 모드"와 `orca-worker` 룰 |
+| 환경변수    | `GEOJIBANG_ROOT`. 형제 저장소 루트. 사용자 `~/.claude/settings.json` 의 `env` 에 둔다. 없으면 `..` |
 
 ## 룰
 
@@ -36,6 +38,7 @@ CLAUDE.md              늘 지켜야 하는 것. 세션마다 로드
 | `domain-vocabulary.md` | 서비스 용어, enum 표준, 대문자 식별자, ID 체계, 확정 수치 | `docs/**`, `src/**`, `contracts/**`, `tests/**`, `scripts/**` |
 | `code-layout.md`       | uv·Python 3.12, 저장소 배치, 의존 방향                    | `src/**`, `tests/**`, `contracts/**`, `database/**`, `scripts/**`, `pyproject.toml` |
 | `testing.md`           | 테스트 디렉터리, fake provider 원칙, 프롬프트 관문, 실측  | `src/**`, `tests/**`, `scripts/**`, `prompts/**`     |
+| `orca-worker.md`       | orca 워커 세션의 불변 규칙. 질문은 `ask`, 공유 자원, 통합 테스트, 편집 범위 | 없음. 늘 로드. preamble 없는 세션은 무시 |
 
 ## 스킬
 
@@ -56,15 +59,22 @@ CLAUDE.md              늘 지켜야 하는 것. 세션마다 로드
 
 ## 슬래시 커맨드
 
-| 명령 | 하는 것 |
-| ---- | ------- |
-|      |         |
+| 명령         | 하는 것 |
+| ------------ | ------- |
+| `/orca-plan` | 계획서의 작업·카드를 orca 워커 스펙(`templates/orca-task.md`)과 웨이브로 나누고, 확인 뒤 워크트리마다 워커를 띄워 감독한다. 감독 루프 자체는 전역 `orchestration` 스킬 |
 
 ## 훅
 
-| 이벤트 | 스크립트 | 하는 것 |
-| ------ | -------- | ------- |
-|        |          |         |
+실행은 `uv run --quiet --no-project .claude/hooks/guard.py`. PEP 723 단독 스크립트라 `.venv` 없이도 돈다. 막을 때 exit 2.
+
+| 이벤트     | 스크립트   | 하는 것 |
+| ---------- | ---------- | ------- |
+| PreToolUse `Bash` | `guard.py` | 늘: `git add .env`, `git push --force` 차단. 워커 모드: main 커밋·체크아웃, 머지 차단 |
+| PreToolUse `Edit·Write·MultiEdit·NotebookEdit` | `guard.py` | 워커 모드: `_workspace/orca/spec.md` 의 Ownership JSON(`owned`·`forbidden`) 밖 편집 차단 |
+| PreToolUse `AskUserQuestion` | `guard.py` | 워커 모드: 차단. preamble 의 `orca orchestration ask` 로 |
+| Stop       | `guard.py` | 워커 모드: `_workspace/orca/done` 이 없으면 끝내지 못하게 한다(`worker_done` 강제) |
+
+워커 모드 = `_workspace/orca/spec.md` 가 있을 때. 사람 세션에는 늘 규칙 두 개만 걸린다.
 
 ## MCP
 
@@ -78,7 +88,8 @@ CLAUDE.md              늘 지켜야 하는 것. 세션마다 로드
 - **스킬**: `templates/SKILL.md` 를 `skills/{이름}/SKILL.md` 로 복사. `name` 은 디렉터리 이름과 같게. 500줄을 넘으면 `references/` 로 나누고 본문에는 언제 읽는지만 남긴다
 - **서브에이전트**: `templates/agent.md` 를 `agents/{이름}.md` 로 복사. 호출하는 스킬의 표와 이 파일의 표를 같이 고친다
 - **슬래시 커맨드**: `templates/command.md` 를 `commands/{이름}.md` 로 복사. 하위 디렉터리를 두면 `/git:commit` 처럼 네임스페이스가 된다
-- **훅**: 스크립트는 `hooks/` 에, 등록은 `settings.json` 의 `hooks` 키에. 이벤트는 PreToolUse·PostToolUse·Stop·SessionStart 등
+- **훅**: 스크립트는 `hooks/` 에, 등록은 `settings.json` 의 `hooks` 키에. 이벤트는 PreToolUse·PostToolUse·Stop·SessionStart 등. 훅을 고치면 실행 중인 세션에는 안 먹고 새 세션(또는 `/hooks` 재검토)부터 적용된다
+- **orca 워커 스펙**: `templates/orca-task.md` 를 `_workspace/orca/tasks/{feat-NN-topic}.md` 로. `/orca-plan` 이 채운다. 커밋되지 않는다
 - **MCP**: 루트 `.mcp.json` 의 `mcpServers` 에 서버 하나를 키 하나로
 
 항목을 더하거나 지우면 위 표를 같이 고친다. 표에 없는 항목은 없는 것으로 친다.

@@ -38,6 +38,15 @@ Agent({
 
 일이 끝난 에이전트는 `SendMessage`로 `shutdown_request`를 보내 정리한다. 에이전트 정의의 `tools`에 `SendMessage`가 없으면 그 에이전트는 응답하지 못해 세션이 남는다. 도구를 좁힐 때 이것을 빼지 않는다.
 
+## 두 가지 실행 모드
+
+| 모드      | 어떻게 아는가                                              | 질문 상대            | 끝                       |
+| --------- | ---------------------------------------------------------- | -------------------- | ------------------------ |
+| 사람 세션 | 보통                                                       | `AskUserQuestion`    | 보고하고 한 줄 묻는다    |
+| orca 워커 | 프롬프트 첫머리에 Task ID·Dispatch ID 가 든 orca preamble  | preamble 의 `ask`    | 커밋·PR·`worker_done`    |
+
+아래 Phase 는 두 모드가 같다. 다른 곳은 게이트 A·B 의 질문 상대와 Phase 4 뒤의 마무리이고, 그것은 맨 아래 "orca 워커 모드" 절에 있다.
+
 ## 게이트
 
 ```bash
@@ -84,7 +93,7 @@ prompt: |
 
 ## 게이트 A. 미결정이면 멈추고 묻는다
 
-`_workspace/01_spec.md`의 `blocked`가 비어 있지 않으면 **여기서 멈춘다.** `AskUserQuestion`으로 묻고 답을 받은 뒤에 진행한다.
+`_workspace/01_spec.md`의 `blocked`가 비어 있지 않으면 **여기서 멈춘다.** `AskUserQuestion`으로 묻고 답을 받은 뒤에 진행한다. orca 워커 모드면 스펙의 "미리 답한 결정"으로 먼저 풀고, 남는 것만 preamble 의 `ask`로 코디네이터에게 묻는다.
 
 이 저장소는 계획서에 없는 값을 코드에 박기 전에 묻기로 되어 있다. 협의 중인 값에 그럴듯한 기본값을 채우면 그것이 사실상 확정이 된다.
 
@@ -96,7 +105,7 @@ prompt: |
 
 `_workspace/01_spec.md`의 `approval`이 비어 있지 않으면 멈추고 묻는다. `pyproject.toml` 의존성 추가, `contracts/*.schema.json` 변경(`schema_version`이 오른다), 새 마이그레이션 번호, ports 시그니처 변경, 계획서 §3 표에 없는 파일 신설이 여기 해당한다.
 
-`approval`이 비어 있으면 사용자를 부르지 않고 Phase 2로 간다.
+`approval`이 비어 있으면 사용자를 부르지 않고 Phase 2로 간다. orca 워커 모드의 질문 상대는 게이트 A 와 같다.
 
 ## Phase 2. 구현한다
 
@@ -163,6 +172,39 @@ prompt: |
 커밋하지 않는다. 계획서 카드 체크도 직접 하지 않는다. 사용자가 시킬 때만 한다.
 
 마지막에 한 줄로 묻는다. 고칠 곳이 있는지, 워크플로우에서 바꾸고 싶은 것이 있는지.
+
+orca 워커 모드는 위 두 문단 대신 아래 "orca 워커 모드" 절의 마무리를 따른다.
+
+## orca 워커 모드
+
+orca 코디네이터가 `worker-start`로 워크트리에 띄운 세션이다. 프롬프트 첫머리에 Task ID·Dispatch ID 와 `ask`·`send`·`check` 명령이 든 preamble 이 있다. 그 preamble 이 있을 때만 이 절이 적용되고, 위 Phase 에 우선한다. 불변 규칙은 `orca-worker` 룰에 있다.
+
+원칙은 하나다. **사람은 이 터미널을 보고 있지 않다.** 로컬에서 묻는 것은 전부 코디네이터에게 `ask`로 보낸다. 훅이 `AskUserQuestion`을 막는다. preamble 의 명령은 그대로 복사한다. 플래그를 재구성하지 않는다.
+
+**시작할 때.**
+
+1. preamble 에 든 작업 스펙을 `_workspace/orca/spec.md`에 그대로 저장한다. 훅이 이 파일의 Ownership JSON 블록으로 편집 범위를 지키고, 이 파일이 있어야 워커 모드로 본다
+2. `.venv`가 없으면 `uv sync`. orca 의 setup 이 에이전트와 동시에 돌아 아직 안 끝났을 수 있다. `pyproject.toml`이 없으면 건너뛴다
+3. 스펙의 "미리 답한 결정"을 게이트 A·B 의 답으로 쓴다. Phase 0 은 스펙의 파일 수로 규모를 정한다
+
+**체크포인트.** Phase 가 바뀔 때마다와 게이트를 돌린 뒤 preamble 의 `check --terminal <handle>` 을 돌린다. 코디네이터의 후속 지시가 있으면 따른다. `consumer_fenced`가 오면 즉시 멈추고 아무것도 보내지 않는다. 이 Dispatch 는 더 이상 내 것이 아니다.
+
+**질문.** 게이트 A·B 에서 스펙이 답하지 못한 것은 `ask --question ... --options a,b`로 묻고 답이 올 때까지 기다린다. 타임아웃이면 같은 message ID 로 `--resume`. 새 질문을 만들지 않고 임시값도 넣지 않는다.
+
+**게이트.** `tests/integration`은 스펙이 `DATABASE_URL`을 주지 않았으면 `--ignore=tests/integration`으로 뺀다. 이유는 `orca-worker` 룰.
+
+**Phase 4 뒤 마무리.**
+
+1. 위 보고 형식을 `_workspace/04_report.md`에 쓴다. "확인하지 못한 것"에 `--ignore`한 통합 테스트를 적는다
+2. `git-workflow` 룰 "orca 워커" 절대로 커밋 → 리베이스 → 푸시 → PR
+3. `check`를 한 번 더 돌려 후속 지시가 없는지 본다
+4. `worker_done`을 정확히 한 번. `--outcome succeeded|failed`, `--report-path <04_report.md 절대 경로>`, `--files-modified`. body 는 세 문장. 만든 것, 발견한 것, 남은 것과 PR URL
+5. `_workspace/orca/done` 파일을 만든다. Stop 훅이 이 파일 없이는 턴을 끝내지 못하게 한다
+6. 턴을 끝내고 대기한다. 새 일을 시작하지 않는다
+
+**실패로 끝날 때도 1~6 은 같다.** 게이트 3회 실패, 스펙 밖 파일이 꼭 필요한데 `ask`로 못 받음, 미결정에 막힘이 그 경우다. 커밋·PR 은 되는 데까지 하고 `--outcome failed`와 이유를 body 에 쓴다. 조용히 종료하지 않는다.
+
+하위 에이전트(spec-auditor 등)는 그대로 쓴다. orca 가 보는 것은 이 터미널 하나뿐이고 하위 에이전트는 preamble 을 모르므로, `ask`·`check`·`worker_done`은 오케스트레이터인 내가 보낸다.
 
 ## 에러
 
