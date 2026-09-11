@@ -1,0 +1,522 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finalize-v1.schema.json",
+  "title": "FinalizeRequest",
+  "$defs": {
+    "AttackAngle": {
+      "enum": [
+        "CONVERSION",
+        "REPETITION",
+        "EXCUSE_DISSECTION",
+        "FUTURE_PROPHECY",
+        "RULE_PERSONIFICATION",
+        "ALTERNATIVE_MOCKERY"
+      ],
+      "type": "string"
+    },
+    "BanterStrategy": {
+      "enum": [
+        "CHEAPER_ALTERNATIVE",
+        "FREE_ALTERNATIVE",
+        "DIY_REPLACEMENT",
+        "PREMISE_REJECTION",
+        "EXCUSE_STRIPPING",
+        "NECESSITY_APPROVAL",
+        "REPEAT_OFFENSE",
+        "ROOM_RULE_CALLBACK"
+      ],
+      "type": "string"
+    },
+    "CheckResult": {
+      "additionalProperties": false,
+      "properties": {
+        "pass": {
+          "type": "boolean"
+        },
+        "violations": {
+          "items": {
+            "$ref": "#/$defs/Violation"
+          },
+          "maxItems": 20,
+          "type": "array"
+        }
+      },
+      "required": [
+        "pass",
+        "violations"
+      ],
+      "type": "object"
+    },
+    "EvaluationReport": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "policy_version": {
+          "enum": [
+            "guardrail-v1",
+            "guardrail-v2"
+          ],
+          "type": "string"
+        },
+        "sentence_check": {
+          "$ref": "#/$defs/CheckResult"
+        },
+        "sentencing_reason_check": {
+          "$ref": "#/$defs/CheckResult"
+        },
+        "texts": {
+          "items": {
+            "$ref": "#/$defs/TextEvaluation"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "policy_version",
+        "sentence_check",
+        "sentencing_reason_check",
+        "texts"
+      ],
+      "type": "object"
+    },
+    "Intensity": {
+      "enum": [
+        "mild",
+        "spicy",
+        "hell"
+      ],
+      "type": "string"
+    },
+    "MemeHints": {
+      "additionalProperties": false,
+      "properties": {
+        "emotion": {
+          "maxLength": 30,
+          "type": "string"
+        },
+        "keywords": {
+          "items": {
+            "maxLength": 30,
+            "type": "string"
+          },
+          "maxItems": 10,
+          "type": "array"
+        }
+      },
+      "required": [
+        "emotion",
+        "keywords"
+      ],
+      "type": "object"
+    },
+    "MemeTag": {
+      "enum": [
+        "GUILTY_HEAVY",
+        "GUILTY_LIGHT",
+        "NOT_GUILTY",
+        "APPROVED",
+        "REJECTED"
+      ],
+      "type": "string"
+    },
+    "ModelIds": {
+      "additionalProperties": false,
+      "properties": {
+        "sentencing": {
+          "type": "string"
+        },
+        "writer": {
+          "type": "string"
+        },
+        "evaluator": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sentencing",
+        "writer",
+        "evaluator"
+      ],
+      "type": "object"
+    },
+    "PrivacyVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "scope_key": {
+          "type": "string"
+        },
+        "epoch": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "scope_key",
+        "epoch"
+      ],
+      "type": "object"
+    },
+    "SentencingDecision": {
+      "additionalProperties": false,
+      "description": "`sentence` 는 문자열이다. 허용 목록 대조는 코드가 동적으로 한다(01 §3.2).",
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "sentence": {
+          "type": "string"
+        },
+        "sentencing_reason": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason_source": {
+          "enum": [
+            "AI",
+            "TEMPLATE"
+          ],
+          "type": "string"
+        },
+        "evidence_labels": {
+          "items": {
+            "pattern": "^F\\d+$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
+        "aggravating": {
+          "items": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "maxItems": 20,
+          "type": "array"
+        },
+        "mitigating": {
+          "items": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "maxItems": 20,
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "sentence",
+        "sentencing_reason",
+        "reason_source",
+        "evidence_labels",
+        "aggravating",
+        "mitigating"
+      ],
+      "type": "object"
+    },
+    "Statement": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "fact",
+            "claim",
+            "opinion"
+          ],
+          "type": "string"
+        },
+        "evidence_labels": {
+          "items": {
+            "pattern": "^F\\d+$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "type": "array"
+        }
+      },
+      "required": [
+        "text",
+        "kind",
+        "evidence_labels"
+      ],
+      "type": "object"
+    },
+    "TextDraft": {
+      "additionalProperties": false,
+      "properties": {
+        "intensity": {
+          "$ref": "#/$defs/Intensity"
+        },
+        "headline": {
+          "maxLength": 30,
+          "type": "string"
+        },
+        "statement": {
+          "items": {
+            "$ref": "#/$defs/Statement"
+          },
+          "maxItems": 4,
+          "minItems": 2,
+          "type": "array"
+        },
+        "banter_strategy": {
+          "$ref": "#/$defs/BanterStrategy"
+        },
+        "selected_candidate_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attack_angle": {
+          "$ref": "#/$defs/AttackAngle"
+        },
+        "source": {
+          "enum": [
+            "AI",
+            "TEMPLATE"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "intensity",
+        "headline",
+        "statement",
+        "banter_strategy",
+        "selected_candidate_id",
+        "attack_angle",
+        "source"
+      ],
+      "type": "object"
+    },
+    "TextEvaluation": {
+      "additionalProperties": false,
+      "properties": {
+        "intensity": {
+          "$ref": "#/$defs/Intensity"
+        },
+        "pass": {
+          "type": "boolean"
+        },
+        "violations": {
+          "items": {
+            "$ref": "#/$defs/Violation"
+          },
+          "maxItems": 20,
+          "type": "array"
+        },
+        "problem_sentences": {
+          "items": {
+            "maxLength": 300,
+            "type": "string"
+          },
+          "maxItems": 10,
+          "type": "array"
+        }
+      },
+      "required": [
+        "intensity",
+        "pass",
+        "violations",
+        "problem_sentences"
+      ],
+      "type": "object"
+    },
+    "Violation": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ViolationCode"
+        },
+        "path": {
+          "maxLength": 200,
+          "type": "string"
+        },
+        "evidence_labels": {
+          "items": {
+            "pattern": "^F\\d+$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
+        "explanation": {
+          "maxLength": 300,
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "path",
+        "evidence_labels",
+        "explanation"
+      ],
+      "type": "object"
+    },
+    "ViolationCode": {
+      "enum": [
+        "PERSONAL_ATTACK",
+        "IDENTITY_DEGRADATION",
+        "SELF_HARM_LEXICON",
+        "UNGROUNDED_CLAIM",
+        "VERDICT_CONTRADICTION",
+        "INJECTION_FOLLOWED",
+        "UNSAFE_CONTENT",
+        "INTENSITY_MISMATCH",
+        "PROFANITY_OUT_OF_LIST",
+        "SENTENCE_REASON_MISMATCH",
+        "SCHEMA_INVALID"
+      ],
+      "type": "string"
+    },
+    "WriterDraft": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "texts": {
+          "items": {
+            "$ref": "#/$defs/TextDraft"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "type": "array"
+        },
+        "meme_tag": {
+          "$ref": "#/$defs/MemeTag"
+        },
+        "meme_hints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MemeHints"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "texts",
+        "meme_tag",
+        "meme_hints"
+      ],
+      "type": "object"
+    },
+    "FinalizeRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "generation_id": {
+          "type": "string"
+        },
+        "verdict_version": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "expected_text_version": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dossier_id": {
+          "type": "string"
+        },
+        "privacy_versions": {
+          "items": {
+            "$ref": "#/$defs/PrivacyVersion"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "draft_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "sentencing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SentencingDecision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "draft": {
+          "$ref": "#/$defs/WriterDraft"
+        },
+        "evaluation": {
+          "$ref": "#/$defs/EvaluationReport"
+        },
+        "evaluation_draft_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "prompt_bundle_version": {
+          "type": "string"
+        },
+        "guardrail_policy_version": {
+          "enum": [
+            "guardrail-v1",
+            "guardrail-v2"
+          ],
+          "type": "string"
+        },
+        "model_ids": {
+          "$ref": "#/$defs/ModelIds"
+        }
+      },
+      "required": [
+        "schema_version",
+        "job_id",
+        "generation_id",
+        "verdict_version",
+        "expected_text_version",
+        "dossier_id",
+        "privacy_versions",
+        "draft_hash",
+        "sentencing",
+        "draft",
+        "evaluation",
+        "evaluation_draft_hash",
+        "prompt_bundle_version",
+        "guardrail_policy_version",
+        "model_ids"
+      ],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/FinalizeRequest"
+}

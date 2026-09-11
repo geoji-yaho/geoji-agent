@@ -1,0 +1,48 @@
+[project]
+name = "geoji-ai"
+version = "0.1.0"
+description = "떼거지 AI 파트 — 심문관·조서·양형관·서기·검수관"
+readme = "README.md"
+requires-python = "==3.12.*"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2",
+    "pydantic-settings",
+    "openai>=1.50",
+    "langgraph",
+    "sqlalchemy[asyncio]>=2",
+    "asyncpg",
+    "httpx",
+    "structlog",
+    "jsonschema",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "ruff",
+]
+
+[build-system]
+requires = ["uv_build>=0.8,<1"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "geoji_ai"
+module-root = "src"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+# 이 워커의 편집 범위 밖(훅·실측 스크립트). 게이트 `ruff check .` 가 그 파일을 건드리지 않게 한다
+extend-exclude = [".claude", "docs", "scripts", "_workspace", "_workspace_prev"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

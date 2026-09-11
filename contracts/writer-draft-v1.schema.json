@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "writer-draft-v1.schema.json",
+  "title": "WriterDraft",
+  "$defs": {
+    "AttackAngle": {
+      "enum": [
+        "CONVERSION",
+        "REPETITION",
+        "EXCUSE_DISSECTION",
+        "FUTURE_PROPHECY",
+        "RULE_PERSONIFICATION",
+        "ALTERNATIVE_MOCKERY"
+      ],
+      "type": "string"
+    },
+    "BanterStrategy": {
+      "enum": [
+        "CHEAPER_ALTERNATIVE",
+        "FREE_ALTERNATIVE",
+        "DIY_REPLACEMENT",
+        "PREMISE_REJECTION",
+        "EXCUSE_STRIPPING",
+        "NECESSITY_APPROVAL",
+        "REPEAT_OFFENSE",
+        "ROOM_RULE_CALLBACK"
+      ],
+      "type": "string"
+    },
+    "Intensity": {
+      "enum": [
+        "mild",
+        "spicy",
+        "hell"
+      ],
+      "type": "string"
+    },
+    "MemeHints": {
+      "additionalProperties": false,
+      "properties": {
+        "emotion": {
+          "maxLength": 30,
+          "type": "string"
+        },
+        "keywords": {
+          "items": {
+            "maxLength": 30,
+            "type": "string"
+          },
+          "maxItems": 10,
+          "type": "array"
+        }
+      },
+      "required": [
+        "emotion",
+        "keywords"
+      ],
+      "type": "object"
+    },
+    "MemeTag": {
+      "enum": [
+        "GUILTY_HEAVY",
+        "GUILTY_LIGHT",
+        "NOT_GUILTY",
+        "APPROVED",
+        "REJECTED"
+      ],
+      "type": "string"
+    },
+    "Statement": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "fact",
+            "claim",
+            "opinion"
+          ],
+          "type": "string"
+        },
+        "evidence_labels": {
+          "items": {
+            "pattern": "^F\\d+$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "type": "array"
+        }
+      },
+      "required": [
+        "text",
+        "kind",
+        "evidence_labels"
+      ],
+      "type": "object"
+    },
+    "TextDraft": {
+      "additionalProperties": false,
+      "properties": {
+        "intensity": {
+          "$ref": "#/$defs/Intensity"
+        },
+        "headline": {
+          "maxLength": 30,
+          "type": "string"
+        },
+        "statement": {
+          "items": {
+            "$ref": "#/$defs/Statement"
+          },
+          "maxItems": 4,
+          "minItems": 2,
+          "type": "array"
+        },
+        "banter_strategy": {
+          "$ref": "#/$defs/BanterStrategy"
+        },
+        "selected_candidate_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attack_angle": {
+          "$ref": "#/$defs/AttackAngle"
+        },
+        "source": {
+          "enum": [
+            "AI",
+            "TEMPLATE"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "intensity",
+        "headline",
+        "statement",
+        "banter_strategy",
+        "selected_candidate_id",
+        "attack_angle",
+        "source"
+      ],
+      "type": "object"
+    },
+    "WriterDraft": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "texts": {
+          "items": {
+            "$ref": "#/$defs/TextDraft"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "type": "array"
+        },
+        "meme_tag": {
+          "$ref": "#/$defs/MemeTag"
+        },
+        "meme_hints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MemeHints"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "texts",
+        "meme_tag",
+        "meme_hints"
+      ],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/WriterDraft"
+}

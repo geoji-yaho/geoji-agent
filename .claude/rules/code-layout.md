@@ -22,9 +22,10 @@ paths:
 이 저장소 루트가 proposal2의 `services/ai/`다. 경로는 루트 기준으로 쓴다.
 
 ```
-contracts/*.schema.json         계약 정본(schema_version=1). 01 소유
+contracts/*.schema.json         계약 정본(schema_version=1). 01 소유. 미러에서 생성(tools/gen_contracts.py), 손으로 고치지 않는다
 contracts/fixtures/*.json       hell 예시, 정책 버전별 기대값
-src/geoji_ai/contracts/         pydantic 미러. extra="forbid". 동등성 테스트로 정본과 묶는다
+src/geoji_ai/contracts/         pydantic 미러. extra="forbid". 동등성·재생성 테스트로 정본과 묶는다
+tools/                          저장소 도구. gen_contracts.py 가 정본 JSON 을 재생성한다
 src/geoji_ai/domain/            intensity, lexicon, attack_angles, validation
 src/geoji_ai/ports/             llm, backend, memory, jobs, ledger. Protocol 5종
 src/geoji_ai/adapters/          fake_llm, openai_compat_llm, postgres 등

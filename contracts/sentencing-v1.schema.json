@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sentencing-v1.schema.json",
+  "title": "SentencingDecision",
+  "$defs": {
+    "SentencingDecision": {
+      "additionalProperties": false,
+      "description": "`sentence` 는 문자열이다. 허용 목록 대조는 코드가 동적으로 한다(01 §3.2).",
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "sentence": {
+          "type": "string"
+        },
+        "sentencing_reason": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason_source": {
+          "enum": [
+            "AI",
+            "TEMPLATE"
+          ],
+          "type": "string"
+        },
+        "evidence_labels": {
+          "items": {
+            "pattern": "^F\\d+$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
+        "aggravating": {
+          "items": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "maxItems": 20,
+          "type": "array"
+        },
+        "mitigating": {
+          "items": {
+            "maxLength": 100,
+            "type": "string"
+          },
+          "maxItems": 20,
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "sentence",
+        "sentencing_reason",
+        "reason_source",
+        "evidence_labels",
+        "aggravating",
+        "mitigating"
+      ],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/SentencingDecision"
+}

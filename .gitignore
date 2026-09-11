@@ -9,6 +9,7 @@ assets/
 #
 docs/*
 !docs/plans/
+!docs/backend-handoff.md
 # 하네스 중간 산출물
 _workspace/
 _workspace_prev/

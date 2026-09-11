@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "verdict-view-v1.schema.json",
+  "title": "VerdictView",
+  "$defs": {
+    "Intensity": {
+      "enum": [
+        "mild",
+        "spicy",
+        "hell"
+      ],
+      "type": "string"
+    },
+    "JuryStatus": {
+      "description": "`verdict-view-v1` 의 `jury_status`. 각하까지 5종.",
+      "enum": [
+        "guilty",
+        "notGuilty",
+        "agree",
+        "disagree",
+        "dismissed"
+      ],
+      "type": "string"
+    },
+    "MemeTag": {
+      "enum": [
+        "GUILTY_HEAVY",
+        "GUILTY_LIGHT",
+        "NOT_GUILTY",
+        "APPROVED",
+        "REJECTED"
+      ],
+      "type": "string"
+    },
+    "MemeView": {
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "$ref": "#/$defs/MemeTag"
+        },
+        "image_id": {
+          "type": "string"
+        },
+        "image_url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tag",
+        "image_id",
+        "image_url"
+      ],
+      "type": "object"
+    },
+    "SentenceCode": {
+      "enum": [
+        "probation",
+        "oneDay",
+        "life"
+      ],
+      "type": "string"
+    },
+    "VerdictTextView": {
+      "additionalProperties": false,
+      "properties": {
+        "intensity": {
+          "$ref": "#/$defs/Intensity"
+        },
+        "headline": {
+          "maxLength": 30,
+          "type": "string"
+        },
+        "statement": {
+          "items": {
+            "maxLength": 300,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "type": "array"
+        },
+        "sentence": {
+          "$ref": "#/$defs/SentenceCode"
+        },
+        "sentence_label": {
+          "maxLength": 30,
+          "type": "string"
+        },
+        "sentencing_reason": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "enum": [
+            "AI",
+            "TEMPLATE"
+          ],
+          "type": "string"
+        },
+        "meme": {
+          "$ref": "#/$defs/MemeView"
+        }
+      },
+      "required": [
+        "intensity",
+        "headline",
+        "statement",
+        "sentence",
+        "sentence_label",
+        "sentencing_reason",
+        "source",
+        "meme"
+      ],
+      "type": "object"
+    },
+    "VerdictView": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "post_id": {
+          "type": "string"
+        },
+        "jury_status": {
+          "$ref": "#/$defs/JuryStatus"
+        },
+        "sentence_status": {
+          "enum": [
+            "PENDING",
+            "FINAL"
+          ],
+          "type": "string"
+        },
+        "text_status": {
+          "enum": [
+            "PENDING",
+            "GENERATING",
+            "TEMPLATE_READY",
+            "AI_READY"
+          ],
+          "type": "string"
+        },
+        "text_version": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "view": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VerdictTextView"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "poll_after_ms": {
+          "maximum": 60000,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema_version",
+        "post_id",
+        "jury_status",
+        "sentence_status",
+        "text_status",
+        "text_version",
+        "view",
+        "poll_after_ms"
+      ],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/VerdictView"
+}

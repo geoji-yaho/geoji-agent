@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "texts": [
+    {
+      "intensity": "mild",
+      "headline": "택시 12,000원, 유죄",
+      "statement": [
+        {
+          "text": "지하철 기본요금 1,400원 기준으로 여덟 번 탈 돈입니다.",
+          "kind": "fact",
+          "evidence_labels": [
+            "F0"
+          ]
+        },
+        {
+          "text": "다음엔 알람을 조금만 일찍 맞춰 봐요.",
+          "kind": "opinion",
+          "evidence_labels": []
+        }
+      ],
+      "banter_strategy": "CHEAPER_ALTERNATIVE",
+      "selected_candidate_id": null,
+      "attack_angle": "CONVERSION",
+      "source": "AI"
+    },
+    {
+      "intensity": "spicy",
+      "headline": "또 늦잠, 또 택시",
+      "statement": [
+        {
+          "text": "택시 12,000원은 지하철 여덟 번 값입니다.",
+          "kind": "fact",
+          "evidence_labels": [
+            "F0"
+          ]
+        },
+        {
+          "text": "지난주에도 늦잠, 이번 주도 늦잠. 택시가 아니라 이불이 문제입니다.",
+          "kind": "claim",
+          "evidence_labels": [
+            "F2",
+            "F3"
+          ]
+        },
+        {
+          "text": "최근 7일 동안 택시 3회, 합계 31,000원.",
+          "kind": "fact",
+          "evidence_labels": [
+            "F1"
+          ]
+        }
+      ],
+      "banter_strategy": "REPEAT_OFFENSE",
+      "selected_candidate_id": "8d3f1a62-6c95-4b07-8e41-9a2d5f3b7c18",
+      "attack_angle": "CONVERSION",
+      "source": "AI"
+    },
+    {
+      "intensity": "hell",
+      "headline": "알람 시계 세 개 값",
+      "statement": [
+        {
+          "text": "12,000원이면 지하철 여덟 번입니다. 여덟 번.",
+          "kind": "fact",
+          "evidence_labels": [
+            "F0"
+          ]
+        },
+        {
+          "text": "최근 7일 동안 택시 3회, 31,000원을 태웠습니다.",
+          "kind": "fact",
+          "evidence_labels": [
+            "F1"
+          ]
+        },
+        {
+          "text": "31,000원이면 알람 시계 세 개입니다. 하나만 사세요.",
+          "kind": "claim",
+          "evidence_labels": [
+            "F1"
+          ]
+        }
+      ],
+      "banter_strategy": "CHEAPER_ALTERNATIVE",
+      "selected_candidate_id": "6a5d2f83-4b70-4e19-8c26-0f7a9b3e5d14",
+      "attack_angle": "CONVERSION",
+      "source": "AI"
+    }
+  ],
+  "meme_tag": "GUILTY_LIGHT",
+  "meme_hints": {
+    "emotion": "DISAPPROVAL",
+    "keywords": [
+      "택시",
+      "늦잠",
+      "알람"
+    ]
+  }
+}

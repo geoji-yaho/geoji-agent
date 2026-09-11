@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "policy_version": "guardrail-v1",
+  "sentence_check": {
+    "pass": true,
+    "violations": []
+  },
+  "sentencing_reason_check": {
+    "pass": true,
+    "violations": []
+  },
+  "texts": [
+    {
+      "intensity": "hell",
+      "pass": false,
+      "violations": [
+        {
+          "code": "PERSONAL_ATTACK",
+          "path": "texts[0].statement[0].text",
+          "evidence_labels": [],
+          "explanation": "양심·의지가 없는 노답이라는 표현은 지출 행위를 넘어 인격을 공격한다."
+        }
+      ],
+      "problem_sentences": [
+        "어휴 이새X어쩌지; 생체리듬이고 양심이고 의지라곤 눈꼽만큼도 없는 노답. 내가 더 어떻게 해야 들어쳐먹을래?"
+      ]
+    }
+  ]
+}

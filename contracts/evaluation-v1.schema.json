@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evaluation-v1.schema.json",
+  "title": "EvaluationReport",
+  "$defs": {
+    "CheckResult": {
+      "additionalProperties": false,
+      "properties": {
+        "pass": {
+          "type": "boolean"
+        },
+        "violations": {
+          "items": {
+            "$ref": "#/$defs/Violation"
+          },
+          "maxItems": 20,
+          "type": "array"
+        }
+      },
+      "required": [
+        "pass",
+        "violations"
+      ],
+      "type": "object"
+    },
+    "Intensity": {
+      "enum": [
+        "mild",
+        "spicy",
+        "hell"
+      ],
+      "type": "string"
+    },
+    "TextEvaluation": {
+      "additionalProperties": false,
+      "properties": {
+        "intensity": {
+          "$ref": "#/$defs/Intensity"
+        },
+        "pass": {
+          "type": "boolean"
+        },
+        "violations": {
+          "items": {
+            "$ref": "#/$defs/Violation"
+          },
+          "maxItems": 20,
+          "type": "array"
+        },
+        "problem_sentences": {
+          "items": {
+            "maxLength": 300,
+            "type": "string"
+          },
+          "maxItems": 10,
+          "type": "array"
+        }
+      },
+      "required": [
+        "intensity",
+        "pass",
+        "violations",
+        "problem_sentences"
+      ],
+      "type": "object"
+    },
+    "Violation": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ViolationCode"
+        },
+        "path": {
+          "maxLength": 200,
+          "type": "string"
+        },
+        "evidence_labels": {
+          "items": {
+            "pattern": "^F\\d+$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
+        "explanation": {
+          "maxLength": 300,
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "path",
+        "evidence_labels",
+        "explanation"
+      ],
+      "type": "object"
+    },
+    "ViolationCode": {
+      "enum": [
+        "PERSONAL_ATTACK",
+        "IDENTITY_DEGRADATION",
+        "SELF_HARM_LEXICON",
+        "UNGROUNDED_CLAIM",
+        "VERDICT_CONTRADICTION",
+        "INJECTION_FOLLOWED",
+        "UNSAFE_CONTENT",
+        "INTENSITY_MISMATCH",
+        "PROFANITY_OUT_OF_LIST",
+        "SENTENCE_REASON_MISMATCH",
+        "SCHEMA_INVALID"
+      ],
+      "type": "string"
+    },
+    "EvaluationReport": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "type": "integer"
+        },
+        "policy_version": {
+          "enum": [
+            "guardrail-v1",
+            "guardrail-v2"
+          ],
+          "type": "string"
+        },
+        "sentence_check": {
+          "$ref": "#/$defs/CheckResult"
+        },
+        "sentencing_reason_check": {
+          "$ref": "#/$defs/CheckResult"
+        },
+        "texts": {
+          "items": {
+            "$ref": "#/$defs/TextEvaluation"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "policy_version",
+        "sentence_check",
+        "sentencing_reason_check",
+        "texts"
+      ],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/EvaluationReport"
+}

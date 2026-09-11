@@ -198,7 +198,7 @@ COMMIT
 
 ## 10. 템플릿 공유 파일
 
-`contracts/fixtures/templates-v1.json`(AI 저장소, 백엔드에 복사·버전 고정): 결과별 `{headline, statement[], sentencing_reason_template}`. 유죄 "배심원 {n}인 중 {m}인이 유죄로 판단했습니다. 형량: {형량 라벨}" / 무죄 "배심원단은 이 지출에 정상 참작의 여지가 있다고 판단했습니다." / 동의 "배심원단이 구매를 승인했습니다. 후회는 본인 몫입니다." / 기각 "배심원단이 구매를 기각했습니다. 지갑을 닫으십시오." 형량 라벨: `집행유예` / `징역 1일 (내일 하루 무지출)` / `무기징역 (3일 무지출)`. watchdog·generation-failed·부분 강도 템플릿 모두 이 파일.
+`contracts/fixtures/templates-v1.json`(AI 저장소, 백엔드에 복사·버전 고정): 결과별 `{headline, statement[], sentencing_reason_template}`. 유죄 "배심원 {n}인 중 {m}인이 유죄로 판단했습니다. 형량: {sentence_label}" / 무죄 "배심원단은 이 지출에 정상 참작의 여지가 있다고 판단했습니다." / 동의 "배심원단이 구매를 승인했습니다. 후회는 본인 몫입니다." / 기각 "배심원단이 구매를 기각했습니다. 지갑을 닫으십시오." 형량 라벨: `집행유예` / `징역 1일 (내일 하루 무지출)` / `무기징역 (3일 무지출)`. watchdog·generation-failed·부분 강도 템플릿 모두 이 파일. **치환 토큰(9/11 확정)**: `{n}` 배심원 수 · `{m}` 유죄 표 수 · `{sentence_label}` 형량 라벨(같은 파일 `sentence_labels` 표). 파일 형태는 `{version, sentence_labels{probation, oneDay, life}, results{guilty|notGuilty|agree|disagree: {headline, statement[], sentencing_reason_template}}}`. `headline` 은 프론트 `VERDICT_LABELS`(유죄·무죄·동의·기각), `sentencing_reason_template` 은 유죄만 `"형량: {sentence_label}"` 나머지 null. (원문) 토큰은 `{형량 라벨}` 이었으나 공백·한글이 든 이름은 `str.format` 으로 채울 수 없어 바꿨다.
 
 ## 11. 짤 점수 선택 (finalize 10 단계, proposal2 §17)
 

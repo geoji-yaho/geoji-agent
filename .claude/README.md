@@ -39,6 +39,7 @@ CLAUDE.md              늘 지켜야 하는 것. 세션마다 로드
 | `code-layout.md`       | uv·Python 3.12, 저장소 배치, 의존 방향                    | `src/**`, `tests/**`, `contracts/**`, `database/**`, `scripts/**`, `pyproject.toml` |
 | `testing.md`           | 테스트 디렉터리, fake provider 원칙, 프롬프트 관문, 실측  | `src/**`, `tests/**`, `scripts/**`, `prompts/**`     |
 | `orca-worker.md`       | orca 워커 세션의 불변 규칙. 질문은 `ask`, 공유 자원, 통합 테스트, 편집 범위 | 없음. 늘 로드. preamble 없는 세션은 무시 |
+| `backend-handoff.md`   | 백엔드가 알아야 할 것(환경변수·엔드포인트·복사 파일·계약 변경·회신 대기)을 `docs/backend-handoff.md` 에 같은 커밋으로 기록 | 없음. 늘 로드 |
 
 ## 스킬
 
