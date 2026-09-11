@@ -212,7 +212,15 @@ def test_templates_cover_four_results() -> None:
         assert body["headline"]
         assert len(body["statement"]) == 1
         if result == "guilty":
-            assert body["sentencing_reason_template"] == "형량: {형량 라벨}"
+            assert body["sentencing_reason_template"] == "형량: {sentence_label}"
+            # 토큰은 str.format 으로 채울 수 있어야 한다(10 §10 토큰 표).
+            filled = body["statement"][0].format(
+                n=4, m=3, sentence_label=templates["sentence_labels"]["oneDay"]
+            )
+            assert (
+                filled
+                == "배심원 4인 중 3인이 유죄로 판단했습니다. 형량: 징역 1일 (내일 하루 무지출)"
+            )
         else:
             assert body["sentencing_reason_template"] is None
 

@@ -9,9 +9,9 @@
     "guilty": {
       "headline": "유죄",
       "statement": [
-        "배심원 {n}인 중 {m}인이 유죄로 판단했습니다. 형량: {형량 라벨}"
+        "배심원 {n}인 중 {m}인이 유죄로 판단했습니다. 형량: {sentence_label}"
       ],
-      "sentencing_reason_template": "형량: {형량 라벨}"
+      "sentencing_reason_template": "형량: {sentence_label}"
     },
     "notGuilty": {
       "headline": "무죄",
