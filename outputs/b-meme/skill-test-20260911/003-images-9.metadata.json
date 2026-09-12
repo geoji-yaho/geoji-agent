@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "003-images-9.png",
+  "asset_sha256": "df6974ab269b5276857061959ff29e85ede9aedecd8028bda7c15b6e16367e7d",
+  "classification": {
+    "emotions": [
+      "ABSURD_SERIOUSNESS"
+    ],
+    "keywords": [
+      "지갑",
+      "당황",
+      "현실부정"
+    ],
+    "expense_categories": [],
+    "subject": "animal",
+    "panels": [
+      {
+        "expression": "눈을 크게 뜨고 입을 벌린 당황한 표정",
+        "pose": "작은 초록 캐릭터가 몸보다 큰 지갑 안을 들여다봄",
+        "captions": [
+          "잠깐",
+          "이럴 리가 없는데"
+        ]
+      }
+    ],
+    "evidence": "거대한 지갑을 진지하게 확인하는 작은 캐릭터와 현실을 부정하는 자막의 우스운 대비. 만화 속 플랑크톤 캐릭터로 분류.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-11T13:15:43+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

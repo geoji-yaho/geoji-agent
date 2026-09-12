@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "001-images-3.png",
+  "asset_sha256": "45303cd4c74a449312ad632092ae70ea8aecae4b1690ddaa27a6af8e544c8a20",
+  "classification": {
+    "emotions": [
+      "ABSURD_SERIOUSNESS"
+    ],
+    "keywords": [
+      "거지왕",
+      "등장",
+      "진지함"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "입을 약간 벌린 무심하고 진지한 표정",
+        "pose": "계단 앞 상반신 정면",
+        "captions": [
+          "거지왕 강림"
+        ]
+      }
+    ],
+    "evidence": "무심한 표정과 거지왕 강림이라는 과장된 자막의 대비.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-11T13:15:43+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

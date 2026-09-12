@@ -1,0 +1,46 @@
+{
+  "entries": [
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images-1.jpg",
+      "style_reference_path": "/Users/hyun/dev/geoji/skills/b-meme/references/portrait.png",
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose,\ncomposition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity,\nclothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: Korean man wearing dark-rimmed glasses, black fluffy ear-muffs, dark hair with bangs, thick purple knitted scarf around neck with small mic clip, grey-and-black plaid jacket.\nScene, framing and panel structure: Single-panel centered bust portrait, straight-on framing.\nEmotion and source of meme humor: Deadpan resignation and solemn pathetic mood, contrasting the absurd declaration of being dead broke.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours,\nslightly asymmetric oversized head, awkward simplified anatomy,\nmuted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: A caption bar at the bottom with the exact Korean text: '지금 거의 거렁뱅이에요' with emphasis.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D,\nelaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "antigravity/generate_image",
+      "model": "imagen-3",
+      "attempts": 1,
+      "generations": 1,
+      "modifications": 0,
+      "output_path": "001-images-1.png",
+      "review_notes": "인물 특징 및 자막(지금 거의 거렁뱅이에요) 완벽 보존됨",
+      "status": "completed",
+      "metadata_v2_path": "001-images-1.metadata.v2.json"
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images-2.jpg",
+      "style_reference_path": "/Users/hyun/dev/geoji/skills/b-meme/references/two-panel.png",
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose,\ncomposition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity,\nclothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: Top panel shows a cute white cartoon creature holding up a yellow leaf. Bottom panel shows a rice-ball character with black nori seaweed on top of its head, looking down out of an oval window with melancholy wide eyes.\nScene, framing and panel structure: Exactly 2 vertically stacked panels separated by a border line. Top panel: character holding yellow leaf. Bottom panel: character looking out window with speech bubble.\nEmotion and source of meme humor: Playful riddle in the top panel transformed into sudden melancholic realization of one's own poverty in the bottom panel.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours,\nslightly asymmetric oversized head, awkward simplified anatomy,\nmuted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: Top panel text inside the yellow leaf: '가난을 거꾸로 읽으면?'. Bottom panel text inside the speech bubble: '난가?\n아...'.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D,\nelaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "antigravity/generate_image",
+      "model": "imagen-3",
+      "attempts": 1,
+      "generations": 1,
+      "modifications": 0,
+      "output_path": "002-images-2.png",
+      "review_notes": "2컷 구성, 손그림 밈 화풍, 자막(가난을 거꾸로 읽으면? / 난가? 아...) 완벽 보존됨",
+      "status": "completed",
+      "metadata_v2_path": "002-images-2.metadata.v2.json"
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images-3.jpg",
+      "style_reference_path": "/Users/hyun/dev/geoji/skills/b-meme/references/portrait.png",
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose,\ncomposition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity,\nclothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: Korean man with round face, short hair with side-swept bangs, headband wrapped around forehead, deadpan pathetic yet dignified expression, mustard yellow inner shirt, light beige scarf draped around neck, dark vest over dark red/maroon sleeves, standing outdoors on wooden stairs.\nScene, framing and panel structure: Single-panel bust portrait, centered angle on outdoor wooden steps.\nEmotion and source of meme humor: Deadpan dignified composure in ragged beggar clothes, creating comedic contrast with the dramatic title 'King of Beggars'.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours,\nslightly asymmetric oversized head, awkward simplified anatomy,\nmuted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: A prominent caption horizontally across the lower chest with the exact Korean text: '거지왕 강림' in yellow letters with green outlines.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D,\nelaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "antigravity/generate_image",
+      "model": "imagen-3",
+      "attempts": 1,
+      "generations": 1,
+      "modifications": 0,
+      "output_path": "003-images-3.png",
+      "review_notes": "인물 특징, 복장, 배경 계단 구도 및 자막(거지왕 강림) 완벽 보존됨",
+      "status": "completed",
+      "metadata_v2_path": "003-images-3.metadata.v2.json"
+    }
+  ]
+}

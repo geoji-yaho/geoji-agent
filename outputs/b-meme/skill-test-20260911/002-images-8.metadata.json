@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "002-images-8.png",
+  "asset_sha256": "61a90593bef70c615ac4f21cb774b2b6c5e32003affe240a8f84430f7cbdd69c",
+  "classification": {
+    "emotions": [
+      "RESIGNATION"
+    ],
+    "keywords": [
+      "돈없음",
+      "체념",
+      "담담함"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "입을 다문 담담한 표정",
+        "pose": "고개를 기울인 얼굴 클로즈업",
+        "captions": [
+          "손에 구겨진 지폐 한장조차 없어요"
+        ]
+      }
+    ],
+    "evidence": "담담한 얼굴과 지폐 한 장도 없다는 자막이 체념을 나타냄. 지출 종류는 알 수 없음.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-11T13:15:43+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

@@ -1,0 +1,62 @@
+{
+  "schema_version": 2,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "002-images-2.png",
+  "asset_sha256": "0233cf1a242f9aa9ecf866d58da7af5bc8d08897cce98af1b6ba34f296c3f2e7",
+  "classification": {
+    "emotions": [
+      "RESIGNATION",
+      "ABSURD_SERIOUSNESS"
+    ],
+    "keywords": [
+      "가난",
+      "체념",
+      "자조",
+      "돈없음"
+    ],
+    "expense_categories": [],
+    "subject": "mixed",
+    "panels": [
+      {
+        "expression": "눈을 동그랗게 뜨고 질문하는 표정",
+        "pose": "노란 나뭇잎을 위로 들어 올린 모습",
+        "captions": [
+          "가난을 거꾸로 읽으면?"
+        ]
+      },
+      {
+        "expression": "눈에 그늘이 지고 당황과 슬픔이 섞인 표정",
+        "pose": "둥근 창가에서 턱을 괴고 밖을 내다보는 모습",
+        "captions": [
+          "난가?",
+          "아..."
+        ]
+      }
+    ],
+    "evidence": "말장난 수수께끼에 대해 자신이 가난의 대상임을 깨닫고 허탈해하는 반전이 체념과 자조를 표현한다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v2",
+  "generated_at": "2026-09-12T08:32:34+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false,
+  "description": "상단 컷에서 캐릭터가 '가난을 거꾸로 읽으면?'이라는 나뭇잎을 들고 있고, 하단 컷에서 창밖을 보던 주먹밥 캐릭터가 '난가? 아...'라며 눈물을 글썽인다.",
+  "usage_context": "가난이나 돈 없음에 대한 농담을 듣고 뒤늦게 자신이 그 가난의 당사자임을 깨닫고 씁쓸해할 때",
+  "tags": [
+    "가난",
+    "주먹밥",
+    "체념",
+    "자조",
+    "돈없음",
+    "말장난"
+  ],
+  "review_status": "pending",
+  "publication_approved": false,
+  "allowed_verdict_tags": [],
+  "search_text_version": 1,
+  "search_text": "description: 상단 컷에서 캐릭터가 '가난을 거꾸로 읽으면?'이라는 나뭇잎을 들고 있고, 하단 컷에서 창밖을 보던 주먹밥 캐릭터가 '난가? 아...'라며 눈물을 글썽인다.\nusage_context: 가난이나 돈 없음에 대한 농담을 듣고 뒤늦게 자신이 그 가난의 당사자임을 깨닫고 씁쓸해할 때\ncaptions:\n가난을 거꾸로 읽으면?\n난가?\n아...\ntags: 가난, 주먹밥, 체념, 자조, 돈없음, 말장난",
+  "search_text_hash": "d9b88f9606f98e1f42680428c9e4e78e7baea9531611ceb16504cb61031856c0",
+  "metadata_version": 1
+}
