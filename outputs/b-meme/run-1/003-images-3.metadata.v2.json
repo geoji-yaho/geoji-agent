@@ -1,0 +1,53 @@
+{
+  "schema_version": 2,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "003-images-3.png",
+  "asset_sha256": "6d919957c83467dfc3a9a36315c028b19516c59a0c48d63d089c66baf6ad7db3",
+  "classification": {
+    "emotions": [
+      "ABSURD_SERIOUSNESS",
+      "SMUG"
+    ],
+    "keywords": [
+      "거지왕",
+      "돈없음",
+      "뻔뻔함",
+      "자조"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "무표정하면서도 위엄 있는 진지한 눈빛",
+        "pose": "계단 위에서 정면을 내려다보는 상반신 구도",
+        "captions": [
+          "거지왕 강림"
+        ]
+      }
+    ],
+    "evidence": "남루한 차림새와 거지왕이라는 자막에도 불구하고 과도하게 진지하고 당당한 태도가 부조리한 웃음을 유발한다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v2",
+  "generated_at": "2026-09-12T08:32:34+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false,
+  "description": "머리에 두건을 두르고 누더기 조끼와 목도리를 착용한 인물이 야외 계단에서 당당하게 서 있고 하단에 '거지왕 강림' 자막이 적혀 있다.",
+  "usage_context": "통장 잔고가 바닥나거나 극단적으로 돈이 없는 거지 상태임에도 불구하고 오히려 위풍당당하거나 뻔뻔하게 행동할 때",
+  "tags": [
+    "거지왕",
+    "돈없음",
+    "당당함",
+    "자조",
+    "뻔뻔함"
+  ],
+  "review_status": "pending",
+  "publication_approved": false,
+  "allowed_verdict_tags": [],
+  "search_text_version": 1,
+  "search_text": "description: 머리에 두건을 두르고 누더기 조끼와 목도리를 착용한 인물이 야외 계단에서 당당하게 서 있고 하단에 '거지왕 강림' 자막이 적혀 있다.\nusage_context: 통장 잔고가 바닥나거나 극단적으로 돈이 없는 거지 상태임에도 불구하고 오히려 위풍당당하거나 뻔뻔하게 행동할 때\ncaptions:\n거지왕 강림\ntags: 거지왕, 돈없음, 당당함, 자조, 뻔뻔함",
+  "search_text_hash": "a7022b2ec4b468dcc600be2e78cf1ea3a156026ecd394a3cbf04a4f1fdeea28c",
+  "metadata_version": 1
+}

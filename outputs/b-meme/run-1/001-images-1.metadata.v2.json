@@ -1,0 +1,53 @@
+{
+  "schema_version": 2,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "001-images-1.png",
+  "asset_sha256": "80222f5a935bfe37a6ea7d7783db4bf8fe147ee5a4796357b68eee82610652ec",
+  "classification": {
+    "emotions": [
+      "RESIGNATION"
+    ],
+    "keywords": [
+      "돈없음",
+      "체념",
+      "자조",
+      "거렁뱅이"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "입을 살짝 벌린 채 멍하니 정면을 보는 체념한 표정",
+        "pose": "정면을 향한 상반신 클로즈업",
+        "captions": [
+          "지금 거의 거렁뱅이에요"
+        ]
+      }
+    ],
+    "evidence": "초점 없는 시선과 거렁뱅이라는 자막이 돈이 다 떨어진 상황에서의 체념과 자조를 나타낸다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v2",
+  "generated_at": "2026-09-12T08:32:34+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false,
+  "description": "안경을 쓰고 귀마개와 보라색 털목도리를 두른 인물이 정면을 응시하며, 하단에 '지금 거의 거렁뱅이에요'라는 자막이 표시된다.",
+  "usage_context": "예상치 못한 지출이나 과소비 후 스스로의 빈곤한 상태를 담담하게 고백하거나 자조할 때",
+  "tags": [
+    "거지",
+    "돈없음",
+    "체념",
+    "자조",
+    "거렁뱅이",
+    "빈곤"
+  ],
+  "review_status": "pending",
+  "publication_approved": false,
+  "allowed_verdict_tags": [],
+  "search_text_version": 1,
+  "search_text": "description: 안경을 쓰고 귀마개와 보라색 털목도리를 두른 인물이 정면을 응시하며, 하단에 '지금 거의 거렁뱅이에요'라는 자막이 표시된다.\nusage_context: 예상치 못한 지출이나 과소비 후 스스로의 빈곤한 상태를 담담하게 고백하거나 자조할 때\ncaptions:\n지금 거의 거렁뱅이에요\ntags: 거지, 돈없음, 체념, 자조, 거렁뱅이, 빈곤",
+  "search_text_hash": "b7439d108bd729b40d361689140a0c8ffb0650109a525c16017b5e0b5ed3e3af",
+  "metadata_version": 1
+}
