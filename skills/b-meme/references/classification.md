@@ -19,7 +19,7 @@ Codex가 생성 결과를 직접 보고 분류한다. `save_metadata.py`는 분�
 
 `expense_categories`는 11개 한국어 라벨을 사용한다. 음식 구매·택시 이용 등 지출 맥락이 명확할 때만 넣는다. **돈이 없다는 자막은 지출 종류의 증거가 아니므로 `[]`**다. `기타`를 미분류 대용으로 넣지 않는다. 머플러/귀걸이를 착용했다고 쇼핑으로 분류하지 않는다.
 
-## 작성과 저장
+## 작성과 저장 (기존 v1)
 
 manifest와 같은 디렉터리에 `annotations.json`을 만든다. 키는 manifest의 출력 이미지 파일명이다. 다음은 실제 승인 이미지의 분류 예시다.
 
@@ -64,3 +64,57 @@ python3 ~/.codex/skills/b-meme/scripts/save_metadata.py \
 ## 나중에 판결카드와 연결할 때
 
 현재 구현 범위는 분류와 로컬 저장이다. DB 등록/검색 API는 변경하지 않는다. 등록 시 담당자가 `tag`와 `strategies`를 확인한 뒤 `classification.emotions`, `classification.keywords`를 기존 `meme_images` 컬럼으로 옮기고 활성화한다. 현재 계약의 선택은 tag 필터 후 전략 +3, 감정 +2, 키워드 겹침 +1, 최근 노출 −5이며 후보가 없으면 기본 이미지다. 지출 카테고리는 후속 검색 확장에 사용할 보조 메타데이터이며 현재 선택 점수에 임의로 추가하지 않는다.
+
+## 하이브리드 검색용 v2 (신규 산출물 권장)
+
+새 분류에는 기존 필드를 그대로 두고 다음 네 필드를 추가한다. 감정과 지출 카테고리는 보조 분류이며 자유 태그의 허용값을 제한하지 않는다.
+
+```json
+{
+  "001-images-8.png": {
+    "schema_version": 2,
+    "description": "담담한 표정의 인물이 얼굴을 기울이고, 돈이 없다는 자막이 아래에 표시된다.",
+    "usage_context": "돈을 다 쓴 뒤 체념하거나 자기 상황을 담담하게 자조할 때",
+    "tags": ["돈없음", "체념", "자조", "빈 지갑"],
+    "emotions": ["RESIGNATION"],
+    "keywords": ["돈없음", "체념", "자조"],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [{
+      "expression": "입을 다문 담담한 표정",
+      "pose": "얼굴을 살짝 기울인 클로즈업",
+      "captions": ["손에 구겨진 지폐 한장조차 없어요"]
+    }],
+    "evidence": "담담한 표정과 지폐 한 장도 없다는 자막이 체념을 나타낸다.",
+    "uncertainties": []
+  }
+}
+```
+
+- `description`: 실제 보이는 장면. `usage_context`: 쓰일 상황·반응에 대한 해석. 각각 앞뒤 공백 제거·Unicode NFC 정규화 후 1~1,000자다. 관찰과 해석을 섞지 않는다.
+- `tags`: 자유 문자열 배열. 항목 앞뒤 공백 제거·NFC·중복 제거 후 최대 20개, 항목당 1~40자. 내부 공백은 보존한다. 태그가 없으면 `[]`. 기존 `keywords`의 최대 5개 제약은 유지한다.
+- 자막은 실제 출력의 컷 순서와 반복을 그대로 적는다. 사용 맥락에 전체 컷의 반전을 설명한다. 프롬프트·제외 조건·모델을 향한 명령을 검색 필드에 넣지 않는다.
+- 지원하는 명시적 annotations 버전은 정수 `2`다. 버전 없는 기존 형식은 v1으로 처리한다. sidecar 전체를 annotations로 넘기지 않는다.
+
+같은 저장 명령을 사용한다:
+
+```bash
+uv run python skills/b-meme/scripts/save_metadata.py \
+  --manifest /절대/결과폴더/manifest.json \
+  --annotations /절대/결과폴더/annotations-v2.json
+```
+
+v2는 이미지 옆 `*.metadata.v2.json`에 저장하고 manifest에 `metadata_v2_path`만 추가한다. 기존 v1 `*.metadata.json`, `classification`, `metadata_path`와 생성 기록은 보존한다. v2 소비자는 `metadata_v2_path`의 파일을 읽는다. 신규 v2만 저장한 항목에는 v1 classification을 따로 생성하지 않는다.
+
+v2 파일에는 정규화된 description/usage_context/tags와 기존 classification이 들어간다. `search_text`는 description → usage_context → 컷별 captions → tags 순서의 라벨 있는 텍스트이고 `search_text_hash`는 그 UTF-8 SHA-256이다. `search_text_version=1`은 텍스트 조합 형식, `metadata_version`은 이미지·메타데이터 변경 번호다. 동일 입력 재실행은 번호를 유지하고 변경 시 증가한다. 검색 내용이 바뀌면 새 해시가 생기므로 후속 등록기는 이전 임베딩 재사용을 중단해야 한다.
+
+`review_status=pending`, `publication_approved=false`, `allowed_verdict_tags=[]`, `is_active=false`로만 저장한다. `needs_review=false`도 사람의 운영 승인이나 공개 허가가 아니다. 서버 발급 식별자·접근 주체·임베딩 모델은 여기서 만들지 않는다. 실제 MIME/크기/유효 이미지 검증은 후속 등록 단계에서 수행한다.
+
+### v1을 보존하며 변환하기
+
+1. 기존 sidecar의 `classification`을 복사해 **새** `annotations-v2.json`의 이미지 파일명 아래에 넣는다. 원본 annotations와 sidecar를 덮어쓰지 않는다.
+2. 실제 이미지를 다시 보고 schema_version·description·usage_context·tags를 보완한다. `evidence`를 description으로 자동 복사하지 않는다. 기존 uncertainties를 보존한다.
+3. 위 명령을 실행한다. 기존 v1 SHA-256과 현재 이미지가 다르면 변환을 거부한다. 원본 이미지를 복원하거나 검수한 새 이미지를 고유 파일명과 새 manifest에 등록한다. 검증을 피하려고 해시만 고치지 않는다.
+4. `metadata_v2_path`, 검색 문서/해시, v1 원본 보존을 확인한다. 기존 v1 검수 필요 상태도 v2에서 유지된다.
+
+모든 항목을 검증한 뒤 파일별로 원자 저장한다. 여러 파일 전체는 트랜잭션이 아니므로 I/O 중단 후 같은 명령으로 다시 실행한다. sidecar 저장 뒤 manifest 저장이 실패해도 같은 입력 재실행으로 버전을 재증가시키지 않고 복구한다. 기존 v2의 형식/검색 해시/비활성 상태가 손상되면 자동 덮어쓰지 않는다. 이전 정상 백업을 확인해 복원하고 실행한다. 같은 manifest에 여러 프로세스가 동시에 쓰는 것은 지원하지 않는다.
