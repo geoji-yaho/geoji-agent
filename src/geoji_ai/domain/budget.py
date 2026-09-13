@@ -6,25 +6,47 @@ DB 가 준 `deadline_at` 과 같은 DB 가 준 `db_now` 의 차이만 믿는다.
 노드 timeout = `min(노드 상한, 남은 시간 − 다음 필수 단계 예약)`. 결과가 0 이하면 그 노드를
 **시작하지 않는다**(`None`). 검수 시간을 확보할 수 없으면 새 서기 호출을 시작하지 않는 규칙이
 이 계산으로 선다.
+
+돈 예산(06 §3.2)도 여기 둔다. 단위는 micro-USD 정수이고 KRW 는 화면·리포트에서만 쓴다.
+단가표는 어댑터 쪽에 있어 domain 이 import 하지 않는다. 호출자가 단가를 넘긴다.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
+import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
+from geoji_ai.domain.draft_hash import _nfc
+
 __all__ = [
+    "CASE_CAP_MICRO_USD",
     "EVALUATOR",
     "FINALIZE_RESERVE_SECONDS",
+    "KRW_PER_USD",
     "NODE_NAMES",
+    "NODE_RESULT_TTL",
     "SENTENCING",
+    "SUBMISSION_BUDGET_PREFIX",
+    "TICKS_PER_MICRO_USD",
     "WRITER",
     "Deadline",
+    "NodeResultKey",
+    "budget_key_for_post",
+    "budget_key_for_submission",
+    "est_max_micro_usd",
     "node_cap",
+    "node_result_expires_at",
+    "request_hash",
     "reserve_after",
+    "resolve_actual_micro_usd",
+    "ticks_to_micro_usd",
 ]
 
 SENTENCING = "sentencing"
@@ -98,3 +120,103 @@ class Deadline:
         if budget <= 0:
             return None
         return budget
+
+
+# --- 돈 예산(06 §3.2) --------------------------------------------------------------
+
+#: 환산 기준(06 §3.2 "1,450원/$"). 표시용이다.
+KRW_PER_USD = 1450
+
+#: 사건당 상한. 40원 상당 = `round(40/1450*1e6)` = 27,586 micro-USD.
+CASE_CAP_MICRO_USD: int = round(40 / KRW_PER_USD * 1_000_000)
+
+#: xAI `cost_in_usd_ticks` 환산. 1 micro-USD = 10,000 ticks.
+TICKS_PER_MICRO_USD = 10_000
+
+#: 제출 임시 예산 키 접두어(06 §3.2). intake 는 `post_id` 가 없다.
+SUBMISSION_BUDGET_PREFIX = "submission:"
+
+#: `node_results` 보존 기간(06 §3.2 "보존 24h").
+NODE_RESULT_TTL = timedelta(hours=24)
+
+
+def est_max_micro_usd(
+    prompt_tokens: int,
+    max_output_tokens: int,
+    price_in_per_1m: float | int | Decimal,
+    price_out_per_1m: float | int | Decimal,
+) -> int:
+    """예약액 `입력 token × 입력 단가 + max_output_tokens × 출력 단가`, 올림.
+
+    단가는 USD/1M token 이다. 1M token 당 USD 는 token 하나당 micro-USD 와 같다.
+    float 오차로 올림이 한 칸 넘어가지 않게 `Decimal(str(단가))` 로 곱한다.
+    """
+    if prompt_tokens < 0 or max_output_tokens < 0:
+        raise ValueError("token 수는 음수일 수 없다")
+    total = prompt_tokens * Decimal(str(price_in_per_1m)) + max_output_tokens * Decimal(
+        str(price_out_per_1m)
+    )
+    return math.ceil(total)
+
+
+def ticks_to_micro_usd(ticks: int) -> int:
+    """xAI ticks → micro-USD, 내림."""
+    if ticks < 0:
+        raise ValueError("ticks 는 음수일 수 없다")
+    return ticks // TICKS_PER_MICRO_USD
+
+
+def resolve_actual_micro_usd(micro_usd: int | None, ticks: int | None) -> int | None:
+    """정산액. `micro_usd` → 없으면 `ticks` 내림 환산 → 둘 다 없으면 None(비용 모름)."""
+    if micro_usd is not None:
+        return micro_usd
+    if ticks is not None:
+        return ticks_to_micro_usd(ticks)
+    return None
+
+
+def budget_key_for_post(post_id: str) -> str:
+    """사건 예산 키. `case_budgets.post_id` 에 그대로 들어간다."""
+    return str(post_id)
+
+
+def budget_key_for_submission(submission_id: str) -> str:
+    """제출 임시 예산 키 `submission:{id}`. 사건 예산으로 옮기는 로직은 결정 대기(10 §4.4)."""
+    return f"{SUBMISSION_BUDGET_PREFIX}{submission_id}"
+
+
+def request_hash(canonical_input: Any) -> str:
+    """canonical 입력의 sha256 hex.
+
+    `draft_hash` 와 같은 규칙이다. 문자열(키·값) NFC, 키 정렬, 공백 없는 JSON, 비 ASCII 그대로,
+    UTF-8 바이트.
+    """
+    text = json.dumps(
+        _nfc(canonical_input), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def node_result_expires_at(now: datetime) -> datetime:
+    """`now + 24h`."""
+    return now + NODE_RESULT_TTL
+
+
+@dataclass(frozen=True)
+class NodeResultKey:
+    """`node_results` 재사용 키 5요소(06 §3.2). 전부 같을 때만 재사용한다."""
+
+    request_hash: str
+    model_id: str
+    prompt_version: str
+    policy_version: str
+    privacy_versions: Any
+
+    def versions(self) -> dict[str, Any]:
+        """원장 포트 `versions` 인자 — `request_hash` 를 뺀 4요소."""
+        return {
+            "model_id": self.model_id,
+            "prompt_version": self.prompt_version,
+            "policy_version": self.policy_version,
+            "privacy_versions": self.privacy_versions,
+        }
