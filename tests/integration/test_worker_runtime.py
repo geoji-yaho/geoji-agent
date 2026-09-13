@@ -271,6 +271,34 @@ async def test_스텁_핸들러가_NOT_IMPLEMENTED_로_되돌린다(
     assert 50 <= delta <= 61
 
 
+async def test_핸들러_예외는_HANDLER_ERROR_로_fail_하고_5초_뒤로_미룬다(
+    jobs: PostgresJobs, enqueue: Enqueue, fetch_job: FetchJob, monkeypatch: pytest.MonkeyPatch
+):
+    # 핸들러가 complete·fail 없이 죽으면 런타임이 fail 을 남긴다. RUNNING 으로 두지 않는다.
+    async def boom(job: Job, ctx: HandlerContext) -> None:
+        raise RuntimeError("핸들러 버그")
+
+    monkeypatch.setitem(dispatch.HANDLERS, "PREPARE", boom)
+    worker = Worker(jobs, make_settings(WORKER_SLOTS={"PREPARE": 1}))
+    job_id = await _prepare_payload_job(enqueue)
+
+    async def recorded() -> bool:
+        return (await fetch_job(job_id))["last_error_code"] is not None
+
+    await run_worker_until(worker, recorded, timeout=5.0)
+
+    row = await fetch_job(job_id)
+    assert row["status"] != "RUNNING"
+    assert row["last_error_code"] == "HANDLER_ERROR"
+    assert row["owner_id"] is None
+    if row["attempts"] >= row["max_attempts"]:
+        assert row["status"] == "FAILED"
+    else:
+        assert row["status"] == "QUEUED"
+        delay = (row["available_at"] - datetime.now(UTC)).total_seconds()
+        assert 3.0 <= delay <= 5.5
+
+
 async def test_네_kind_모두_스텁으로_처리된다(
     jobs: PostgresJobs,
     engine: AsyncEngine,
@@ -301,5 +329,8 @@ async def test_네_kind_모두_스텁으로_처리된다(
         assert row["last_error_code"] == "NOT_IMPLEMENTED", kind
         assert row["attempts"] == 1, kind
         # TEXT_RETRY 는 max_attempts=1 이라 첫 실패에서 FAILED 다(02 §3.4).
-        assert row["status"] == ("FAILED" if kind == "TEXT_RETRY" else "QUEUED"), kind
+        # SENTENCE 는 기한이 enqueue+10초인데 스텁이 60초 뒤 재시도를 걸어 재시도 시각이
+        # 기한 뒤다. claim 이 다시 집지 못하므로 FAIL_SQL 이 CANCELLED 로 끝낸다.
+        expected = {"TEXT_RETRY": "FAILED", "SENTENCE": "CANCELLED"}.get(kind, "QUEUED")
+        assert row["status"] == expected, kind
     assert await _running_count(engine) == 0
