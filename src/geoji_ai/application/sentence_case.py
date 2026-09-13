@@ -20,17 +20,24 @@ application 은 어댑터를 import 하지 않는다. 어댑터 예외(`BackendR
 
 from __future__ import annotations
 
-from typing import Protocol
+import asyncio
+import time
+from collections.abc import Awaitable, Callable
+from datetime import datetime
+from typing import Any, Protocol
 
 from geoji_ai.contracts.jobs import Job, SentencePayload, TextRetryPayload, parse_payload
+from geoji_ai.graphs.sentencing import SentenceDeps, build_sentence_graph, initial_state
 from geoji_ai.ports.backend import BackendPort
 from geoji_ai.ports.jobs import JobsPort
+from geoji_ai.ports.llm import LLMPort
 
 __all__ = [
     "BACKEND_AUTH",
     "BACKEND_AUTH_RETRY_AFTER_S",
     "BACKEND_UNAVAILABLE",
     "STUB_ERROR_CODE",
+    "SentenceHandler",
     "SentenceStubHandler",
 ]
 
@@ -73,6 +80,62 @@ class SentenceStubHandler:
                 generation_id=ctx.generation_id,
                 error_code=STUB_ERROR_CODE,
             )
+        except Exception as exc:
+            if not await _settle_backend_error(job, ctx, exc):
+                raise
+            return
+        await ctx.jobs.complete(job.id, ctx.worker_id, ctx.generation_id)
+
+
+class SentenceContext(Protocol):
+    """그래프 C 핸들러 문맥. `preparation` 은 없어도 된다(`getattr`, 없으면 MINIMAL)."""
+
+    jobs: JobsPort
+    backend: BackendPort
+    llm: LLMPort
+    semaphore: asyncio.Semaphore
+    settings: Any
+    generation_id: str
+    worker_id: str
+
+
+class SentenceHandler:
+    """SENTENCE·TEXT_RETRY 본체(05 GR-03). payload → 스냅샷 → 그래프 C → `complete`/`fail`.
+
+    그래프가 끝나면(finalize 200·폐기·generation-failed 보고 모두) `complete`.
+    백엔드 예외는 `_settle_backend_error` 가 스텁과 같은 표로 정리한다.
+    `db_now` 는 DB 가 준 현재 시각을 돌려주는 함수다(`Deadline.from_db`). 공급처는 미결정.
+    """
+
+    def __init__(
+        self,
+        graph_factory: Callable[[SentenceDeps], Any] = build_sentence_graph,
+        *,
+        db_now: Callable[[], Awaitable[datetime]],
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._graph_factory = graph_factory
+        self._db_now = db_now
+        self._clock = clock
+
+    async def __call__(self, job: Job, ctx: SentenceContext) -> None:
+        payload = parse_payload(job)
+        assert isinstance(payload, SentencePayload | TextRetryPayload)
+        mode = "REGENERATE" if job.kind == "TEXT_RETRY" else "INITIAL"
+        try:
+            snapshot = await ctx.backend.snapshot(job.id, ctx.generation_id)
+            deps = SentenceDeps(
+                backend=ctx.backend,
+                llm=ctx.llm,
+                semaphore=ctx.semaphore,
+                settings=ctx.settings,
+                generation_id=ctx.generation_id,
+                db_now=self._db_now,
+                preparation=getattr(ctx, "preparation", None),
+                clock=self._clock,
+            )
+            graph = self._graph_factory(deps)
+            await graph.ainvoke(initial_state(job, mode, snapshot))
         except Exception as exc:
             if not await _settle_backend_error(job, ctx, exc):
                 raise
