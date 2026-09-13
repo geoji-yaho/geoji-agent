@@ -112,7 +112,7 @@
 - [x] 사용자 결정 4건(9/7 밤)
 - [x] **D-20 회신(9/8)** — 확정: Supabase 인스턴스 공유(10 §15.2). 작업 2 는 로컬 `postgres:16` 으로 개발하고 grants 회신 후 Supabase 에 적용
 ### Phase 1 완료 판정 기준
-- [ ] 스키마 거부 케이스 6종 통과, fixture 12·ports 5·fake 시나리오 8
+- [x] 스키마 거부 케이스 6종 통과, fixture 12·ports 5·fake 시나리오 8 — 9/11 완료(01, PR #3. fixture 16)
 - [ ] **실제 Postgres 에서 claim 중복 0, 이전 generation 저장 0**
 
 ### Phase 2 — M2 9/10 (작업 3) 진입 조건
@@ -173,7 +173,7 @@ flowchart LR
 ### 작업 ↔ 날짜 ↔ 완료 기준 (proposal2 §20)
 | 마감 | 작업 | 완료 기준 | 잔여 리스크 |
 |---|---|---|---|
-| 9/8~9/9 | 1·2 | 스키마 거부 통과, claim 중복 0 | 서버 role·grants 미회신 |
+| 9/8~9/9 | 1·2 | 스키마 거부 통과(**1 은 9/11 완료**), claim 중복 0 | 서버 role·grants 미회신 |
 | 9/10 M2 | 3 | AI 없이 템플릿 노출·형량 1회 | 백엔드 4개 API + watchdog 하루 |
 | 9/11~9/12 | 4 | 30일 집계·삭제 차단 | resolve-evidence 9/11 |
 | 9/13 | 5 | fake 로 판결문 노출 | 하루에 3.75 인일 |
@@ -251,8 +251,10 @@ flowchart LR
 | §9.2 `generation-failed` | `error_code` 만 언급, 코드 표 없음 | 코드 표(재시도 없음 3종 / round 예약 5종) 신설. M2 스텁은 `AI_NOT_READY` | 03 §1, 10 §4.6 |
 | §5.2 조회 6종 | `get_room_rules`·`get_defendant_stats` 원본 "RDBMS" | 워커는 업무 테이블을 못 읽으므로 **`resolve-evidence` 응답에 방 규칙·집계·최근 판결·승인 댓글** 포함 | 04 §3.4, 10 §4.2 |
 | §9.2 snapshot | 사건·평결만 | RETAIN job 용 `verdict_final`·`comment` 확장 `(제안)` | 04, 10 §4.1 |
-| §6.3 `SentencingDecision` | `reason_source` 없음 | D-19 치환을 finalize 에 전달하려면 `reason_source ∈ AI|TEMPLATE` 필요 | 01, 05, 10 §5 |
-| §6.3 `TextDraft` · §15 "일부 강도만 실패" | 강도별 `source` 없음 | `TextDraft.source ∈ AI|TEMPLATE` + `TEXT_RETRY payload.intensities[]` `(제안)` | 01, 05, 10 §5·§7 |
+| §6.2 `CaseSnapshot` 표기 | 10 §4.1 이 `post{id,…}` 중첩으로 옮겨 적음 | **평면이 정본**(01 §3.2, 9/11). 10 §4.1 정정 | 01, 10 §4.1 |
+| §6.4 `IntakeResult` | `mode` 없음 | `FINAL_CHECK → NEEDS_CLARIFICATION` 금지를 스키마가 보려면 결과에 `mode` 필요. 9/11 추가 | 01 §3.2, 07 |
+| §6.3 `SentencingDecision` | `reason_source` 없음 | D-19 치환을 finalize 에 전달하려면 `reason_source ∈ AI|TEMPLATE` 필요. **9/11 01 계약에 반영(필수 필드, `schema_version` 1 유지)** | 01, 05, 10 §5 |
+| §6.3 `TextDraft` · §15 "일부 강도만 실패" | 강도별 `source` 없음 | `TextDraft.source ∈ AI|TEMPLATE`(**9/11 01 계약에 반영**) + `TEXT_RETRY payload.intensities[]` `(제안)` | 01, 05, 10 §5·§7 |
 | §7.4 제출 임시 예산 | "등록 시 사건 예산으로 이전" | 이전하려면 제출→게시물 매핑 통지가 필요 `(제안)` | 06 §3.2, 10 §4.4 |
 | 부록 B 데모 C "관측 화면" | 주체 미정 | AI API `trace` 엔드포인트 + 백엔드 프록시 `(제안)` | 08 §3.3, 10 §4.5 |
 | §19 경로 | `services/ai/…` | 이 저장소 루트 = `services/ai/`. 모노레포가 아니면 접두 없이 | 01 |
