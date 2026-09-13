@@ -26,12 +26,14 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from geoji_ai.adapters.backend_http import BackendHttp, bind_trace
 from geoji_ai.adapters.postgres_jobs import PostgresJobs, make_engine, reap
+from geoji_ai.adapters.postgres_memory import PostgresMemory
 from geoji_ai.contracts.jobs import Job
 from geoji_ai.core.config import Settings, secret_value
 from geoji_ai.core.logging import bind_trace_id, get_logger
 from geoji_ai.core.startup import StartupError
 from geoji_ai.ports.backend import BackendPort
 from geoji_ai.ports.jobs import JobsPort
+from geoji_ai.ports.memory import MemoryPort
 from geoji_ai.workers.dispatch import SLOT_KINDS, HandlerContext, handler_for
 from geoji_ai.workers.heartbeat import start_heartbeat
 
@@ -76,6 +78,7 @@ class Worker:
         reaper: bool = False,
         engine: AsyncEngine | None = None,
         backend: BackendPort | None = None,
+        memory: MemoryPort | None = None,
     ) -> None:
         unknown = set(settings.WORKER_SLOTS) - set(SLOT_KINDS)
         if unknown:
@@ -91,6 +94,8 @@ class Worker:
         self._engine = engine
         # `run_worker` 가 `BackendHttp` 를 넣는다. 테스트는 가짜 백엔드 클라이언트를 넣는다.
         self._backend = backend
+        # `run_worker` 가 `PostgresMemory` 를 넣는다(04 ME-03).
+        self._memory = memory
         self._shutdown = asyncio.Event()
         # 프로세스 전역 세마포어. 슬롯이 몇 개든 하나를 공유한다(02 §3.3 동시성).
         self._semaphore = asyncio.Semaphore(settings.MODEL_CONCURRENCY_LIMIT)
@@ -153,6 +158,7 @@ class Worker:
             generation_id=generation_id,
             worker_id=worker_id,
             backend=self._backend,  # type: ignore[arg-type]  # None 은 백엔드 없는 테스트뿐
+            memory=self._memory,
         )
         handler = handler_for(job.kind)
         handler_task = asyncio.create_task(handler(job, ctx), name=f"handler:{job.kind}")
@@ -293,7 +299,8 @@ async def run_worker(settings: Settings, *, reaper: bool = False) -> None:
     engine = make_engine(secret_value(settings, "DATABASE_URL"))
     jobs: JobsPort = PostgresJobs(engine, lease_s=settings.JOB_LEASE_SECONDS)
     backend = BackendHttp(backend_url, secret_value(settings, "SERVICE_AUTH_TOKEN"))
-    worker = Worker(jobs, settings, reaper=reaper, engine=engine, backend=backend)
+    memory: MemoryPort = PostgresMemory(engine, settings)
+    worker = Worker(jobs, settings, reaper=reaper, engine=engine, backend=backend, memory=memory)
     _install_sigterm(worker)
     log.info("worker_started", slots=settings.WORKER_SLOTS, reaper=reaper)
     try:

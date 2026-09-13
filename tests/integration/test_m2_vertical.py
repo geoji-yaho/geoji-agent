@@ -4,7 +4,8 @@
 
 ① SENTENCE: claim → begin → failed(AI_NOT_READY) → complete. 가짜 백엔드 FINAL/RULE +
    TEMPLATE_READY, TEXT_RETRY 예약 없음, `ai.jobs` 에 RETAIN(`sentence.finalized`) 1행
-② PREPARE·RETAIN 은 백엔드를 부르지 않고 SUCCEEDED
+② PREPARE 는 백엔드를 부르지 않고, RETAIN 은 snapshot 만 부른다(확장 필드가 없어 행 0).
+   둘 다 SUCCEEDED
 ③ TEXT_RETRY(FINAL 상태) 는 폴백을 유지한 채 SUCCEEDED
 ④ 백엔드 주소가 죽었으면 `fail(BACKEND_UNAVAILABLE, 5)` → QUEUED · available_at +5s
 """
@@ -155,7 +156,7 @@ async def test_SENTENCE_스텁이_폴백_확정과_RETAIN_을_만든다(
 # --- ② PREPARE · RETAIN ----------------------------------------------------------
 
 
-async def test_PREPARE_RETAIN_은_백엔드를_부르지_않고_SUCCEEDED(
+async def test_PREPARE_는_백엔드_없이_RETAIN_은_snapshot_만_부르고_SUCCEEDED(
     jobs: PostgresJobs,
     enqueue: Enqueue,
     fetch_job: FetchJob,
@@ -179,7 +180,8 @@ async def test_PREPARE_RETAIN_은_백엔드를_부르지_않고_SUCCEEDED(
 
     assert (await fetch_job(prepare_id))["status"] == "SUCCEEDED"
     assert (await fetch_job(retain_id))["status"] == "SUCCEEDED"
-    assert fake.calls == []
+    # 04 ME-03: RETAIN 은 snapshot 을 부른다. 가짜 스냅샷에 RETAIN 확장 필드가 없어 행 0 이다.
+    assert fake.calls == [("GET", f"/internal/v1/ai-jobs/{retain_id}/snapshot")]
 
 
 # --- ③ TEXT_RETRY(FINAL) --------------------------------------------------------
@@ -212,7 +214,11 @@ async def test_TEXT_RETRY_는_FINAL_폴백을_유지하고_SUCCEEDED(
     assert state.sentence == "oneDay"
     assert state.text_version == 0
     assert fake.text_retry_rounds == []
-    assert [path.rsplit("/", 1)[-1] for _, path in fake.calls] == [
+    # 04 ME-03: 같은 BACKGROUND 슬롯이 앞서 쌓인 RETAIN 을 집어 snapshot 을 부를 수 있다.
+    # 그 호출만 뺀다.
+    assert [
+        path.rsplit("/", 1)[-1] for _, path in fake.calls if not path.endswith("/snapshot")
+    ] == [
         "begin-generation",
         "generation-failed",
     ]

@@ -19,12 +19,13 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from geoji_ai.application.prepare_case import PrepareStubHandler
-from geoji_ai.application.retain_memory import RetainStubHandler
+from geoji_ai.application.retain_memory import RetainHandler
 from geoji_ai.application.sentence_case import SentenceStubHandler
 from geoji_ai.contracts.jobs import Job, JobKind
 from geoji_ai.core.config import Settings
 from geoji_ai.ports.backend import BackendPort
 from geoji_ai.ports.jobs import JobsPort
+from geoji_ai.ports.memory import MemoryPort
 
 __all__ = [
     "DEFAULT_ROUTE_BY_KIND",
@@ -147,6 +148,8 @@ class HandlerContext:
     worker_id: str
     #: 백엔드 내부 API(03 §3.3). 워커가 `BackendHttp` 를 넣고 테스트는 가짜를 넣는다.
     backend: BackendPort
+    #: 기억 포트(04 ME-03). 워커가 `PostgresMemory` 를 넣는다. RETAIN 만 쓴다.
+    memory: MemoryPort | None = None
 
 
 class Handler(Protocol):
@@ -168,12 +171,12 @@ class NotImplementedHandler:
 
 _sentence_stub = SentenceStubHandler()
 
-#: 작업 3 M2 스텁 4종(03 §3.3). SENTENCE·TEXT_RETRY 는 같은 핸들러다.
+#: 작업 3 M2 스텁(03 §3.3). SENTENCE·TEXT_RETRY 는 같은 핸들러다. RETAIN 은 작업 4(04 ME-03).
 HANDLERS: dict[str, Handler] = {
     "PREPARE": PrepareStubHandler(),
     "SENTENCE": _sentence_stub,
     "TEXT_RETRY": _sentence_stub,
-    "RETAIN": RetainStubHandler(),
+    "RETAIN": RetainHandler(),
 }
 
 
