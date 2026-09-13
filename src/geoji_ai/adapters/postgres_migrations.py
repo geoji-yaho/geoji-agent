@@ -75,6 +75,9 @@ async def migrate(
     pending = _discover(directory, max_version)
 
     async with engine.begin() as conn:
+        # 부트스트랩도 같은 잠금 아래에서 돈다. 빈 DB 에 두 프로세스가 동시에
+        # `CREATE SCHEMA IF NOT EXISTS` 를 돌리면 `pg_namespace` 중복 키로 한쪽이 죽는다.
+        await conn.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _LOCK_KEY})
         for statement in _BOOTSTRAP_SQL:
             await conn.execute(text(statement))
 

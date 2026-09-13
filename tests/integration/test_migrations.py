@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
@@ -89,6 +90,30 @@ async def test_ai_worker_는_insert_가_막히고_select_update_는_된다(
             assert result.rowcount == 1
     finally:
         await worker_engine.dispose()
+
+
+async def test_빈_DB_에_migrate_를_동시에_두_번_돌려도_실패하지_않는다(
+    engine: AsyncEngine, test_database_url: str
+) -> None:
+    # 부트스트랩(`CREATE SCHEMA`·`CREATE TABLE IF NOT EXISTS`)도 잠금 아래여야 한다.
+    # 경합은 비결정적이라 여러 번 돌린다. 엔진을 따로 두고 미리 연결해 출발을 맞춘다.
+    for _ in range(5):
+        first = make_engine(test_database_url)
+        second = make_engine(test_database_url)
+        try:
+            for warm in (first, second):
+                async with warm.connect():
+                    pass
+            async with engine.begin() as conn:
+                await conn.execute(text("DROP SCHEMA IF EXISTS ai CASCADE"))
+
+            results = await asyncio.gather(migrate(first), migrate(second))
+        finally:
+            await first.dispose()
+            await second.dispose()
+
+        assert sorted(results) == [[], [1]]
+        assert await _versions(engine) == [1]
 
 
 async def test_러너는_004_를_읽지도_적용하지도_않는다(engine: AsyncEngine, tmp_path: Path) -> None:

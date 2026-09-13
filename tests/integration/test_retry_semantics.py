@@ -94,6 +94,49 @@ async def test_release_는_attempts_를_되돌리고_QUEUED_로_반납한다(job
     assert row["lease_until"] is None
 
 
+async def test_재시도_시각이_마감_뒤인_SENTENCE_fail_은_CANCELLED_다(jobs, enqueue, fetch_job):
+    # claim 은 `deadline_at > now()` 만 집고 reaper 는 RUNNING 만 본다. QUEUED 로 되돌리면
+    # 영원히 남으므로 reaper(02 §3.5)와 같은 규칙으로 CANCELLED 로 끝낸다.
+    deadline = datetime.now(UTC) + timedelta(seconds=10)
+    job_id = await enqueue("SENTENCE", deadline_at=deadline, max_attempts=2, **_SENTENCE)
+    job = await jobs.claim(["SENTENCE"], "w1")
+    assert job is not None
+
+    assert await jobs.fail(job.id, "w1", job.generation_id, "NOT_IMPLEMENTED", 60) is True
+
+    row = await fetch_job(job_id)
+    assert row["status"] == "CANCELLED"
+    assert row["last_error_code"] == "NOT_IMPLEMENTED"
+    assert row["owner_id"] is None
+    assert row["generation_id"] is None
+    assert row["lease_until"] is None
+
+
+async def test_재시도_시각이_마감_전인_SENTENCE_fail_은_QUEUED_다(jobs, enqueue, fetch_job):
+    deadline = datetime.now(UTC) + timedelta(seconds=10)
+    job_id = await enqueue("SENTENCE", deadline_at=deadline, max_attempts=2, **_SENTENCE)
+    job = await jobs.claim(["SENTENCE"], "w1")
+    assert job is not None
+
+    assert await jobs.fail(job.id, "w1", job.generation_id, "NOT_IMPLEMENTED", None) is True
+
+    row = await fetch_job(job_id)
+    assert row["status"] == "QUEUED"
+    assert row["last_error_code"] == "NOT_IMPLEMENTED"
+
+
+async def test_마감이_없는_PREPARE_fail_은_그대로_QUEUED_다(jobs, enqueue, fetch_job):
+    job_id = await enqueue("PREPARE", **_PREPARE)
+    job = await jobs.claim(["PREPARE"], "w1")
+    assert job is not None
+
+    assert await jobs.fail(job.id, "w1", job.generation_id, "NOT_IMPLEMENTED", 60) is True
+
+    row = await fetch_job(job_id)
+    assert row["deadline_at"] is None
+    assert row["status"] == "QUEUED"
+
+
 async def test_마감이_지난_SENTENCE_는_reaper_에서_CANCELLED_가_된다(
     engine, make_jobs, enqueue, fetch_job
 ):

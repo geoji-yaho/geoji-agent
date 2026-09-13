@@ -61,10 +61,14 @@ HEARTBEAT_SQL = (
 
 COMPLETE_SQL = "UPDATE ai.jobs SET " + _TOUCH + "status='SUCCEEDED'" + OWNERSHIP_WHERE
 
+# 재시도 시각이 기한 이후인 SENTENCE 는 claim(`deadline_at > now()`)이 다시 집지 않고
+# reaper 는 RUNNING 만 보므로 QUEUED 로 되돌리면 영원히 남는다. reaper(02 §3.5)와
+# 같은 규칙으로 CANCELLED 로 끝낸다.
 FAIL_SQL = (
-    "UPDATE ai.jobs SET "
-    + _TOUCH
-    + "status = CASE WHEN attempts >= max_attempts THEN 'FAILED' ELSE 'QUEUED' END, "
+    "UPDATE ai.jobs SET " + _TOUCH + "status = CASE "
+    "WHEN kind = 'SENTENCE' AND deadline_at IS NOT NULL "
+    "AND deadline_at <= now() + make_interval(secs => :retry_after_s) THEN 'CANCELLED' "
+    "WHEN attempts >= max_attempts THEN 'FAILED' ELSE 'QUEUED' END, "
     "available_at = now() + make_interval(secs => :retry_after_s), "
     "last_error_code = :error_code, "
     "owner_id=NULL, generation_id=NULL, lease_until=NULL" + OWNERSHIP_WHERE

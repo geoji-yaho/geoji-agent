@@ -42,6 +42,11 @@ log = get_logger(__name__)
 #: 폴링 jitter 상한(초). 02 §3.3 "빈 큐 WORKER_POLL_MS + jitter(0~100ms)".
 _POLL_JITTER_S = 0.1
 
+#: 핸들러가 예외로 죽었을 때 `fail` 에 남기는 오류 코드와 재시도 간격(초).
+#: 간격은 `BACKEND_UNAVAILABLE` 과 같은 5초다(사용자 9/14).
+HANDLER_ERROR_CODE = "HANDLER_ERROR"
+HANDLER_ERROR_RETRY_AFTER_S = 5
+
 
 def make_worker_id(slot: str) -> str:
     """`<host>:<pid>:<slot>` (02 §3.3 원문).
@@ -157,6 +162,7 @@ class Worker:
             worker_id=worker_id,
             generation_id=generation_id,
             interval_s=self._settings.HEARTBEAT_SECONDS,
+            lease_s=self._settings.JOB_LEASE_SECONDS,
             target=handler_task,
         )
         self._inflight[job.id] = _InFlight(
@@ -217,10 +223,23 @@ class Worker:
                 self._inflight.pop(job.id, None)
                 log.warning("job_cancelled", slot=slot)
             except Exception:
-                # 오류 분류는 작업 6 `domain/retries.py` 다. 작업 2 에는 쓸 오류 코드가
-                # 없으므로 결과를 저장하지 않고 reaper 회수에 맡긴다.
+                # 핸들러가 complete·fail 없이 죽었다. lease 만료까지 RUNNING 으로 두지 않고
+                # `HANDLER_ERROR` 로 fail 한다. 시도 횟수를 쓰고 5초 뒤 재시도, max 도달이면
+                # FAILED, 기한 지난 SENTENCE 는 CANCELLED(FAIL_SQL). 세분 분류는 작업 6
+                # `domain/retries.py` 다. 핸들러가 이미 fail 했으면 0행이라 무해하다.
                 self._inflight.pop(job.id, None)
                 log.exception("handler_failed", slot=slot)
+                try:
+                    await self._jobs.fail(
+                        job.id,
+                        worker_id,
+                        job.generation_id or "",
+                        error_code=HANDLER_ERROR_CODE,
+                        retry_after_s=HANDLER_ERROR_RETRY_AFTER_S,
+                    )
+                except Exception:
+                    # fail 까지 죽으면 로그만 남긴다. 행은 lease 만료 뒤 reaper 가 회수한다.
+                    log.exception("handler_fail_record_failed", slot=slot)
 
     async def _reaper_loop(self) -> None:
         engine = self._engine
