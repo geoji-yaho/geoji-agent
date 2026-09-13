@@ -4,8 +4,7 @@
 한곳에 둔다. 02 §3.4 표가 RETAIN 을 두 행(`sentence.finalized`·`comment.approved`)으로
 나누므로 규약의 키는 kind 가 아니라 **`event_type`** 이다.
 
-작업 2 는 4 kind 모두 `NotImplementedHandler` 다(즉시 `fail("NOT_IMPLEMENTED", 60)`).
-작업 3·4·5 가 `HANDLERS` 를 갈아끼운다.
+작업 3·4·5 가 `HANDLERS` 를 갈아끼운다. PREPARE 는 그래프 B(05 GR-02)다.
 
 payload 는 `contracts/jobs.py` 의 4형 그대로다(`extra="forbid"`). 10 §3 의
 `intensities[]` 와 RETAIN 의 `verdict_version` 은 백엔드 미채택이라 넣지 않는다.
@@ -18,14 +17,16 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from geoji_ai.application.prepare_case import PrepareStubHandler
+from geoji_ai.application.prepare_case import PrepareHandler
 from geoji_ai.application.retain_memory import RetainHandler
 from geoji_ai.application.sentence_case import SentenceStubHandler
 from geoji_ai.contracts.jobs import Job, JobKind
 from geoji_ai.core.config import Settings
 from geoji_ai.ports.backend import BackendPort
 from geoji_ai.ports.jobs import JobsPort
+from geoji_ai.ports.llm import LLMPort
 from geoji_ai.ports.memory import MemoryPort
+from geoji_ai.ports.preparation import PreparationPort
 
 __all__ = [
     "DEFAULT_ROUTE_BY_KIND",
@@ -150,6 +151,10 @@ class HandlerContext:
     backend: BackendPort
     #: 기억 포트(04 ME-03). 워커가 `PostgresMemory` 를 넣는다. RETAIN 만 쓴다.
     memory: MemoryPort | None = None
+    #: 모델 포트(05 GR-02). 워커가 역할 라우터를 넣는다. 벤더 키가 둘 다 없으면 None.
+    llm: LLMPort | None = None
+    #: 재판 준비 저장 포트(05 GR-02). 워커가 `PostgresPreparation` 을 넣는다.
+    preparation: PreparationPort | None = None
 
 
 class Handler(Protocol):
@@ -171,9 +176,10 @@ class NotImplementedHandler:
 
 _sentence_stub = SentenceStubHandler()
 
-#: 작업 3 M2 스텁(03 §3.3). SENTENCE·TEXT_RETRY 는 같은 핸들러다. RETAIN 은 작업 4(04 ME-03).
+#: SENTENCE·TEXT_RETRY 는 작업 3 M2 스텁(03 §3.3)이고 같은 핸들러다. RETAIN 은 작업 4(04 ME-03).
+#: PREPARE 는 그래프 B(05 GR-02).
 HANDLERS: dict[str, Handler] = {
-    "PREPARE": PrepareStubHandler(),
+    "PREPARE": PrepareHandler(),
     "SENTENCE": _sentence_stub,
     "TEXT_RETRY": _sentence_stub,
     "RETAIN": RetainHandler(),

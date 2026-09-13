@@ -21,23 +21,28 @@ import random
 import signal
 import socket
 from dataclasses import dataclass
+from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from geoji_ai.adapters.backend_http import BackendHttp, bind_trace
+from geoji_ai.adapters.openai_compat_llm import OpenAICompatLLM
 from geoji_ai.adapters.postgres_jobs import PostgresJobs, make_engine, reap
 from geoji_ai.adapters.postgres_memory import PostgresMemory
+from geoji_ai.adapters.postgres_preparation import PostgresPreparation
 from geoji_ai.contracts.jobs import Job
 from geoji_ai.core.config import Settings, secret_value
 from geoji_ai.core.logging import bind_trace_id, get_logger
 from geoji_ai.core.startup import StartupError
 from geoji_ai.ports.backend import BackendPort
 from geoji_ai.ports.jobs import JobsPort
+from geoji_ai.ports.llm import LLMError, LLMPort, LLMResult, LLMRole
 from geoji_ai.ports.memory import MemoryPort
+from geoji_ai.ports.preparation import PreparationPort
 from geoji_ai.workers.dispatch import SLOT_KINDS, HandlerContext, handler_for
 from geoji_ai.workers.heartbeat import start_heartbeat
 
-__all__ = ["Worker", "make_worker_id", "run_worker"]
+__all__ = ["RoleRoutedLLM", "Worker", "build_llm", "make_worker_id", "run_worker"]
 
 log = get_logger(__name__)
 
@@ -48,6 +53,80 @@ _POLL_JITTER_S = 0.1
 #: 간격은 `BACKEND_UNAVAILABLE` 과 같은 5초다(사용자 9/14).
 HANDLER_ERROR_CODE = "HANDLER_ERROR"
 HANDLER_ERROR_RETRY_AFTER_S = 5
+
+
+#: 역할 → 벤더(코디네이터 9/14 임시 배선. 정식 벤더 라우팅은 작업 6).
+#: 판단 역할은 OpenAI(`MODEL_JUDGMENT`), 드립·서기는 xAI(`MODEL_WRITER`).
+ROLE_VENDOR: dict[str, Literal["openai", "xai"]] = {
+    "intake": "openai",
+    "context": "openai",
+    "sentencing": "openai",
+    "evaluator": "openai",
+    "banter": "xai",
+    "writer": "xai",
+}
+
+
+class RoleRoutedLLM:
+    """`LLMPort` 구현. 역할에 맞는 벤더 어댑터로 넘긴다.
+
+    키가 빈 벤더는 어댑터가 없고, 그 벤더 역할을 부를 때만 `LLMError("TRANSPORT")` 를 올린다.
+    """
+
+    def __init__(self, adapters: dict[str, LLMPort | None]) -> None:
+        self._adapters = dict(adapters)
+
+    @classmethod
+    def from_settings(cls, settings: Settings) -> RoleRoutedLLM:
+        openai_key = secret_value(settings, "OPENAI_API_KEY")
+        xai_key = secret_value(settings, "XAI_API_KEY")
+        adapters: dict[str, LLMPort | None] = {
+            "openai": OpenAICompatLLM(
+                "openai", api_key=openai_key, model_id=settings.MODEL_JUDGMENT
+            )
+            if openai_key
+            else None,
+            "xai": OpenAICompatLLM(
+                "xai",
+                api_key=xai_key,
+                base_url=settings.XAI_BASE_URL,
+                model_id=settings.MODEL_WRITER,
+            )
+            if xai_key
+            else None,
+        }
+        return cls(adapters)
+
+    def adapter_for(self, role: str) -> LLMPort | None:
+        """역할의 어댑터. 키가 빈 벤더면 None."""
+        return self._adapters.get(ROLE_VENDOR[role])
+
+    async def structured_call(
+        self,
+        *,
+        role: LLMRole,
+        messages: list[dict],
+        schema: dict,
+        timeout_s: float,
+        max_output_tokens: int,
+    ) -> LLMResult:
+        adapter = self.adapter_for(role)
+        if adapter is None:
+            raise LLMError("TRANSPORT", message=f"{ROLE_VENDOR[role]} API 키가 없다")
+        return await adapter.structured_call(
+            role=role,
+            messages=messages,
+            schema=schema,
+            timeout_s=timeout_s,
+            max_output_tokens=max_output_tokens,
+        )
+
+
+def build_llm(settings: Settings) -> LLMPort | None:
+    """두 벤더 키가 다 비었을 때만 None. 하나라도 있으면 `RoleRoutedLLM`."""
+    if not secret_value(settings, "OPENAI_API_KEY") and not secret_value(settings, "XAI_API_KEY"):
+        return None
+    return RoleRoutedLLM.from_settings(settings)
 
 
 def make_worker_id(slot: str) -> str:
@@ -79,6 +158,8 @@ class Worker:
         engine: AsyncEngine | None = None,
         backend: BackendPort | None = None,
         memory: MemoryPort | None = None,
+        llm: LLMPort | None = None,
+        preparation: PreparationPort | None = None,
     ) -> None:
         unknown = set(settings.WORKER_SLOTS) - set(SLOT_KINDS)
         if unknown:
@@ -96,6 +177,9 @@ class Worker:
         self._backend = backend
         # `run_worker` 가 `PostgresMemory` 를 넣는다(04 ME-03).
         self._memory = memory
+        # `run_worker` 가 `build_llm` 결과와 `PostgresPreparation` 을 넣는다(05 GR-02).
+        self._llm = llm
+        self._preparation = preparation
         self._shutdown = asyncio.Event()
         # 프로세스 전역 세마포어. 슬롯이 몇 개든 하나를 공유한다(02 §3.3 동시성).
         self._semaphore = asyncio.Semaphore(settings.MODEL_CONCURRENCY_LIMIT)
@@ -159,6 +243,8 @@ class Worker:
             worker_id=worker_id,
             backend=self._backend,  # type: ignore[arg-type]  # None 은 백엔드 없는 테스트뿐
             memory=self._memory,
+            llm=self._llm,
+            preparation=self._preparation,
         )
         handler = handler_for(job.kind)
         handler_task = asyncio.create_task(handler(job, ctx), name=f"handler:{job.kind}")
@@ -300,7 +386,20 @@ async def run_worker(settings: Settings, *, reaper: bool = False) -> None:
     jobs: JobsPort = PostgresJobs(engine, lease_s=settings.JOB_LEASE_SECONDS)
     backend = BackendHttp(backend_url, secret_value(settings, "SERVICE_AUTH_TOKEN"))
     memory: MemoryPort = PostgresMemory(engine, settings)
-    worker = Worker(jobs, settings, reaper=reaper, engine=engine, backend=backend, memory=memory)
+    preparation: PreparationPort = PostgresPreparation(engine)
+    llm = build_llm(settings)
+    if llm is None:
+        log.warning("llm_disabled_no_vendor_keys")
+    worker = Worker(
+        jobs,
+        settings,
+        reaper=reaper,
+        engine=engine,
+        backend=backend,
+        memory=memory,
+        llm=llm,
+        preparation=preparation,
+    )
     _install_sigterm(worker)
     log.info("worker_started", slots=settings.WORKER_SLOTS, reaper=reaper)
     try:
