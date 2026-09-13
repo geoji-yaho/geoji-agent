@@ -106,6 +106,26 @@ async def engine(test_database_url: str) -> AsyncIterator[AsyncEngine]:
 
 
 @pytest.fixture
+async def privacy_epochs(engine: AsyncEngine) -> str:
+    """`ai.privacy_epochs` 를 테스트 스키마에만 만든다(10 §2 정의). autouse 아님.
+
+    이 테이블은 004(백엔드 소유)에 있어 우리 마이그레이션에 넣지 않는다. 운영에서는 백엔드가
+    만들고, 테스트에서는 이 fixture 가 대신 만든다. `ai_worker` 는 SELECT 만, `backend` 는
+    SELECT·INSERT·UPDATE. 테이블 이름을 돌려준다.
+    """
+    async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "CREATE TABLE ai.privacy_epochs ("
+                "scope_key text PRIMARY KEY, epoch bigint NOT NULL DEFAULT 0)"
+            )
+        )
+        await conn.execute(text("GRANT SELECT ON ai.privacy_epochs TO ai_worker"))
+        await conn.execute(text("GRANT SELECT, INSERT, UPDATE ON ai.privacy_epochs TO backend"))
+    return "ai.privacy_epochs"
+
+
+@pytest.fixture
 def jobs(engine: AsyncEngine) -> PostgresJobs:
     return PostgresJobs(engine, lease_s=DEFAULT_LEASE_SECONDS)
 

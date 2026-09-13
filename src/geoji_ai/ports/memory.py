@@ -15,6 +15,7 @@ class MemoryCandidate:
     source_id: str
     source_version: int
     score: float
+    fact_type: str
 
 
 @dataclass(frozen=True)
@@ -27,7 +28,7 @@ class RoomStrictness:
 
 @dataclass(frozen=True)
 class RoomRecall:
-    rules_hit: list[str] = field(default_factory=list)
+    rules_hit: list[MemoryCandidate] = field(default_factory=list)  # RULE_HIT 참조(04 §3.2)
     style_example_refs: list[str] = field(default_factory=list)
     strictness: RoomStrictness | None = None
 
