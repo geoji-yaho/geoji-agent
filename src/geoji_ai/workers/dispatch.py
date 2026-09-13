@@ -19,7 +19,7 @@ from typing import Any, Protocol
 
 from geoji_ai.application.prepare_case import PrepareHandler
 from geoji_ai.application.retain_memory import RetainHandler
-from geoji_ai.application.sentence_case import SentenceStubHandler
+from geoji_ai.application.sentence_case import SentenceHandler
 from geoji_ai.contracts.jobs import Job, JobKind
 from geoji_ai.core.config import Settings
 from geoji_ai.ports.backend import BackendPort
@@ -174,14 +174,15 @@ class NotImplementedHandler:
         )
 
 
-_sentence_stub = SentenceStubHandler()
+_sentence = SentenceHandler()
 
-#: SENTENCE·TEXT_RETRY 는 작업 3 M2 스텁(03 §3.3)이고 같은 핸들러다. RETAIN 은 작업 4(04 ME-03).
+#: SENTENCE·TEXT_RETRY 는 그래프 C(05 GR-03)이고 같은 핸들러다(TEXT_RETRY 는 `REGENERATE`).
+#: `ctx.llm` 이 없으면 핸들러가 M2 스텁(03 §3.3) 동작으로 떨어진다. RETAIN 은 작업 4(04 ME-03).
 #: PREPARE 는 그래프 B(05 GR-02).
 HANDLERS: dict[str, Handler] = {
     "PREPARE": PrepareHandler(),
-    "SENTENCE": _sentence_stub,
-    "TEXT_RETRY": _sentence_stub,
+    "SENTENCE": _sentence,
+    "TEXT_RETRY": _sentence,
     "RETAIN": RetainHandler(),
 }
 

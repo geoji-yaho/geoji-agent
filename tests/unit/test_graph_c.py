@@ -9,7 +9,8 @@ import asyncio
 import json
 import logging
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -25,6 +26,7 @@ from geoji_ai.contracts.jobs import Job
 from geoji_ai.contracts.sentencing import SentencingDecision
 from geoji_ai.contracts.writer import BanterStrategy
 from geoji_ai.core.config import Settings
+from geoji_ai.domain.attack_angles import pick
 from geoji_ai.domain.draft_hash import draft_hash
 from geoji_ai.domain.intensity import Intensity
 from geoji_ai.domain.visibility import Scope
@@ -78,12 +80,15 @@ class FakeBackend:
         fixed: dict[str, Any] | None = None,
         begin_error: Exception | None = None,
         finalize_error: Exception | None = None,
+        finalize_errors: list[Exception] | None = None,
     ) -> None:
         self._snapshot = snapshot
         self.remaining_s = remaining_s
         self.fixed = fixed
         self.begin_error = begin_error
         self.finalize_error = finalize_error
+        #: 앞에서부터 한 번씩만 올리는 finalize 오류.
+        self.finalize_errors = list(finalize_errors or [])
         self.began: list[dict[str, Any]] = []
         self.finalized: list[FinalizeRequest] = []
         self.failed: list[str] = []
@@ -115,6 +120,8 @@ class FakeBackend:
         recomputed = draft_hash(req.draft, req.sentencing)
         if not (req.draft_hash == req.evaluation_draft_hash == recomputed):
             raise Rejected(422, "INVALID_DRAFT")
+        if self.finalize_errors:
+            raise self.finalize_errors.pop(0)
         if self.finalize_error is not None:
             raise self.finalize_error
         return FinalizeResult(verdict_id=verdict_id, text_version=1, committed_at=DB_NOW)
@@ -147,13 +154,24 @@ class FakeJobs:
 
 
 class FakePreparation:
-    def __init__(self, prep: Any) -> None:
+    def __init__(self, prep: Any, *, stale: list[str] | None = None) -> None:
         self.prep = prep
+        self.stale = list(stale or [])
         self.asked: list[str] = []
+        self.saved: list[Dossier] = []
+        self.epoch_checks = 0
 
     async def load_valid_prep(self, snapshot: CaseSnapshot, prompt_version: str) -> Any:
         self.asked.append(prompt_version)
         return self.prep
+
+    async def save_dossier(self, dossier: Dossier) -> str:
+        self.saved.append(dossier)
+        return dossier.dossier_id
+
+    async def stale_scopes(self, privacy_versions: Any) -> list[str]:
+        self.epoch_checks += 1
+        return list(self.stale)
 
 
 class ScriptedLLM(FakeLLM):
@@ -303,6 +321,9 @@ def run(
     prep: Any = "default",
     kind: str = "SENTENCE",
     clock: FakeClock | None = None,
+    settings: Settings | None = None,
+    preparation: FakePreparation | None = None,
+    templates: dict[str, Any] | None = None,
 ) -> Run:
     llm = llm or FakeLLM()
     snapshot = snapshot or make_snapshot()
@@ -311,7 +332,9 @@ def run(
     captured: dict[str, Any] = {}
 
     def factory(deps: Any) -> Any:
-        graph = build_sentence_graph(deps)
+        graph = build_sentence_graph(
+            deps if templates is None else replace(deps, templates=templates)
+        )
 
         class Capturing:
             async def ainvoke(self, state: Any) -> Any:
@@ -327,9 +350,9 @@ def run(
         jobs=jobs,
         backend=backend,
         llm=llm,
-        preparation=FakePreparation(make_prep() if prep == "default" else prep),
+        preparation=preparation or FakePreparation(make_prep() if prep == "default" else prep),
         semaphore=asyncio.Semaphore(8),
-        settings=Settings(_env_file=None),
+        settings=settings or Settings(_env_file=None),
         generation_id=GENERATION_ID,
         worker_id=WORKER_ID,
     )
@@ -661,8 +684,8 @@ def test_begin_409_discards_without_model_calls() -> None:
 
 
 def test_missing_prep_uses_minimal_dossier() -> None:
-    """prep 없음 → MINIMAL(코드 Evidence F0 만), 조서 호출 없음."""
-    result = run(prep=None)
+    """prep 없음 ∧ 남은 < 8.5s → MINIMAL(코드 Evidence F0 만), 조서 호출 없음, dossier 저장."""
+    result = run(prep=None, backend_kwargs={"remaining_s": 8.4})
     assert result.state["dossier_source"] == "MINIMAL"
     assert set(result.state["dossier"].label_map) == {"F0"}
     assert "context" not in result.roles()
@@ -683,3 +706,207 @@ def test_backend_unavailable_fails_job() -> None:
     result = run(backend_kwargs={"finalize_error": Unavailable()})
     assert result.jobs.failures == [("BACKEND_UNAVAILABLE", 5)]
     assert result.jobs.completed == []
+
+
+# ---------------------------------------------------------------------------
+# GR-06 검수·보정 / GR-03 남은 것
+# ---------------------------------------------------------------------------
+
+POST_ID = "post-taxi-20260907-0852"
+
+
+def report(intensities: Iterable[str], fail: Iterable[str] = ()) -> dict[str, Any]:
+    """요청 강도만의 검수 출력. `fail` 강도는 `pass=false` + 위반·문제 문장."""
+    base = fixture("evaluation-taxi-pass")
+    base.pop("schema_version")
+    base.pop("policy_version")
+    by_intensity = {t["intensity"]: t for t in base["texts"]}
+    failing = set(fail)
+    texts = []
+    for index, intensity in enumerate(intensities):
+        entry = dict(by_intensity[intensity])
+        if intensity in failing:
+            entry["pass"] = False
+            entry["violations"] = [
+                {
+                    "code": "PERSONAL_ATTACK",
+                    "path": f"texts[{index}].statement[0].text",
+                    "evidence_labels": [],
+                    "explanation": "인신공격",
+                }
+            ]
+            entry["problem_sentences"] = ["문제 문장 마커"]
+        texts.append(entry)
+    base["texts"] = texts
+    return base
+
+
+def writer_angle(call: FakeCall) -> str:
+    return call.schema["properties"]["attack_angle"]["enum"][0]
+
+
+def writer_intensity(call: FakeCall) -> str:
+    return call.schema["properties"]["intensity"]["enum"][0]
+
+
+def evaluator_intensities(call: FakeCall) -> list[str]:
+    return call.schema["properties"]["texts"]["items"]["properties"]["intensity"]["enum"]
+
+
+def test_16_evaluator_failure_repairs_failed_intensity_only() -> None:
+    """검수 `hell` 실패 → repair(hell 만, 각도 +1, 피할 것) → hell 만 재검수 통과 → AI finalize."""
+    llm = ScriptedLLM(
+        sequences={"evaluator": [report(["spicy", "hell"], fail=["hell"]), report(["hell"])]}
+    )
+    result = run(llm)
+    writers = result.calls_of("writer")
+    assert [writer_intensity(c) for c in writers] == ["spicy", "hell", "hell"]
+    assert writer_angle(writers[0]) == pick(POST_ID, 0).value
+    assert writer_angle(writers[2]) == pick(POST_ID, 1).value
+    avoid = user_payload(writers[2])["avoid"]
+    assert avoid == {"violations": ["PERSONAL_ATTACK"], "problem_sentences": ["문제 문장 마커"]}
+    assert "avoid" not in user_payload(writers[1])
+    evaluators = result.calls_of("evaluator")
+    assert [evaluator_intensities(c) for c in evaluators] == [["spicy", "hell"], ["hell"]]
+    assert [t["intensity"] for t in user_payload(evaluators[1])["draft"]["texts"]] == ["hell"]
+    assert result.state["repair_count"] == 1
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [("spicy", "AI"), ("hell", "AI")]
+    assert [t.intensity for t in req.evaluation.texts] == ["spicy", "hell"]
+    assert req.sentencing == fixture_sentencing()  # 양형 고정
+    assert result.roles()["sentencing"] == 1
+    assert result.backend.failed == []
+
+
+def test_17_repair_evaluation_fails_again_then_template() -> None:
+    """검수 실패 2회 → repair_count=1 뒤 그 강도 TEMPLATE, 전체 재검수 뒤 부분 저장."""
+    llm = ScriptedLLM(
+        sequences={
+            "evaluator": [
+                report(["spicy", "hell"], fail=["hell"]),
+                report(["hell"], fail=["hell"]),
+                None,
+            ]
+        }
+    )
+    result = run(llm)
+    assert result.roles()["writer"] == 3
+    assert result.roles()["evaluator"] == 3
+    assert result.state["repair_count"] == 1
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [
+        ("spicy", "AI"),
+        ("hell", "TEMPLATE"),
+    ]
+    assert_finalize_hash_is_last_evaluated(result)
+    assert result.backend.failed == []
+
+
+def test_18_no_repair_when_less_than_5s_remain() -> None:
+    """남은 < 5s → repair 없이 실패 강도 TEMPLATE."""
+    llm = ScriptedLLM(sequences={"evaluator": [report(["spicy", "hell"], fail=["hell"]), None]})
+    result = run(llm, backend_kwargs={"remaining_s": 4.9})
+    assert result.roles()["writer"] == 2
+    assert result.roles()["evaluator"] == 2
+    assert result.state["repair_count"] == 0
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [
+        ("spicy", "AI"),
+        ("hell", "TEMPLATE"),
+    ]
+
+
+def test_19_regenerate_does_not_repair() -> None:
+    """TEXT_RETRY(REGENERATE) 는 round 안 보정 없음."""
+    fixed = {"sentence": "probation", "sentencing_reason": "고정된 이유", "reason_source": "AI"}
+    llm = ScriptedLLM(sequences={"evaluator": [report(["spicy", "hell"], fail=["hell"]), None]})
+    result = run(llm, backend_kwargs={"fixed": fixed}, kind="TEXT_RETRY")
+    assert result.roles()["writer"] == 2
+    assert result.roles()["sentencing"] == 0
+    assert result.state["repair_count"] == 0
+    assert [t.source for t in result.finalize().draft.texts] == ["AI", "TEMPLATE"]
+
+
+def test_20_finalize_422_repairs_once_then_succeeds() -> None:
+    """finalize 422 ∧ repair 남음 → AI 강도 repair 1회 → 재검수 → finalize 성공."""
+    result = run(backend_kwargs={"finalize_errors": [Rejected(422, "INVALID_DRAFT")]})
+    assert len(result.backend.finalized) == 2
+    assert result.roles() == Counter({"sentencing": 1, "writer": 4, "evaluator": 2})
+    assert [writer_angle(c) for c in result.calls_of("writer")[2:]] == [pick(POST_ID, 1).value] * 2
+    assert result.state["repair_count"] == 1
+    assert result.backend.failed == []
+    first, second = result.backend.finalized
+    assert first.sentencing == second.sentencing == fixture_sentencing()
+    assert_finalize_hash_is_last_evaluated(
+        Run(
+            state=result.state, backend=_last_only(result.backend), jobs=result.jobs, llm=result.llm
+        )
+    )
+
+
+def _last_only(backend: FakeBackend) -> FakeBackend:
+    backend.finalized = backend.finalized[-1:]
+    return backend
+
+
+def test_20b_finalize_422_after_repair_used_reports_schema_invalid() -> None:
+    """검수 repair 를 이미 썼으면 422 는 `SCHEMA_INVALID`."""
+    llm = ScriptedLLM(
+        sequences={"evaluator": [report(["spicy", "hell"], fail=["hell"]), report(["hell"])]}
+    )
+    result = run(llm, backend_kwargs={"finalize_errors": [Rejected(422, "INVALID_DRAFT")]})
+    assert result.roles()["writer"] == 3
+    assert len(result.backend.finalized) == 1
+    assert result.backend.failed == ["SCHEMA_INVALID"]
+
+
+def test_21_hell_evaluated_separately_when_model_differs() -> None:
+    """`hell` 포함 ∧ `MODEL_EVALUATOR_HELL != MODEL_JUDGMENT` → hell 만 별도 호출."""
+    settings = Settings(_env_file=None, MODEL_EVALUATOR_HELL="other-hell-model")
+    result = run(settings=settings)
+    evaluators = result.calls_of("evaluator")
+    assert sorted(evaluator_intensities(c) for c in evaluators) == [["hell"], ["spicy"]]
+    records = [c for c in result.state["calls"] if c.role == "evaluator"]
+    assert sorted(str(c.intensity) for c in records) == ["None", "hell"]
+    req = result.finalize()
+    assert [t.intensity for t in req.evaluation.texts] == ["spicy", "hell"]
+    assert result.backend.failed == []
+
+
+def test_21b_same_model_single_evaluator_call() -> None:
+    result = run()
+    assert [evaluator_intensities(c) for c in result.calls_of("evaluator")] == [["spicy", "hell"]]
+
+
+def test_22_epoch_mismatch_before_finalize() -> None:
+    """finalize 직전 epoch 불일치 → finalize 0 · `generation_failed(EVIDENCE_INVALIDATED)`."""
+    preparation = FakePreparation(make_prep(), stale=["room:room-ddegeoji-01"])
+    result = run(preparation=preparation)
+    assert preparation.epoch_checks == 1
+    assert result.backend.finalized == []
+    assert result.backend.failed == ["EVIDENCE_INVALIDATED"]
+    assert result.jobs.completed == ["job-1"]
+
+
+def test_22b_epoch_checked_once_on_success() -> None:
+    preparation = FakePreparation(make_prep())
+    result = run(preparation=preparation)
+    assert preparation.epoch_checks == 1
+    assert len(result.backend.finalized) == 1
+
+
+def test_23_missing_intensity_fails_at_join() -> None:
+    """서기 hell 실패 ∧ 템플릿 없음 → 강도 누락 → join `SCHEMA_INVALID`, 검수 0."""
+    llm = ScriptedLLM(FakeScenario.INTENSITY_FAIL)
+    result = run(llm, templates={"results": {}, "sentence_labels": {}})
+    assert result.roles()["evaluator"] == 0
+    assert result.backend.finalized == []
+    assert result.backend.failed == ["SCHEMA_INVALID"]
+
+
+def test_24_minimal_dossier_is_saved() -> None:
+    """MINIMAL dossier 도 저장한다(finalize dossier_id 무결성)."""
+    preparation = FakePreparation(None)
+    result = run(preparation=preparation, backend_kwargs={"remaining_s": 8.4})
+    assert result.state["dossier_source"] == "MINIMAL"
+    assert [d.dossier_id for d in preparation.saved] == [result.state["dossier"].dossier_id]

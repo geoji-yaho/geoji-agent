@@ -1,8 +1,8 @@
-"""SENTENCE·TEXT_RETRY M2 스텁 핸들러(03 §3.3).
+"""SENTENCE·TEXT_RETRY 핸들러. 본체 `SentenceHandler`(05 GR-03, 그래프 C) + M2 스텁(03 §3.3).
 
-`begin-generation` → `generation-failed(AI_NOT_READY)` → `complete`. 모델을 부르지 않는다.
+스텁: `begin-generation` → `generation-failed(AI_NOT_READY)` → `complete`. 모델을 부르지 않는다.
 백엔드는 `fallback_sentence` 로 FINAL/RULE + 템플릿 + RETAIN 을 만든다(10 §4.6).
-작업 5 가 본체로 교체한다.
+dispatch 는 본체를 등록하고, 본체는 `ctx.llm` 이 없을 때 스텁으로 떨어진다.
 
 오류 처리(03 §3.2, 스펙 "미리 답한 결정"):
 
@@ -23,7 +23,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Awaitable, Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Protocol
 
 from geoji_ai.contracts.jobs import Job, SentencePayload, TextRetryPayload, parse_payload
@@ -104,23 +104,40 @@ class SentenceHandler:
 
     그래프가 끝나면(finalize 200·폐기·generation-failed 보고 모두) `complete`.
     백엔드 예외는 `_settle_backend_error` 가 스텁과 같은 표로 정리한다.
-    `db_now` 는 DB 가 준 현재 시각을 돌려주는 함수다(`Deadline.from_db`). 공급처는 미결정.
+
+    `db_now`(`Deadline.from_db`)는 주입하지 않으면 `job.updated_at` 에 핸들러 시작부터의 경과
+    monotonic 을 더한 값이다. claim 이 `updated_at = now()` 를 DB 시각으로 찍고, begin 응답에는
+    DB 시각이 없어서다(코디네이터 해석). 주입 인자는 테스트용이다.
+
+    `ctx.llm` 이 없으면(벤더 키 없음) 모델을 부를 수 없어 M2 스텁(`AI_NOT_READY`, 즉시 폴백)으로
+    처리한다.
     """
 
     def __init__(
         self,
         graph_factory: Callable[[SentenceDeps], Any] = build_sentence_graph,
         *,
-        db_now: Callable[[], Awaitable[datetime]],
+        db_now: Callable[[], Awaitable[datetime]] | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._graph_factory = graph_factory
         self._db_now = db_now
         self._clock = clock
+        self._stub = SentenceStubHandler()
+
+    def _job_db_now(self, job: Job, started: float) -> Callable[[], Awaitable[datetime]]:
+        async def db_now() -> datetime:
+            return job.updated_at + timedelta(seconds=self._clock() - started)
+
+        return db_now
 
     async def __call__(self, job: Job, ctx: SentenceContext) -> None:
+        started = self._clock()
         payload = parse_payload(job)
         assert isinstance(payload, SentencePayload | TextRetryPayload)
+        if getattr(ctx, "llm", None) is None:
+            await self._stub(job, ctx)
+            return
         mode = "REGENERATE" if job.kind == "TEXT_RETRY" else "INITIAL"
         try:
             snapshot = await ctx.backend.snapshot(job.id, ctx.generation_id)
@@ -130,7 +147,7 @@ class SentenceHandler:
                 semaphore=ctx.semaphore,
                 settings=ctx.settings,
                 generation_id=ctx.generation_id,
-                db_now=self._db_now,
+                db_now=self._db_now or self._job_db_now(job, started),
                 preparation=getattr(ctx, "preparation", None),
                 clock=self._clock,
             )

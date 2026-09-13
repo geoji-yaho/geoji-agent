@@ -66,13 +66,13 @@ def _serve(app: Any, port: int) -> Iterator[None]:
 
 
 def _start_worker(database_url: str, backend_url: str, log_path: Path) -> subprocess.Popen[bytes]:
+    # 벤더 키를 넣지 않는다: llm=None → SENTENCE 는 스텁 위임 경로(실제 벤더 호출 금지)
+    inherited = {k: v for k, v in os.environ.items() if k not in ("OPENAI_API_KEY", "XAI_API_KEY")}
     env = {
-        **os.environ,
+        **inherited,
         "DATABASE_URL": database_url,
         "BACKEND_INTERNAL_URL": backend_url,
         "SERVICE_AUTH_TOKEN": FAKE_SERVICE_TOKEN,
-        "OPENAI_API_KEY": "sk-test",
-        "XAI_API_KEY": "xai-test",
         "APP_ENV": "development",
         "WORKER_SLOTS": '{"SENTENCE": 1}',
         "JOB_LEASE_SECONDS": str(LEASE_S),

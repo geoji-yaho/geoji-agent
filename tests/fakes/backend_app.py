@@ -193,6 +193,8 @@ class FakeBackend:
         self.began = threading.Event()
         #: 주면 begin-generation 이 상태를 바꾼 뒤 이 이벤트가 설 때까지 응답을 미룬다.
         self.hold_after_begin: threading.Event | None = None
+        #: finalize 가 앞에서부터 하나씩 꺼내 그대로 거부할 `(status, code)`. 비면 기존 동작이다.
+        self.finalize_rejections: list[tuple[int, str]] = []
 
     # --- 테스트 헬퍼 -------------------------------------------------------------
 
@@ -502,6 +504,9 @@ def create_fake_backend(
     async def finalize(verdict_id: str, request: Request) -> Any:
         if not fake.authorized(request):
             return _reject(401, "UNAUTHORIZED")
+        if fake.finalize_rejections:
+            status, code = fake.finalize_rejections.pop(0)
+            return _reject(status, code)
         raw = await request.body()
         request_hash = hashlib.sha256(raw).hexdigest()
         try:
