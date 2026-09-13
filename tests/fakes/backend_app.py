@@ -18,6 +18,8 @@ verdict 별 상태: `sentence_status(PENDING/FINAL)`·`sentence_source(AI/RULE)`
 - `finalize`(10 §5): commit record → generation·버전 → hash 형식·정책 버전 → 저장
 - `snapshot`(10 §4.1): `case-snapshot-taxi.json` 을 job payload 로 덮어 반환
 - `resolve-evidence`(10 §4.2): 빈 sources + 고정 aggregates
+- 두 엔드포인트 모두 `create_fake_backend(snapshot_fixture=..., resolve_fixture=...)` 로 다른
+  fixture 를 줄 수 있다(데모 C, 04 ME-07)
 
 `jobs_engine` 을 주면 job 소유(RUNNING ∧ generation ∧ lease)를 `ai.jobs` 에서 확인하고 RETAIN 을
 `ai.jobs` 에 INSERT 한다(02 §3.4 `sentence.finalized` 규약). 없으면 `retain_jobs` 에 기록한다.
@@ -36,6 +38,7 @@ import re
 import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -343,12 +346,30 @@ def _trace_id(request: Request) -> str:
     return request.headers.get("x-trace-id") or str(uuid4())
 
 
+def _load_json(path: Path | str) -> dict[str, Any]:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
 def create_fake_backend(
     *,
     jobs_engine: AsyncEngine | None = None,
     token: str = FAKE_SERVICE_TOKEN,
+    snapshot_fixture: Path | str | None = None,
+    resolve_fixture: Path | str | None = None,
 ) -> FastAPI:
+    """`snapshot_fixture`·`resolve_fixture` 는 JSON 경로(04 ME-07). 없으면 기존 동작이다.
+
+    - `snapshot_fixture`: snapshot 과 resolve-evidence 의 기준 사건을 이 파일로 바꾼다
+    - `resolve_fixture`: resolve-evidence 가 이 파일을 돌려준다. `aggregates.excludes_post_id`
+      만 job 의 post_id 로 치환한다
+    """
     fake = FakeBackend(token=token, jobs_engine=jobs_engine, policy_version=_DEFAULT_POLICY_VERSION)
+
+    def load_snapshot_data() -> dict[str, Any]:
+        if snapshot_fixture is None:
+            return load_fixture(_SNAPSHOT_FIXTURE)
+        return _load_json(snapshot_fixture)
+
     app = FastAPI(title="fake-backend")
     app.state.fake = fake
 
@@ -365,7 +386,7 @@ def create_fake_backend(
         payload = await fake.job_payload(job_id, request.headers.get("x-generation-id", ""))
         if payload is None:
             return _reject(409, _STALE)
-        data = load_fixture(_SNAPSHOT_FIXTURE)
+        data = load_snapshot_data()
         if "post_id" in payload:
             data["post_id"] = payload["post_id"]
         if "verdict_id" in payload and data.get("jury") is not None:
@@ -388,9 +409,13 @@ def create_fake_backend(
         payload = await fake.job_payload(job_id, request.headers.get("x-generation-id", ""))
         if payload is None:
             return _reject(409, _STALE)
-        snapshot_data = load_fixture(_SNAPSHOT_FIXTURE)
+        snapshot_data = load_snapshot_data()
         created_at = datetime.fromisoformat(snapshot_data["created_at"])
         post_id = payload.get("post_id", snapshot_data["post_id"])
+        if resolve_fixture is not None:
+            fixed = _load_json(resolve_fixture)
+            fixed["aggregates"]["excludes_post_id"] = post_id
+            return ResolveEvidenceResponse.model_validate(fixed).model_dump(mode="json")
         response = {
             "sources": [],
             "aggregates": {

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "post_id": "post-starbucks-3rd",
+  "author_id": "user-demo-c",
+  "post_version": 1,
+  "item": "스타벅스",
+  "reason": "오후 회의 전에 잠 깨려고 스타벅스 들름",
+  "amount_krw": 6100,
+  "category": "카페/간식",
+  "post_type": "spent",
+  "created_at": "2026-09-14T12:00:00Z",
+  "audience": {
+    "room_ids": [
+      "room-demo-c"
+    ],
+    "audience_version": 1,
+    "public_share_enabled": false
+  },
+  "privacy_versions": [
+    {
+      "scope_key": "user:user-demo-c",
+      "epoch": 1
+    },
+    {
+      "scope_key": "room:room-demo-c",
+      "epoch": 1
+    }
+  ],
+  "room_snapshots": [
+    {
+      "room_id": "room-demo-c",
+      "intensity": "spicy",
+      "rule_version": 1
+    }
+  ],
+  "intake_result": null,
+  "jury": null
+}

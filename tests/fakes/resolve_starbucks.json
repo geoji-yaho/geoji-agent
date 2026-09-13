@@ -1,0 +1,93 @@
+{
+  "sources": [
+    {
+      "source_type": "POST",
+      "source_id": "post-starbucks-1",
+      "source_version": 1,
+      "payload": {
+        "category": "카페/간식",
+        "amount_krw": 6100,
+        "reason": null,
+        "spent_at": "2026-09-04T12:00:00+00:00"
+      },
+      "scope": {
+        "visibility": "ROOMS",
+        "room_ids": [
+          "room-demo-c"
+        ]
+      }
+    },
+    {
+      "source_type": "POST",
+      "source_id": "post-starbucks-2",
+      "source_version": 1,
+      "payload": {
+        "category": "카페/간식",
+        "amount_krw": 6100,
+        "reason": null,
+        "spent_at": "2026-09-10T12:00:00+00:00"
+      },
+      "scope": {
+        "visibility": "ROOMS",
+        "room_ids": [
+          "room-demo-c"
+        ]
+      }
+    }
+  ],
+  "aggregates": {
+    "burn_rate": 0.41,
+    "tier": "FAKE",
+    "no_spend_days": 0,
+    "repeat_same_category_30d": 2,
+    "excludes_post_id": "post-starbucks-3rd",
+    "window": {
+      "start_at": "2026-08-15T12:00:00+00:00",
+      "end_at": "2026-09-14T12:00:00+00:00"
+    },
+    "rule_version": 1
+  },
+  "room_rules": [
+    {
+      "room_id": "room-demo-c",
+      "rule_id": "rule-demo-c-1",
+      "version": 1,
+      "text": "카페는 주 1회까지"
+    }
+  ],
+  "recent_verdicts": [
+    {
+      "post_id": "post-starbucks-1",
+      "post_version": 1,
+      "category": "카페/간식",
+      "amount_krw": 6100,
+      "reason": null,
+      "result": "guilty",
+      "sentence": "oneDay",
+      "judged_at": "2026-09-04T12:00:00+00:00",
+      "scope": {
+        "visibility": "ROOMS",
+        "room_ids": [
+          "room-demo-c"
+        ]
+      }
+    },
+    {
+      "post_id": "post-starbucks-2",
+      "post_version": 1,
+      "category": "카페/간식",
+      "amount_krw": 6100,
+      "reason": null,
+      "result": "guilty",
+      "sentence": "oneDay",
+      "judged_at": "2026-09-10T12:00:00+00:00",
+      "scope": {
+        "visibility": "ROOMS",
+        "room_ids": [
+          "room-demo-c"
+        ]
+      }
+    }
+  ],
+  "style_comments": []
+}
