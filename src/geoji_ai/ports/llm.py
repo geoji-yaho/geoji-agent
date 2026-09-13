@@ -56,7 +56,11 @@ class LLMResult:
 
 
 class LLMError(Exception):
-    """모델 호출 실패. `kind` 로 분류한다(오류 분류 표는 작업 6)."""
+    """모델 호출 실패. `kind` 로 분류한다(06 §3.1 표).
+
+    `usage`·`cost` 는 벤더가 응답을 돌려준 실패(잘림·거절·파싱 실패)에서만 채운다.
+    원장 FAILED + 사용량 기록용이다. timeout·연결 오류처럼 응답이 없으면 None.
+    """
 
     def __init__(
         self,
@@ -64,10 +68,14 @@ class LLMError(Exception):
         *,
         retry_after_s: float | None = None,
         message: str | None = None,
+        usage: Usage | None = None,
+        cost: Cost | None = None,
     ) -> None:
         super().__init__(message or kind)
         self.kind: LLMErrorKind = kind
         self.retry_after_s: float | None = retry_after_s
+        self.usage: Usage | None = usage
+        self.cost: Cost | None = cost
 
 
 @runtime_checkable

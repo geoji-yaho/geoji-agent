@@ -169,26 +169,44 @@ async def test_usage_details_missing_are_zero() -> None:
     assert result.usage.cached_tokens == 0
 
 
-# ③ length / content_filter / refusal
-async def test_length_maps_to_max_tokens() -> None:
+# 06 §3.1 오류 6상황. 케이스 번호는 작업 6 스펙(feat-06-adapter-retries) ①~⑦.
+async def test_length_raises_schema_with_usage() -> None:
+    """06 ① finish_reason=length → SCHEMA + usage·cost."""
     llm, _ = make_llm(ok(completion_body(content='{"sentence": "one', finish_reason="length")))
-    result = await call(llm)
-    assert result.stop_reason == "max_tokens"
-    assert result.output is None
+    with pytest.raises(LLMError) as exc:
+        await call(llm)
+    assert exc.value.kind == "SCHEMA"
+    assert exc.value.usage is not None
+    assert exc.value.usage.prompt_tokens == 1000
+    assert exc.value.usage.completion_tokens == 500
+    assert exc.value.cost is not None
+    assert exc.value.cost.micro_usd == 800
 
 
-async def test_content_filter_maps_to_refusal() -> None:
-    llm, _ = make_llm(ok(completion_body(content=None, finish_reason="content_filter")))
-    result = await call(llm)
-    assert result.stop_reason == "refusal"
-    assert result.output is None
+async def test_length_with_complete_json_still_schema() -> None:
+    """06 ① 잘림 신호가 있으면 본문이 파싱돼도 결과로 쓰지 않는다."""
+    llm, _ = make_llm(ok(completion_body(finish_reason="length")))
+    with pytest.raises(LLMError) as exc:
+        await call(llm)
+    assert exc.value.kind == "SCHEMA"
 
 
-async def test_message_refusal_maps_to_refusal() -> None:
+async def test_message_refusal_raises_refusal() -> None:
+    """06 ② provider refusal(message.refusal) → REFUSAL."""
     llm, _ = make_llm(ok(completion_body(content=None, refusal="I can't help with that.")))
-    result = await call(llm)
-    assert result.stop_reason == "refusal"
-    assert result.output is None
+    with pytest.raises(LLMError) as exc:
+        await call(llm)
+    assert exc.value.kind == "REFUSAL"
+    assert exc.value.usage is not None
+    assert exc.value.usage.prompt_tokens == 1000
+
+
+async def test_content_filter_raises_refusal() -> None:
+    """06 ② finish_reason=content_filter → REFUSAL."""
+    llm, _ = make_llm(ok(completion_body(content=None, finish_reason="content_filter")))
+    with pytest.raises(LLMError) as exc:
+        await call(llm)
+    assert exc.value.kind == "REFUSAL"
 
 
 # ④ xAI ticks → micro-USD 내림
@@ -242,6 +260,28 @@ async def test_rate_limit_with_retry_after() -> None:
     assert exc.value.retry_after_s == 3
 
 
+async def test_rate_limit_retry_after_2() -> None:
+    """06 ③ 429 + Retry-After 2 → RATE_LIMIT, retry_after_s=2, usage 없음."""
+    llm, _ = make_llm(
+        lambda _r: httpx.Response(
+            429, json={"error": {"message": "slow down"}}, headers={"retry-after": "2"}
+        )
+    )
+    with pytest.raises(LLMError) as exc:
+        await call(llm)
+    assert exc.value.kind == "RATE_LIMIT"
+    assert exc.value.retry_after_s == 2
+    assert exc.value.usage is None
+
+
+async def test_rate_limit_without_retry_after_is_none() -> None:
+    llm, _ = make_llm(lambda _r: httpx.Response(429, json={"error": {"message": "slow down"}}))
+    with pytest.raises(LLMError) as exc:
+        await call(llm)
+    assert exc.value.kind == "RATE_LIMIT"
+    assert exc.value.retry_after_s is None
+
+
 async def test_server_error() -> None:
     llm, _ = make_llm(lambda _r: httpx.Response(500, json={"error": {"message": "boom"}}))
     with pytest.raises(LLMError) as exc:
@@ -249,11 +289,37 @@ async def test_server_error() -> None:
     assert exc.value.kind == "SERVER"
 
 
+async def test_503_is_server() -> None:
+    """06 ④ 503 → SERVER. Retry-After 가 없으면 retry_after_s None."""
+    llm, _ = make_llm(lambda _r: httpx.Response(503, json={"error": {"message": "overloaded"}}))
+    with pytest.raises(LLMError) as exc:
+        await call(llm)
+    assert exc.value.kind == "SERVER"
+    assert exc.value.retry_after_s is None
+    assert exc.value.usage is None
+
+
+async def test_503_with_retry_after() -> None:
+    """06 ④ 5xx 에 Retry-After 가 있으면 넘긴다."""
+    llm, _ = make_llm(
+        lambda _r: httpx.Response(
+            503, json={"error": {"message": "overloaded"}}, headers={"retry-after": "1"}
+        )
+    )
+    with pytest.raises(LLMError) as exc:
+        await call(llm)
+    assert exc.value.kind == "SERVER"
+    assert exc.value.retry_after_s == 1
+
+
 async def test_connection_error_is_transport() -> None:
+    """06 ⑤ 연결 오류 → TRANSPORT, usage None."""
     llm, _ = make_llm(raising(httpx.ConnectError, "refused"))
     with pytest.raises(LLMError) as exc:
         await call(llm)
     assert exc.value.kind == "TRANSPORT"
+    assert exc.value.usage is None
+    assert exc.value.cost is None
 
 
 async def test_strict_schema_rejection_is_schema() -> None:
@@ -269,13 +335,38 @@ async def test_strict_schema_rejection_is_schema() -> None:
     with pytest.raises(LLMError) as exc:
         await call(llm)
     assert exc.value.kind == "SCHEMA"
+    # 400 거절 응답에는 usage 가 없다
+    assert exc.value.usage is None
 
 
 async def test_non_json_content_is_parse() -> None:
+    """06 ⑥ 본문이 JSON 이 아님 → PARSE + usage·cost."""
     llm, _ = make_llm(ok(completion_body(content="판결: 유죄")))
     with pytest.raises(LLMError) as exc:
         await call(llm)
     assert exc.value.kind == "PARSE"
+    assert exc.value.usage is not None
+    assert exc.value.usage.completion_tokens == 500
+    assert exc.value.cost is not None
+    assert exc.value.cost.source == "table"
+
+
+async def test_broken_json_content_is_parse_with_usage() -> None:
+    """06 ⑥ 깨진 JSON → PARSE + usage."""
+    llm, _ = make_llm(ok(completion_body(content='{"sentence": "oneDay"')))
+    with pytest.raises(LLMError) as exc:
+        await call(llm)
+    assert exc.value.kind == "PARSE"
+    assert exc.value.usage is not None
+    assert exc.value.usage.prompt_tokens == 1000
+
+
+async def test_json_array_content_is_parse_with_usage() -> None:
+    llm, _ = make_llm(ok(completion_body(content="[1, 2]")))
+    with pytest.raises(LLMError) as exc:
+        await call(llm)
+    assert exc.value.kind == "PARSE"
+    assert exc.value.usage is not None
 
 
 async def test_non_json_http_body_is_parse() -> None:
@@ -287,16 +378,21 @@ async def test_non_json_http_body_is_parse() -> None:
     with pytest.raises(LLMError) as exc:
         await call(llm)
     assert exc.value.kind == "PARSE"
+    # completion 자체가 없어 usage 를 얻을 수 없다
+    assert exc.value.usage is None
 
 
 async def test_timeout() -> None:
+    """06 ⑤ timeout → TIMEOUT, usage None."""
     llm, _ = make_llm(raising(httpx.ReadTimeout, "timed out"))
     with pytest.raises(LLMError) as exc:
         await call(llm)
     assert exc.value.kind == "TIMEOUT"
+    assert exc.value.usage is None
+    assert exc.value.cost is None
 
 
-# ⑦ max_retries=0 — 실패 시 요청 1개
+# ⑦ max_retries=0 — 실패 시 요청 1개(06 ⑦ SDK 자동 재시도 0)
 @pytest.mark.parametrize("status", [429, 500, 503])
 async def test_no_retry_on_status_error(status: int) -> None:
     # 주입 클라이언트가 재시도를 켜 두어도 어댑터가 0 으로 고정한다
