@@ -30,6 +30,8 @@ AI 파트(`geoji-agent`)가 백엔드 담당에게 알려야 하는 것을 모�
 
 | 파일 | 어디에 | 왜 |
 |---|---|---|
+| `database/sql/invalidate_scope.sql` | 백엔드 무효화 스케줄러 | 삭제·공유 철회 뒤 파생 데이터 무효화 SQL(04 §3.5, 10 §8). **한 트랜잭션**으로 실행, 바인드 `:t`·`:id`·`:scope_key`. `node_results` 조건은 `@>`(04 원문 `?` 는 객체 배열에서 매치 안 됨) |
+| `scripts/seed_memory_demo_c.py` | 실행만(우리 저장소) | 데모 C 메모리 시드. 백엔드 시드가 만든 스타벅스 post 2개·verdict 2개 id 를 받아 `uv run scripts/seed_memory_demo_c.py --user U --room R --post-ids P1,P2 --verdict-ids V1,V2 [--now ISO8601]`. 멱등. `--now` 는 백엔드 시드 기준 시각과 맞춘다(04 §3.6, 10 §12) |
 | `database/migrations/001_ai_jobs.sql`·`002_preparation_evidence.sql`·`003_memory_call_ledger.sql` | 적용만(복사 불필요) | `DATABASE_URL=<Session Pooler URL> uv run geoji-ai migrate` 로 우리가 적용한다. 번호 순·`ai.schema_migrations` 기록·재적용 no-op·advisory lock 으로 동시 실행 안전. **001~003 만** 적용하고 004 는 백엔드 소유. **파일에 `CREATE ROLE` 이 없다** — `ai_worker`·`ai_api`·`backend` role 을 먼저 만들어야 `GRANT` 가 통과한다. 권한 표는 각 SQL 파일 끝 |
 | `src/geoji_ai/adapters/postgres_jobs.py` 의 `REAPER_SQL` | 백엔드 스케줄러, 5초 주기 | 02 §3.5 원문 그대로. 운영에서 워커 `--reaper` 는 끈다. TEXT_RETRY `FAILED` 뒤 다음 round 예약과 SENTENCE `CANCELLED` 뒤 폴백은 백엔드 watchdog 몫(10 §7) |
 | `contracts/fixtures/templates-v1.json` | 백엔드 저장소, 버전 고정 | watchdog·generation-failed 폴백 문구(10 §10). 치환 토큰 `{n}`·`{m}`·`{sentence_label}` (9/11 `{형량 라벨}` → `{sentence_label}` 로 바뀜) |
@@ -39,6 +41,9 @@ AI 파트(`geoji-agent`)가 백엔드 담당에게 알려야 하는 것을 모�
 
 | 날짜 | 항목 | 내용 | 출처 | 상태 |
 |---|---|---|---|---|
+| 9/14 | `draft_hash` canonical 규칙 | finalize 가 `draft_hash`·`evaluation_draft_hash` 를 같은 규칙으로 재계산해야 한다: `{"draft": WriterDraft, "sentencing": SentencingDecision 또는 null}` → 키·값 문자열 NFC → 키 정렬·구분자 `,` `:`·비 ASCII 이스케이프 없음 JSON → UTF-8 sha256 소문자 hex. 정의는 `src/geoji_ai/domain/draft_hash.py` | 05 §3.4, 10 §5 | 미전달 |
+| 9/14 | RETAIN snapshot 확장 필드 없을 때 | `verdict_final`·`jury`(sentence.finalized)·`comment`(comment.approved)가 없으면 워커는 행 0 으로 complete — **기억이 쌓이지 않는다**. 댓글 방이 `room_snapshots` 에 있어야 댓글 기억 저장 | 04 §3.3, 10 §4.1 | 미전달 |
+| 9/14 | RETAIN snapshot 404 규약 | RETAIN 원본(판결·댓글)이 삭제됐으면 snapshot 이 **404** 를 줘야 워커가 skip. 409 등은 skip 이 아니라 오류로 재시도 | 04 §3.5, 10 §4.1 | 미전달 |
 | 9/14 | RETAIN snapshot 필드 | `CaseSnapshot` 에 선택 필드 `verdict_final`(sentence.finalized)·`comment`(comment.approved). 기존 스냅샷은 그대로 유효, `schema_version` 1. `comment.content` 가 1000자를 넘으면 스냅샷 전체가 거부된다. 모양은 `contracts/case-snapshot-v1.schema.json` | 10 §4.1 | 미전달 |
 | 9/14 | 002·003 grants | `backend` 는 무효화용 `evidence`·`dossiers`·`trial_prep`·`memory_facts`·`node_results` SELECT·UPDATE, `evidence_sources` SELECT. `ai_worker` 는 002·003 테이블 SELECT·INSERT·UPDATE, `ai_api` 는 `case_budgets`·`llm_calls` SELECT·INSERT·UPDATE + 스키마 USAGE. DELETE 는 아무에게도 없다 | 10 §1 | 미전달 |
 | 9/14 | `privacy_epochs` 정의 가정 | AI 테스트는 004 의 `ai.privacy_epochs(scope_key text PRIMARY KEY, epoch bigint NOT NULL DEFAULT 0)` 에 `ai_worker` SELECT, `backend` SELECT·INSERT·UPDATE 를 가정한다. 행이 없으면 epoch 0 으로 본다. 004 초안이 다르면 회신(§5) | 10 §2 | 미전달 |
@@ -61,6 +66,9 @@ AI 파트(`geoji-agent`)가 백엔드 담당에게 알려야 하는 것을 모�
 
 | 항목 | 무엇 | 기한 | 출처 |
 |---|---|---|---|
+| `aggregates.burn_rate` 단위 | 0~1 비율인가(우리는 0~1 로 가정해 문장을 만든다) | 미정 | 10 §4.2 |
+| `recent_verdicts[].verdict_id` | 응답에 `verdict_id` 가 없어 PRIOR 근거 출처를 `POST/{post_id}/{post_version}` 로 둔다. `verdict_id`·`verdict_version` 을 넣어 줄 수 있는가 | 미정 | 10 §4.2 |
+| 데모 C 시드 식별자 | 백엔드 시드의 스타벅스 post 2개 `post_id`·`verdict_id`, 사용자·방 id, 시드 기준 시각(§3 시드 스크립트 입력) | 9/17 | 10 §12 |
 | `privacy_epochs` 004 정의 | §4 9/14 줄의 테이블 정의·권한 가정이 004 초안과 같은가 | 미정 | 10 §2 |
 | 거부 응답 본문 | 401·404·409·422 본문이 `{"code": …}` 인가, 404·422 코드 이름 | 미정 | 10 §4·§5 |
 | 내부 API 상태 기계 | §4 9/14 줄(가짜 백엔드 기준)과 실제 구현이 같은가 | 미정 | 10 §4·§5 |
