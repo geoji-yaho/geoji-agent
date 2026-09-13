@@ -72,6 +72,8 @@ class Settings(BaseSettings):
     WORKER_SLOTS: dict[str, int] = Field(
         default_factory=lambda: {"SENTENCE": 2, "PREPARE": 1, "BACKGROUND": 1}
     )
+    WORKER_SHUTDOWN_DEADLINE_SECONDS: int = 10
+    REAPER_INTERVAL_SECONDS: int = 5
 
     # 마감·재시도 (작업 5)
     FINALIZE_RESERVE_MS: int = 500

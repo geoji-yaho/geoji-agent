@@ -16,22 +16,39 @@ uv run uvicorn geoji_ai.api.app:app --port 8100 & curl -s localhost:8100/health/
 ```
 
 - `/health/live` 는 프로세스가 살아 있으면 200 이다.
-- `/health/ready` 는 벤더 키가 없으면 503 과 `{"status":"not_ready","missing":[...]}` 를 낸다.
-  DB 검사는 작업 2 에서 붙는다.
+- `/health/ready` 는 벤더 키나 `DATABASE_URL` 이 없으면 503 과
+  `{"status":"not_ready","missing":[...]}` 를 낸다. `DATABASE_URL` 이 있는데 2초 안에 `SELECT 1` 이
+  안 되면 503 과 `{"status":"not_ready","db":"unreachable"}` 이다.
 
-로컬 Postgres(작업 2 의 `ai.jobs` 큐·통합 테스트용)는 compose 로 띄운다.
+### 큐와 워커 (02 §4.3)
+
+로컬 Postgres(`ai.jobs` 큐·통합 테스트용)는 compose 로 띄운다. 운영은 Supabase 다(D-20).
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d postgres
+uv run geoji-ai migrate                    # database/migrations 의 001~003 적용
+uv run geoji-ai worker --reaper &          # 로컬 1개. --reaper 는 개발 전용이다
+uv run scripts/enqueue_job.py --kind PREPARE --post p1 --version 1 --audience 1
+psql "$DATABASE_URL" -c "select kind,status,attempts,owner_id,lease_until,last_error_code from ai.jobs order by created_at desc limit 5"
 ```
+
+`geoji-ai migrate` 는 `database/migrations/NNN_*.sql` 을 번호 순으로 적용하고
+`ai.schema_migrations` 에 기록한다. 이미 적용된 번호는 건너뛴다. **004 부터는 백엔드 소유라
+우리 러너가 적용하지 않는다**(02 §3.6). `ai_worker`·`backend` role 은 Supabase 에서 백엔드가 만든다
+(10 §2). 로컬에서는 통합 테스트가 만든다.
 
 ### 게이트
 
 ```bash
 uv run ruff check .
 uv run ruff format .
-uv run pytest -q
+TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/postgres uv run pytest -q
 ```
+
+`tests/integration/` 은 실제 Postgres 를 쓴다(02 §4.2). 접속은 **`TEST_DATABASE_URL`** 환경변수로만
+받는다. 설정 필드가 아니라 pytest 만 읽으므로 `.env.example` 에는 주석 줄로 있다. 값이 없으면 통합
+테스트는 **실패**한다 — 조용히 넘기지 않는다. 테스트는 `ai` 스키마를 매번 지우고 다시 만드니
+운영 DB 를 가리키지 않는다.
 
 ## 계약 정본
 
@@ -75,6 +92,8 @@ uv run python tools/gen_contracts.py
 | `JOB_LEASE_SECONDS` | `15` | 작업 2 |
 | `HEARTBEAT_SECONDS` | `5` | 작업 2 |
 | `WORKER_SLOTS` | `{"SENTENCE":2,"PREPARE":1,"BACKGROUND":1}` | JSON. 작업 2 |
+| `WORKER_SHUTDOWN_DEADLINE_SECONDS` | `10` | 종료 시 진행 중 핸들러에 주는 시간. 작업 2 |
+| `REAPER_INTERVAL_SECONDS` | `5` | `--reaper` 의 lease 회수 주기. 작업 2 |
 | `FINALIZE_RESERVE_MS` | `500` | 작업 5 |
 | `INLINE_CONTEXT_MIN_REMAINING_MS` | `8500` | 작업 5 |
 | `IMMEDIATE_REPAIR_MAX` | `1` | |
