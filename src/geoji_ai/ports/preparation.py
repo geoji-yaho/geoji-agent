@@ -1,28 +1,42 @@
-"""재판 준비 저장 포트(04 §3.4·§3.5).
+"""재판 준비 저장 포트(04 §3.4·§3.5, 05 §3.2·§3.3).
 
 `build_evidence` 가 만든 `Dossier` 를 `ai.dossiers`·`ai.evidence`·`ai.evidence_sources`
 에 한 트랜잭션으로 저장한다. 저장 직전 epoch 가 어긋나면 `EvidenceInvalidated`.
+
+그래프 B 는 `save_prep` 으로 dossier 와 `ai.trial_prep(DOSSIER_READY)` 을 같이 쓰고,
+드립까지 되면 `save_banter` 로 `COMPLETE` 로 올린다. 그래프 C 는 `load_valid_prep` 으로 읽는다.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
+from geoji_ai.domain.intensity import Intensity
 from geoji_ai.domain.visibility import Scope
+
+if TYPE_CHECKING:
+    from geoji_ai.contracts.case import CaseSnapshot
+    from geoji_ai.graphs.states import Candidate
 
 __all__ = [
     "EVIDENCE_TEXT_MAX",
     "Dossier",
     "EvidenceFact",
     "EvidenceInvalidated",
+    "PrepSaveResult",
+    "PrepStatus",
     "PreparationPort",
+    "ValidPrep",
 ]
 
 #: `ai.evidence.text` CHECK(char_length ≤ 500).
 EVIDENCE_TEXT_MAX = 500
+
+#: `ai.trial_prep.status` CHECK(002).
+PrepStatus = Literal["DOSSIER_READY", "COMPLETE", "INVALIDATED"]
 
 
 class EvidenceInvalidated(Exception):
@@ -65,8 +79,52 @@ class Dossier:
     privacy_versions: tuple[tuple[str, int], ...]
 
 
+@dataclass(frozen=True)
+class PrepSaveResult:
+    """`save_prep` 결과. `reused` 면 같은 `(post_id, input_hash, prompt_version)` 행이 이미 있어
+    아무것도 새로 쓰지 않았다. `status` 는 그 행의 현재 상태다."""
+
+    prep_id: str
+    status: PrepStatus
+    reused: bool
+
+
+@dataclass(frozen=True)
+class ValidPrep:
+    """그래프 C 가 쓸 수 있는 사전 준비(05 §3.3 조건 통과). 드립이 없으면 `banter` 는 빈 dict."""
+
+    dossier: Dossier
+    banter: dict[Intensity, list[Candidate]] = field(default_factory=dict)
+    prep_id: str = ""
+
+
 @runtime_checkable
 class PreparationPort(Protocol):
     async def save_dossier(self, dossier: Dossier) -> str:
         """저장한 dossier id. epoch 불일치면 `EvidenceInvalidated`."""
+        ...
+
+    async def save_prep(
+        self, dossier: Dossier, snapshot: CaseSnapshot, prompt_version: str
+    ) -> PrepSaveResult:
+        """한 트랜잭션: epoch 재확인(불일치면 `EvidenceInvalidated`) → 같은 키 행이 있으면 그대로
+        반환(`reused=True`) → 없으면 dossier·evidence·sources + `trial_prep(DOSSIER_READY)`."""
+        ...
+
+    async def save_banter(self, prep_id: str, banter: Mapping[Intensity, list[Candidate]]) -> bool:
+        """`banter_json IS NULL ∧ status='DOSSIER_READY'` 일 때만 채우고 `COMPLETE`.
+
+        채웠으면 True."""
+        ...
+
+    async def load_valid_prep(
+        self, snapshot: CaseSnapshot, prompt_version: str
+    ) -> ValidPrep | None:
+        """post_id·input_hash·prompt_version 일치 ∧ 무효화 안 됨 ∧ dossier epoch == 스냅샷."""
+        ...
+
+    async def approved_banter_examples(
+        self, intensity: Intensity, category: str, limit: int
+    ) -> list[str]:
+        """`ai.banter_examples approved=true` 중 강도 일치, 카테고리 일치 우선 `limit` 개의 문장."""
         ...

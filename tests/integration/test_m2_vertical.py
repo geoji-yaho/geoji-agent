@@ -4,8 +4,8 @@
 
 ① SENTENCE: claim → begin → failed(AI_NOT_READY) → complete. 가짜 백엔드 FINAL/RULE +
    TEMPLATE_READY, TEXT_RETRY 예약 없음, `ai.jobs` 에 RETAIN(`sentence.finalized`) 1행
-② PREPARE 는 백엔드를 부르지 않고, RETAIN 은 snapshot 만 부른다(확장 필드가 없어 행 0).
-   둘 다 SUCCEEDED
+② PREPARE 는 그래프 B(snapshot → resolve-evidence, LLM 없음 → DOSSIER_READY), RETAIN 은
+   snapshot 만 부른다(확장 필드가 없어 행 0). 둘 다 SUCCEEDED
 ③ TEXT_RETRY(FINAL 상태) 는 폴백을 유지한 채 SUCCEEDED
 ④ 백엔드 주소가 죽었으면 `fail(BACKEND_UNAVAILABLE, 5)` → QUEUED · available_at +5s
 """
@@ -25,9 +25,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from geoji_ai.adapters.backend_http import BackendHttp
 from geoji_ai.adapters.postgres_jobs import PostgresJobs
+from geoji_ai.adapters.postgres_preparation import PostgresPreparation
+from geoji_ai.contracts.case import CaseSnapshot
 from geoji_ai.contracts.jobs import Job
 from geoji_ai.workers.main import Worker
+from tests.conftest import load_fixture
 from tests.fakes.backend_app import FAKE_SERVICE_TOKEN
+from tests.integration.test_retain_handler import seed_epochs
 from tests.integration.test_worker_runtime import make_settings, run_worker_until
 
 Enqueue = Callable[..., Awaitable[str]]
@@ -156,20 +160,26 @@ async def test_SENTENCE_스텁이_폴백_확정과_RETAIN_을_만든다(
 # --- ② PREPARE · RETAIN ----------------------------------------------------------
 
 
-async def test_PREPARE_는_백엔드_없이_RETAIN_은_snapshot_만_부르고_SUCCEEDED(
+async def test_PREPARE_는_snapshot_resolve_RETAIN_은_snapshot_만_부르고_SUCCEEDED(
     jobs: PostgresJobs,
+    engine: AsyncEngine,
+    privacy_epochs: str,
     enqueue: Enqueue,
     fetch_job: FetchJob,
     fake_backend: FastAPI,
     backend_client: BackendHttp,
 ):
     fake = fake_backend.state.fake
+    # 05 GR-02: PREPARE 는 그래프 B 다. 저장 직전 epoch 를 보므로 스냅샷 epoch 를 심는다.
+    snapshot = CaseSnapshot.model_validate(load_fixture("case-snapshot-taxi"))
+    await seed_epochs(engine, {pv.scope_key: pv.epoch for pv in snapshot.privacy_versions})
     prepare_id = await enqueue("PREPARE", post_id=POST_ID, post_version=1, audience_version=1)
     retain_id = await enqueue("RETAIN", verdict_id="v9", comment_id=None, version=1)
     worker = Worker(
         jobs,
         make_settings(WORKER_SLOTS={"PREPARE": 1, "BACKGROUND": 1}),
         backend=backend_client,
+        preparation=PostgresPreparation(engine),
     )
 
     async def both_done() -> bool:
@@ -181,7 +191,14 @@ async def test_PREPARE_는_백엔드_없이_RETAIN_은_snapshot_만_부르고_SU
     assert (await fetch_job(prepare_id))["status"] == "SUCCEEDED"
     assert (await fetch_job(retain_id))["status"] == "SUCCEEDED"
     # 04 ME-03: RETAIN 은 snapshot 을 부른다. 가짜 스냅샷에 RETAIN 확장 필드가 없어 행 0 이다.
-    assert fake.calls == [("GET", f"/internal/v1/ai-jobs/{retain_id}/snapshot")]
+    # 05 GR-02: PREPARE 는 snapshot → resolve-evidence. 두 슬롯이 동시에 돌아 순서는 보지 않는다.
+    assert sorted(fake.calls) == sorted(
+        [
+            ("GET", f"/internal/v1/ai-jobs/{retain_id}/snapshot"),
+            ("GET", f"/internal/v1/ai-jobs/{prepare_id}/snapshot"),
+            ("POST", f"/internal/v1/ai-jobs/{prepare_id}/resolve-evidence"),
+        ]
+    )
 
 
 # --- ③ TEXT_RETRY(FINAL) --------------------------------------------------------

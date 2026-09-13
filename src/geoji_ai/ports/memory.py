@@ -41,7 +41,11 @@ class MemoryPort(Protocol):
         category: str,
         before: datetime,
         limit: int,
-    ) -> list[MemoryCandidate]: ...
+        *,
+        reason: str | None = None,
+    ) -> list[MemoryCandidate]:
+        """`reason` 은 현재 사건 사유다. 키워드 항에 쓴다(04 §3.2)."""
+        ...
 
     async def recall_room(self, room_id: str, category: str) -> RoomRecall: ...
 
