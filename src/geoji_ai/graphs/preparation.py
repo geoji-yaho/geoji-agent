@@ -66,6 +66,9 @@ __all__ = [
     "STATUS_STALE_EVENT",
     "PrepareDeps",
     "build_preparation_graph",
+    "call_context",
+    "dossier_from_resolved",
+    "evidence_include",
     "filter_banter",
     "merge_inferred_facts",
     "run_preparation",
@@ -326,6 +329,59 @@ def _merge_candidates(
     return sorted(best.values(), key=lambda c: c.score, reverse=True)[:limit]
 
 
+# --- 그래프 C 가 같이 쓰는 단계(05 §3.3 inline_context) ----------------------------
+
+
+def evidence_include(settings: Settings) -> list[EvidenceInclude]:
+    """`resolve-evidence` 의 include. 말투 댓글은 플래그가 켜졌을 때만."""
+    include: list[EvidenceInclude] = ["rules", "aggregates", "recent_verdicts"]
+    if settings.ROOM_COMMENT_STYLE_ENABLED:
+        include.append("style_comments")
+    return include
+
+
+def dossier_from_resolved(
+    snapshot: CaseSnapshot, resolved: ResolveEvidenceResponse | None, settings: Settings
+) -> Dossier:
+    """04 `build_evidence`. resolve 실패(None)면 F0 만."""
+    if resolved is None:
+        return build_evidence(snapshot, _f0_only(snapshot), pack_limit=1)
+    return build_evidence(
+        snapshot,
+        resolved,
+        pack_limit=settings.EVIDENCE_PACK_LIMIT,
+        rule_matcher=dossier_rules.rule_matcher,
+    )
+
+
+async def call_context(
+    llm: LLMPort,
+    semaphore: asyncio.Semaphore,
+    settings: Settings,
+    snapshot: CaseSnapshot,
+    dossier: Dossier,
+    *,
+    timeout_s: float | None = None,
+) -> tuple[Dossier, dict[str, Any] | None]:
+    """조서 1호출 → `merge_inferred_facts`. 호출 오류는 호출자에게 올린다.
+
+    `timeout_s` 가 없으면 `WRITER_NODE_TIMEOUT_SECONDS`(그래프 B 값).
+    """
+    timeout = float(settings.WRITER_NODE_TIMEOUT_SECONDS) if timeout_s is None else timeout_s
+    async with semaphore:
+        result = await asyncio.wait_for(
+            llm.structured_call(
+                role="context",
+                messages=_context_messages(snapshot, dossier.facts),
+                schema=context_schema(),
+                timeout_s=timeout,
+                max_output_tokens=settings.CONTEXT_MAX_OUTPUT_TOKENS,
+            ),
+            timeout=timeout,
+        )
+    return merge_inferred_facts(dossier, result.output)
+
+
 # --- 그래프 -----------------------------------------------------------------------
 
 
@@ -383,9 +439,7 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
 
     async def resolve_sources(state: PrepareState) -> dict[str, Any]:
         job = state["job"]
-        include: list[EvidenceInclude] = ["rules", "aggregates", "recent_verdicts"]
-        if settings.ROOM_COMMENT_STYLE_ENABLED:
-            include.append("style_comments")
+        include = evidence_include(settings)
         request = ResolveEvidenceRequest(
             candidates=[
                 EvidenceCandidate(
@@ -407,16 +461,7 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
 
     async def build_db_evidence(state: PrepareState) -> dict[str, Any]:
         snapshot = state["snapshot"]
-        resolved = state["resolved"]
-        if resolved is None:
-            dossier = build_evidence(snapshot, _f0_only(snapshot), pack_limit=1)
-        else:
-            dossier = build_evidence(
-                snapshot,
-                resolved,
-                pack_limit=settings.EVIDENCE_PACK_LIMIT,
-                rule_matcher=dossier_rules.rule_matcher,
-            )
+        dossier = dossier_from_resolved(snapshot, state["resolved"], settings)
         ctx.dossier = dossier
         return {"evidence": list(dossier.facts), "label_map": dict(dossier.label_map)}
 
@@ -425,23 +470,13 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
         assert dossier is not None
         if deps.llm is None:
             return {}
-        timeout_s = float(settings.WRITER_NODE_TIMEOUT_SECONDS)
         try:
-            async with deps.semaphore:
-                result = await asyncio.wait_for(
-                    deps.llm.structured_call(
-                        role="context",
-                        messages=_context_messages(state["snapshot"], dossier.facts),
-                        schema=context_schema(),
-                        timeout_s=timeout_s,
-                        max_output_tokens=settings.CONTEXT_MAX_OUTPUT_TOKENS,
-                    ),
-                    timeout=timeout_s,
-                )
+            merged, reason_analysis = await call_context(
+                deps.llm, deps.semaphore, settings, state["snapshot"], dossier
+            )
         except Exception as exc:  # 코드 Evidence 만으로 계속(05 §3.2).
             log.warning("context_failed", error=type(exc).__name__)
             return {"errors": [*state.get("errors", []), "CONTEXT_FAILED"]}
-        merged, reason_analysis = merge_inferred_facts(dossier, result.output)
         ctx.dossier = merged
         return {
             "evidence": list(merged.facts),

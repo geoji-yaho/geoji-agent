@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
@@ -127,4 +127,10 @@ class PreparationPort(Protocol):
         self, intensity: Intensity, category: str, limit: int
     ) -> list[str]:
         """`ai.banter_examples approved=true` 중 강도 일치, 카테고리 일치 우선 `limit` 개의 문장."""
+        ...
+
+    async def stale_scopes(self, privacy_versions: Iterable[tuple[str, int]]) -> list[str]:
+        """현재 `ai.privacy_epochs` 와 epoch 가 다른 scope_key(04 §3.5 (b) finalize 직전).
+
+        빈 목록이면 일치. 아무것도 쓰지 않는다."""
         ...

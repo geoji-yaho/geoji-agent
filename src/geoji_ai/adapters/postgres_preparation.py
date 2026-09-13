@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import datetime
 from typing import Any
 
@@ -301,17 +301,28 @@ class PostgresPreparation:
             )
             return [row[0] for row in rows]
 
+    async def stale_scopes(self, privacy_versions: Iterable[tuple[str, int]]) -> list[str]:
+        pairs = tuple((str(scope_key), int(epoch)) for scope_key, epoch in privacy_versions)
+        async with self._engine.connect() as conn:
+            current = await self._current_epochs(conn, pairs)
+        return mismatched_scopes(pairs, current)
+
     # --- 내부 -------------------------------------------------------------------
 
     @staticmethod
-    async def _check_epochs(conn: AsyncConnection, pairs: tuple[tuple[str, int], ...]) -> None:
+    async def _current_epochs(
+        conn: AsyncConnection, pairs: tuple[tuple[str, int], ...]
+    ) -> dict[str, int]:
         keys = [scope_key for scope_key, _ in pairs]
-        current: dict[str, int] = {}
-        if keys:
-            statement = text(EPOCH_SQL).bindparams(bindparam("keys", type_=ARRAY(Text)))
-            rows = await conn.execute(statement, {"keys": keys})
-            current = {row.scope_key: int(row.epoch) for row in rows}
-        mismatched = mismatched_scopes(pairs, current)
+        if not keys:
+            return {}
+        statement = text(EPOCH_SQL).bindparams(bindparam("keys", type_=ARRAY(Text)))
+        rows = await conn.execute(statement, {"keys": keys})
+        return {row.scope_key: int(row.epoch) for row in rows}
+
+    @classmethod
+    async def _check_epochs(cls, conn: AsyncConnection, pairs: tuple[tuple[str, int], ...]) -> None:
+        mismatched = mismatched_scopes(pairs, await cls._current_epochs(conn, pairs))
         if mismatched:
             raise EvidenceInvalidated(mismatched)
 
