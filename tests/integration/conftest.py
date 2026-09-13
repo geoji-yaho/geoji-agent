@@ -18,14 +18,18 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
+import httpx
 import pytest
+from fastapi import FastAPI
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from geoji_ai.adapters.backend_http import BackendHttp
 from geoji_ai.adapters.postgres_jobs import PostgresJobs, make_engine
 from geoji_ai.adapters.postgres_migrations import migrate
 from geoji_ai.core.config import Settings
 from geoji_ai.workers.dispatch import DEFAULT_ROUTE_BY_KIND, JOB_ROUTES, build_dedupe_key
+from tests.fakes.backend_app import FAKE_SERVICE_TOKEN, create_fake_backend
 
 TEST_DB_ENV = "TEST_DATABASE_URL"
 
@@ -188,6 +192,23 @@ def fetch_job(engine: AsyncEngine) -> Callable[[str], Awaitable[dict[str, Any]]]
         return dict(row)
 
     return _fetch
+
+
+@pytest.fixture
+def fake_backend(engine: AsyncEngine) -> FastAPI:
+    """가짜 백엔드(03 §3.7). RETAIN 은 이 테스트 DB 의 `ai.jobs` 에 INSERT 한다."""
+    return create_fake_backend(jobs_engine=engine)
+
+
+@pytest.fixture
+async def backend_client(fake_backend: FastAPI) -> AsyncIterator[BackendHttp]:
+    """가짜 백엔드에 `ASGITransport` 로 붙은 `BackendHttp`."""
+    client = httpx.AsyncClient(transport=httpx.ASGITransport(app=fake_backend))
+    backend = BackendHttp("http://fake-backend", FAKE_SERVICE_TOKEN, client=client)
+    try:
+        yield backend
+    finally:
+        await backend.aclose()
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from geoji_ai.api import health
+from geoji_ai.api import health, intake_routes
 from geoji_ai.core.config import Settings, get_settings
 from geoji_ai.core.logging import configure_logging
 from geoji_ai.core.startup import validate
@@ -24,6 +24,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="geoji-ai", version="0.1.0")
     app.state.settings = settings
     app.include_router(health.router)
+    app.include_router(intake_routes.router)
     return app
 
 

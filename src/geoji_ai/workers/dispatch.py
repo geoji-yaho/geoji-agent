@@ -18,8 +18,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from geoji_ai.application.prepare_case import PrepareStubHandler
+from geoji_ai.application.retain_memory import RetainStubHandler
+from geoji_ai.application.sentence_case import SentenceStubHandler
 from geoji_ai.contracts.jobs import Job, JobKind
 from geoji_ai.core.config import Settings
+from geoji_ai.ports.backend import BackendPort
 from geoji_ai.ports.jobs import JobsPort
 
 __all__ = [
@@ -141,6 +145,8 @@ class HandlerContext:
     settings: Settings
     generation_id: str
     worker_id: str
+    #: 백엔드 내부 API(03 §3.3). 워커가 `BackendHttp` 를 넣고 테스트는 가짜를 넣는다.
+    backend: BackendPort
 
 
 class Handler(Protocol):
@@ -160,14 +166,14 @@ class NotImplementedHandler:
         )
 
 
-_not_implemented = NotImplementedHandler()
+_sentence_stub = SentenceStubHandler()
 
-#: 작업 2 는 4 kind 전부 스텁이다.
+#: 작업 3 M2 스텁 4종(03 §3.3). SENTENCE·TEXT_RETRY 는 같은 핸들러다.
 HANDLERS: dict[str, Handler] = {
-    "PREPARE": _not_implemented,
-    "SENTENCE": _not_implemented,
-    "TEXT_RETRY": _not_implemented,
-    "RETAIN": _not_implemented,
+    "PREPARE": PrepareStubHandler(),
+    "SENTENCE": _sentence_stub,
+    "TEXT_RETRY": _sentence_stub,
+    "RETAIN": RetainStubHandler(),
 }
 
 
