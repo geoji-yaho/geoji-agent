@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from geoji_ai.domain.retries import (
+    NO_LEDGER_KINDS,
     FallbackAction,
     backoff_seconds,
     classify_generation_error,
@@ -110,3 +111,31 @@ def test_second_attempt_cannot_retry() -> None:
 def test_non_retryable_kind_backoff_is_none() -> None:
     assert backoff_seconds("TIMEOUT", 1, 10.0) is None
     assert backoff_seconds("REFUSAL", 1, 10.0) is None
+
+
+# 06 §3.1 추가 kind(9/14): AUTH·DEGRADED·BUDGET
+@pytest.mark.parametrize(
+    ("kind", "code"),
+    [
+        ("AUTH", "VENDOR_UNAVAILABLE"),
+        ("DEGRADED", "VENDOR_UNAVAILABLE"),
+        ("BUDGET", "BUDGET_EXCEEDED"),
+    ],
+)
+def test_added_kinds_map_to_generation_codes(kind: str, code: str) -> None:
+    assert classify_vendor_error(kind) == code
+    assert classify_generation_error(code) is FallbackAction.SCHEDULE_TEXT_RETRY
+    assert retry_allowed(kind, 1) is False
+    assert backoff_seconds(kind, 1, 10.0) is None
+
+
+def test_auth_ledger_status_is_failed() -> None:
+    assert ledger_status("AUTH") == "FAILED"
+
+
+@pytest.mark.parametrize("kind", ["DEGRADED", "BUDGET"])
+def test_no_ledger_row_kinds_have_no_ledger_status(kind: str) -> None:
+    """호출 전에 끝나 원장 행이 없다 → 상태를 물으면 ValueError."""
+    assert kind in NO_LEDGER_KINDS
+    with pytest.raises(ValueError):
+        ledger_status(kind)

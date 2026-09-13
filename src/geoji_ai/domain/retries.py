@@ -2,7 +2,7 @@
 
 `generation-failed` 의 `error_code` 가 백엔드에서 TEXT_RETRY round 를 예약하는지 가르고,
 `LLMError.kind` 를 생성 오류 코드·원장 상태·재시도 여부·대기 시간으로 옮긴다.
-순수 함수만 둔다. 그래프 배선은 작업 6 웨이브 2 몫이다.
+순수 함수만 둔다. 배선은 `application/llm_gateway.py`.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ from enum import StrEnum
 from typing import Literal
 
 __all__ = [
+    "NO_LEDGER_KINDS",
     "NO_RETRY_CODES",
     "RETRYABLE_KINDS",
     "TEXT_RETRY_CODES",
@@ -50,7 +51,13 @@ _VENDOR_ERROR_CODE: dict[str, str] = {
     "SERVER": "VENDOR_UNAVAILABLE",
     "TIMEOUT": "VENDOR_UNAVAILABLE",
     "TRANSPORT": "VENDOR_UNAVAILABLE",
+    "AUTH": "VENDOR_UNAVAILABLE",
+    "DEGRADED": "VENDOR_UNAVAILABLE",
+    "BUDGET": "BUDGET_EXCEEDED",
 }
+
+#: 호출을 시작하지 않아 원장 행이 없는 kind. 원장 상태가 없다(`ledger_status` 는 `ValueError`).
+NO_LEDGER_KINDS: frozenset[str] = frozenset({"DEGRADED", "BUDGET"})
 
 #: 청구 여부가 불명확한 실패. 원장은 UNKNOWN 으로 두고 예약을 유지한다(06 §3.1).
 _UNKNOWN_LEDGER_KINDS: frozenset[str] = frozenset({"TIMEOUT", "TRANSPORT"})
@@ -80,9 +87,14 @@ def classify_vendor_error(kind: str) -> str:
 
 
 def ledger_status(kind: str) -> LedgerStatus:
-    """`LLMError.kind` → 원장 상태. TIMEOUT·TRANSPORT 는 UNKNOWN, 나머지는 FAILED."""
+    """`LLMError.kind` → 원장 상태. TIMEOUT·TRANSPORT 는 UNKNOWN, 나머지는 FAILED.
+
+    `DEGRADED`·`BUDGET` 은 호출 전에 끝나 원장 행이 없다. 상태를 물으면 `ValueError`.
+    """
     if kind not in _VENDOR_ERROR_CODE:
         raise ValueError(f"벤더 오류 분류 표(06 §3.1)에 없는 kind: {kind!r}")
+    if kind in NO_LEDGER_KINDS:
+        raise ValueError(f"원장 행이 없는 kind: {kind!r}")
     return "UNKNOWN" if kind in _UNKNOWN_LEDGER_KINDS else "FAILED"
 
 

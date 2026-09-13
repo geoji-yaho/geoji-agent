@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 from typing import Protocol
 
+from geoji_ai.application.llm_gateway import ScopedLLM
 from geoji_ai.contracts.jobs import Job
 from geoji_ai.core.config import Settings
 from geoji_ai.core.logging import get_logger
@@ -45,7 +46,7 @@ class _Context(Protocol):
     jobs: JobsPort
     backend: BackendPort
     memory: MemoryPort | None
-    llm: LLMPort | None
+    llm: LLMPort | ScopedLLM | None
     preparation: PreparationPort | None
     settings: Settings
     semaphore: asyncio.Semaphore

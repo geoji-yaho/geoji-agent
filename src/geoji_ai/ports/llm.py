@@ -21,6 +21,12 @@ LLMErrorKind = Literal[
     "REFUSAL",
     "SCHEMA",
     "PARSE",
+    # 401·403. 재시도 없음, degraded 카운트 안 함(06 §3.1, PR #19 미결 → 9/14).
+    "AUTH",
+    # 벤더 degraded 판정으로 호출하지 않음(게이트웨이). 원장 행 없음.
+    "DEGRADED",
+    # 사건 예산 초과로 호출하지 않음(게이트웨이). 원장 행 없음.
+    "BUDGET",
 ]
 
 

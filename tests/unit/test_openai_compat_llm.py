@@ -425,3 +425,27 @@ def test_default_clients_per_vendor() -> None:
     )
     assert xai_llm.client.max_retries == 0
     assert str(xai_llm.client.base_url).startswith("https://api.x.ai/v1")
+
+
+@pytest.mark.parametrize("status", [401, 403])
+async def test_auth_status_is_auth(status: int) -> None:
+    """401·403 → AUTH(재시도 없음·degraded 카운트 안 함, 9/14). Retry-After 를 싣지 않는다."""
+    llm, recorder = make_llm(
+        lambda _r: httpx.Response(
+            status, json={"error": {"message": "no"}}, headers={"retry-after": "1"}
+        )
+    )
+    with pytest.raises(LLMError) as exc:
+        await call(llm)
+    assert exc.value.kind == "AUTH"
+    assert exc.value.retry_after_s is None
+    assert len(recorder.requests) == 1
+
+
+@pytest.mark.parametrize("status", [404, 409, 422])
+async def test_other_4xx_is_schema(status: int) -> None:
+    """400 밖 4xx 도 요청 오류라 SCHEMA(9/14)."""
+    llm, _ = make_llm(lambda _r: httpx.Response(status, json={"error": {"message": "bad"}}))
+    with pytest.raises(LLMError) as exc:
+        await call(llm)
+    assert exc.value.kind == "SCHEMA"

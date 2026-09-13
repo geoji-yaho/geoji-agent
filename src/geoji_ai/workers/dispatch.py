@@ -17,6 +17,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from geoji_ai.application.llm_gateway import ScopedLLM
 from geoji_ai.application.prepare_case import PrepareHandler
 from geoji_ai.application.retain_memory import RetainHandler
 from geoji_ai.application.sentence_case import SentenceHandler
@@ -151,8 +152,9 @@ class HandlerContext:
     backend: BackendPort
     #: 기억 포트(04 ME-03). 워커가 `PostgresMemory` 를 넣는다. RETAIN 만 쓴다.
     memory: MemoryPort | None = None
-    #: 모델 포트(05 GR-02). 워커가 역할 라우터를 넣는다. 벤더 키가 둘 다 없으면 None.
-    llm: LLMPort | None = None
+    #: 모델 포트(05 GR-02). 워커가 `LLMGateway`(역할 라우터 + 원장, 06 §3.1·§3.2)를 넣는다.
+    #: 벤더 키가 둘 다 없으면 None. 테스트는 `LLMPort` 가짜를 넣을 수 있다(원장 없는 경로).
+    llm: LLMPort | ScopedLLM | None = None
     #: 재판 준비 저장 포트(05 GR-02). 워커가 `PostgresPreparation` 을 넣는다.
     preparation: PreparationPort | None = None
 
