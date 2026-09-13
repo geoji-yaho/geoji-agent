@@ -1,7 +1,9 @@
 """OpenAI 호환 벤더 어댑터(03 §3.5). `LLMPort` 구현.
 
 OpenAI 와 xAI 는 같은 chat.completions API 를 쓴다. 벤더마다 클라이언트를 하나 만든다.
-재시도는 하지 않는다(`max_retries=0`). 재시도·백오프·예산 판단은 그래프가 한다(작업 6).
+재시도는 하지 않는다(`max_retries=0`). 재시도·백오프·예산 판단은 호출자가 한다
+(`domain/retries.py`). 실패는 06 §3.1 표대로 `LLMError(kind)` 로만 낸다.
+성공이 아닌 응답(잘림·거절·파싱 실패)은 `usage`·`cost` 를 예외에 실어 원장이 쓰게 한다.
 `settings` → 어댑터 조립은 작업 5·6 몫이다.
 """
 
@@ -16,7 +18,7 @@ from typing import Any, Literal
 import openai
 import pydantic
 
-from geoji_ai.ports.llm import Cost, LLMError, LLMResult, LLMRole, StopReason, Usage
+from geoji_ai.ports.llm import Cost, LLMError, LLMResult, LLMRole, Usage
 
 Vendor = Literal["openai", "xai"]
 
@@ -30,12 +32,6 @@ KRW_PER_USD = 1450
 
 # xAI usage.cost_in_usd_ticks: 1 tick = 1e-10 USD → 1 micro-USD = 10_000 ticks.
 TICKS_PER_MICRO_USD = 10_000
-
-_FINISH_REASON: dict[str, StopReason] = {
-    "stop": "stop",
-    "length": "max_tokens",
-    "content_filter": "refusal",
-}
 
 
 class OpenAICompatLLM:
@@ -92,40 +88,46 @@ class OpenAICompatLLM:
                 message=str(exc),
             ) from exc
         except openai.APIStatusError as exc:
-            raise LLMError(_status_kind(exc.status_code), message=str(exc)) from exc
+            kind = _status_kind(exc.status_code)
+            raise LLMError(
+                kind,
+                retry_after_s=_retry_after_s(exc.response.headers) if kind == "SERVER" else None,
+                message=str(exc),
+            ) from exc
         except (
             openai.APIResponseValidationError,
             pydantic.ValidationError,
             json.JSONDecodeError,
         ) as exc:
+            # HTTP 본문 자체가 깨져 completion 이 없다. usage 를 얻을 수 없다.
             raise LLMError("PARSE", message=str(exc)) from exc
         latency_ms = math.ceil((time.perf_counter() - started) * 1000)
 
+        usage = _usage(completion.usage)
+        # 응답의 model 은 날짜 접미사가 붙을 수 있어 단가표는 설정한 model_id 로 찾는다
+        cost = _cost(completion.usage, usage, self.model_id)
+
         if not completion.choices:
-            raise LLMError("PARSE", message="응답에 choices 가 없다")
+            raise LLMError("PARSE", message="응답에 choices 가 없다", usage=usage, cost=cost)
         choice = completion.choices[0]
         message = choice.message
-        stop_reason = _FINISH_REASON.get(choice.finish_reason or "", "stop")
-        if getattr(message, "refusal", None):
-            stop_reason = "refusal"
-
-        output: dict[str, Any] | None = None
-        if stop_reason == "stop":
+        if getattr(message, "refusal", None) or choice.finish_reason == "content_filter":
+            raise LLMError("REFUSAL", message="벤더가 응답을 거절했다", usage=usage, cost=cost)
+        if choice.finish_reason == "length":
+            # 잘린 JSON 은 스키마 실패로 본다(06 §3.1, §14.1).
+            raise LLMError(
+                "SCHEMA", message="출력이 max_tokens 에서 잘렸다", usage=usage, cost=cost
+            )
+        try:
             output = _parse_output(message.content)
-        elif stop_reason == "max_tokens":
-            # 잘린 JSON 은 결과가 아니다. 판단은 호출자가 stop_reason 으로 한다.
-            try:
-                output = _parse_output(message.content)
-            except LLMError:
-                output = None
+        except LLMError as exc:
+            raise LLMError(exc.kind, message=str(exc), usage=usage, cost=cost) from exc
 
-        usage = _usage(completion.usage)
         return LLMResult(
             output=output,
-            stop_reason=stop_reason,
+            stop_reason="stop",
             usage=usage,
-            # 응답의 model 은 날짜 접미사가 붙을 수 있어 단가표는 설정한 model_id 로 찾는다
-            cost=_cost(completion.usage, usage, self.model_id),
+            cost=cost,
             provider_request_id=raw.headers.get("x-request-id") or completion.id or None,
             model_id=self.model_id,
             vendor=self.vendor,
@@ -146,7 +148,8 @@ def _parse_output(content: str | None) -> dict[str, Any]:
 
 
 def _status_kind(status: int) -> Literal["SCHEMA", "SERVER"]:
-    # strict 스키마 거절은 400 이다. 세분 분류는 작업 6 `domain/retries.py`.
+    # strict 스키마 거절은 400 이다. 그 밖 4xx(401·403·404 등)는 06 §3.1 표 밖이라
+    # 기존대로 SERVER 로 둔다(작업 6 보고서 미결).
     if status == 400:
         return "SCHEMA"
     return "SERVER"
