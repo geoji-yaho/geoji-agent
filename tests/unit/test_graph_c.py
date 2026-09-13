@@ -1,0 +1,685 @@
+"""그래프 C(선고) — 05 §3.3·§3.5·§4.2, 스펙 케이스 ①~⑮.
+
+FakeLLM + 이 파일 안의 가짜 백엔드·큐·준비 포트. 네트워크·DB·키 없음.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+from collections import Counter
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
+
+import pytest
+
+from geoji_ai.adapters.fake_llm import FakeCall, FakeLLM, FakeScenario, load_role_fixture
+from geoji_ai.application.sentence_case import SentenceHandler
+from geoji_ai.contracts.case import CaseSnapshot
+from geoji_ai.contracts.finalize import FinalizeRequest
+from geoji_ai.contracts.jobs import Job
+from geoji_ai.contracts.sentencing import SentencingDecision
+from geoji_ai.contracts.writer import BanterStrategy
+from geoji_ai.core.config import Settings
+from geoji_ai.domain.draft_hash import draft_hash
+from geoji_ai.domain.intensity import Intensity
+from geoji_ai.domain.visibility import Scope
+from geoji_ai.graphs.sentencing import build_sentence_graph
+from geoji_ai.graphs.states import Candidate
+from geoji_ai.ports.backend import BeginGenerationResult, FinalizeResult
+from geoji_ai.ports.llm import LLMError
+from geoji_ai.ports.preparation import Dossier, EvidenceFact
+
+ROOT = Path(__file__).resolve().parents[2]
+FIXTURES = ROOT / "contracts" / "fixtures"
+DB_NOW = datetime(2026, 9, 7, 9, 20, tzinfo=UTC)
+GENERATION_ID = "gen-1"
+WORKER_ID = "worker-1"
+CANDIDATE_MARK = "드립후보마커문장"
+SENTENCING_FIXTURE = load_role_fixture("sentencing")
+
+
+def fixture(name: str) -> dict[str, Any]:
+    return json.loads((FIXTURES / f"{name}.json").read_text("utf-8"))
+
+
+# ---------------------------------------------------------------------------
+# 가짜 포트
+# ---------------------------------------------------------------------------
+
+
+class Rejected(Exception):
+    """어댑터 `BackendRejected` 모양(속성으로 판별)."""
+
+    def __init__(self, status: int, code: str) -> None:
+        super().__init__(f"{status} {code}")
+        self.status = status
+        self.code = code
+
+
+class FakeClock:
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+class FakeBackend:
+    def __init__(
+        self,
+        snapshot: CaseSnapshot,
+        *,
+        remaining_s: float = 60.0,
+        fixed: dict[str, Any] | None = None,
+        begin_error: Exception | None = None,
+        finalize_error: Exception | None = None,
+    ) -> None:
+        self._snapshot = snapshot
+        self.remaining_s = remaining_s
+        self.fixed = fixed
+        self.begin_error = begin_error
+        self.finalize_error = finalize_error
+        self.began: list[dict[str, Any]] = []
+        self.finalized: list[FinalizeRequest] = []
+        self.failed: list[str] = []
+
+    async def snapshot(self, job_id: str, generation_id: str) -> CaseSnapshot:
+        return self._snapshot
+
+    async def resolve_evidence(self, *args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("그래프 C 는 resolve-evidence 를 부르지 않는다")
+
+    async def begin_generation(
+        self, verdict_id: str, *, job_id: str, generation_id: str, verdict_version: int
+    ) -> BeginGenerationResult:
+        self.began.append({"verdict_id": verdict_id, "job_id": job_id})
+        if self.begin_error is not None:
+            raise self.begin_error
+        return BeginGenerationResult.model_validate(
+            {
+                "fixed_sentencing": self.fixed,
+                "text_version": 0,
+                "deadline_at": DB_NOW + timedelta(seconds=self.remaining_s),
+            }
+        )
+
+    async def finalize(self, verdict_id: str, req: FinalizeRequest) -> FinalizeResult:
+        # 계약 모델로 다시 파싱한다(가짜 백엔드가 JSON 을 받는 것과 같다).
+        self.finalized.append(FinalizeRequest.model_validate(req.model_dump(mode="json")))
+        # 백엔드처럼 hash 를 다시 계산한다. 검수 뒤 문구가 바뀌면 422(05 §4.2 hash).
+        recomputed = draft_hash(req.draft, req.sentencing)
+        if not (req.draft_hash == req.evaluation_draft_hash == recomputed):
+            raise Rejected(422, "INVALID_DRAFT")
+        if self.finalize_error is not None:
+            raise self.finalize_error
+        return FinalizeResult(verdict_id=verdict_id, text_version=1, committed_at=DB_NOW)
+
+    async def generation_failed(
+        self, verdict_id: str, *, job_id: str, generation_id: str, error_code: str
+    ) -> None:
+        self.failed.append(error_code)
+
+
+class FakeJobs:
+    def __init__(self) -> None:
+        self.completed: list[str] = []
+        self.failures: list[tuple[str, float | None]] = []
+
+    async def complete(self, job_id: str, worker_id: str, generation_id: str) -> bool:
+        self.completed.append(job_id)
+        return True
+
+    async def fail(
+        self,
+        job_id: str,
+        worker_id: str,
+        generation_id: str,
+        error_code: str,
+        retry_after_s: float | None,
+    ) -> bool:
+        self.failures.append((error_code, retry_after_s))
+        return True
+
+
+class FakePreparation:
+    def __init__(self, prep: Any) -> None:
+        self.prep = prep
+        self.asked: list[str] = []
+
+    async def load_valid_prep(self, snapshot: CaseSnapshot, prompt_version: str) -> Any:
+        self.asked.append(prompt_version)
+        return self.prep
+
+
+class ScriptedLLM(FakeLLM):
+    """역할별 오류·순차 출력·호출 전 훅을 더한 FakeLLM."""
+
+    def __init__(
+        self,
+        scenario: FakeScenario = FakeScenario.OK,
+        *,
+        errors: dict[str, LLMError] | None = None,
+        sequences: dict[str, list[dict | None]] | None = None,
+        before: Callable[[str], None] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(scenario, **kwargs)
+        self.errors = dict(errors or {})
+        self.sequences = {role: list(items) for role, items in (sequences or {}).items()}
+        self.before = before
+
+    async def structured_call(self, *, role: Any, messages: list[dict], schema: dict, **kw: Any):
+        if self.before is not None:
+            self.before(role)
+        if role in self.errors:
+            self.calls.append(
+                FakeCall(
+                    role, schema, messages, kw["timeout_s"], kw["max_output_tokens"], self.scenario
+                )
+            )
+            raise self.errors[role]
+        if self.sequences.get(role):
+            output = self.sequences[role].pop(0)
+            if output is None:
+                self.outputs.pop(role, None)
+            else:
+                self.outputs[role] = output
+        return await super().structured_call(role=role, messages=messages, schema=schema, **kw)
+
+
+# ---------------------------------------------------------------------------
+# 입력 만들기
+# ---------------------------------------------------------------------------
+
+
+def make_snapshot(**jury_update: Any) -> CaseSnapshot:
+    data = fixture("case-snapshot-taxi")
+    data["jury"].update({"target_intensities": ["spicy", "hell"], **jury_update})
+    return CaseSnapshot.model_validate(data)
+
+
+def make_dossier() -> Dossier:
+    data = fixture("dossier-taxi")
+    scope = Scope("ROOMS", frozenset({"room-ddegeoji-01"}))
+    return Dossier(
+        dossier_id=data["dossier_id"],
+        post_id="post-taxi-20260907-0852",
+        snapshot_hash="0" * 64,
+        facts=tuple(
+            EvidenceFact(
+                label=f["label"],
+                epistemic_type="DB_RECORD",
+                fact_type=f["kind"],
+                text=f["text"],
+                scope=scope,
+                aggregation=None,
+                occurred_at=None,
+                sources=(),
+            )
+            for f in data["facts"]
+        ),
+        label_map=data["label_map"],
+        privacy_versions=(("user:user-01H8Z9QK", 1), ("room:room-ddegeoji-01", 1)),
+    )
+
+
+def make_prep() -> SimpleNamespace:
+    candidate = Candidate(
+        candidate_id="8d3f1a62-6c95-4b07-8e41-9a2d5f3b7c18",
+        text=CANDIDATE_MARK,
+        strategy=BanterStrategy.REPEAT_OFFENSE,
+        fits=("guilty", "disagree"),
+        evidence_labels=("F1",),
+    )
+    return SimpleNamespace(dossier=make_dossier(), banter={Intensity.spicy: [candidate]})
+
+
+def make_job(kind: str = "SENTENCE") -> Job:
+    if kind == "SENTENCE":
+        payload = {
+            "verdict_id": "7a1d9c40-3b52-4e18-9f0a-2c6d8b4e1f31",
+            "verdict_version": 1,
+            "post_id": "post-taxi-20260907-0852",
+        }
+    else:
+        payload = {
+            "verdict_id": "7a1d9c40-3b52-4e18-9f0a-2c6d8b4e1f31",
+            "verdict_version": 1,
+            "round": 1,
+        }
+    return Job(
+        id="job-1",
+        event_id="event-1",
+        event_type="verdict.confirmed",
+        kind=kind,  # type: ignore[arg-type]
+        dedupe_key=f"{kind}:1",
+        aggregate_id=payload["verdict_id"],
+        aggregate_version=1,
+        schema_version=1,
+        payload=payload,
+        status="RUNNING",
+        priority=0,
+        attempts=1,
+        max_attempts=3,
+        available_at=DB_NOW,
+        deadline_at=None,
+        lease_until=DB_NOW + timedelta(seconds=15),
+        owner_id=WORKER_ID,
+        generation_id=GENERATION_ID,
+        last_error_code=None,
+        trace_id="trace-1",
+        created_at=DB_NOW,
+        updated_at=DB_NOW,
+    )
+
+
+class Run(SimpleNamespace):
+    state: dict[str, Any]
+    backend: FakeBackend
+    jobs: FakeJobs
+    llm: FakeLLM
+
+    def roles(self) -> Counter[str]:
+        return Counter(call.role for call in self.llm.calls)
+
+    def finalize(self) -> FinalizeRequest:
+        assert len(self.backend.finalized) == 1
+        return self.backend.finalized[0]
+
+    def calls_of(self, role: str) -> list[FakeCall]:
+        return [call for call in self.llm.calls if call.role == role]
+
+
+def run(
+    llm: FakeLLM | None = None,
+    *,
+    snapshot: CaseSnapshot | None = None,
+    backend_kwargs: dict[str, Any] | None = None,
+    prep: Any = "default",
+    kind: str = "SENTENCE",
+    clock: FakeClock | None = None,
+) -> Run:
+    llm = llm or FakeLLM()
+    snapshot = snapshot or make_snapshot()
+    backend = FakeBackend(snapshot, **(backend_kwargs or {}))
+    jobs = FakeJobs()
+    captured: dict[str, Any] = {}
+
+    def factory(deps: Any) -> Any:
+        graph = build_sentence_graph(deps)
+
+        class Capturing:
+            async def ainvoke(self, state: Any) -> Any:
+                captured["state"] = await graph.ainvoke(state)
+                return captured["state"]
+
+        return Capturing()
+
+    async def db_now() -> datetime:
+        return DB_NOW
+
+    ctx = SimpleNamespace(
+        jobs=jobs,
+        backend=backend,
+        llm=llm,
+        preparation=FakePreparation(make_prep() if prep == "default" else prep),
+        semaphore=asyncio.Semaphore(8),
+        settings=Settings(_env_file=None),
+        generation_id=GENERATION_ID,
+        worker_id=WORKER_ID,
+    )
+    handler = SentenceHandler(factory, db_now=db_now, clock=clock or FakeClock())
+    asyncio.run(handler(make_job(kind), ctx))
+    return Run(state=captured.get("state", {}), backend=backend, jobs=jobs, llm=llm)
+
+
+def fixture_sentencing() -> SentencingDecision:
+    return SentencingDecision.model_validate(SENTENCING_FIXTURE)
+
+
+def user_payload(call: FakeCall) -> dict[str, Any]:
+    return json.loads(call.messages[-1]["content"])
+
+
+def all_content(calls: list[FakeCall]) -> str:
+    return "\n".join(str(m["content"]) for call in calls for m in call.messages)
+
+
+def evaluation_without(intensity: str) -> dict[str, Any]:
+    report = fixture("evaluation-taxi-pass")
+    report.pop("schema_version")
+    report.pop("policy_version")
+    report["texts"] = [t for t in report["texts"] if t["intensity"] in {"spicy", "hell"}]
+    report["texts"] = [t for t in report["texts"] if t["intensity"] != intensity]
+    return report
+
+
+def evaluation_reason_failed() -> dict[str, Any]:
+    """전 강도 통과, `sentencing_reason_check` 만 실패한 보고서."""
+    report = evaluation_without("mild")
+    report["sentencing_reason_check"] = {
+        "pass": False,
+        "violations": [
+            {
+                "code": "SENTENCE_REASON_MISMATCH",
+                "path": "sentencing.sentencing_reason",
+                "evidence_labels": [],
+                "explanation": "이유가 형량과 맞지 않는다",
+            }
+        ],
+    }
+    return report
+
+
+def assert_finalize_hash_is_last_evaluated(result: Run) -> None:
+    """finalize `draft_hash == evaluation_draft_hash` = 마지막 검수 입력 hash."""
+    req = result.finalize()
+    evaluated = user_payload(result.calls_of("evaluator")[-1])
+    expected = draft_hash(evaluated["draft"], evaluated["sentencing"])
+    assert req.draft_hash == req.evaluation_draft_hash == expected
+    assert draft_hash(req.draft, req.sentencing) == expected
+
+
+# ---------------------------------------------------------------------------
+# ①~⑮
+# ---------------------------------------------------------------------------
+
+
+def test_01_guilty_two_intensities_call_counts() -> None:
+    """① 유죄·2강도: 양형 1 + 서기 2 + 검수 1, 전 강도 AI 로 finalize."""
+    result = run()
+    assert result.roles() == Counter({"sentencing": 1, "writer": 2, "evaluator": 1})
+    assert Counter(c.role for c in result.state["calls"]) == result.roles()
+    assert all(c.error is None for c in result.state["calls"])
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [("spicy", "AI"), ("hell", "AI")]
+    assert req.model_ids.model_dump() == {
+        "sentencing": Settings(_env_file=None).MODEL_JUDGMENT,
+        "writer": Settings(_env_file=None).MODEL_WRITER,
+        "evaluator": Settings(_env_file=None).MODEL_JUDGMENT,
+    }
+    assert result.state["dossier_source"] == "PREP"
+    assert result.backend.failed == []
+    assert result.jobs.completed == ["job-1"]
+
+
+def test_02_disagree_skips_sentencing() -> None:
+    """② `disagree` → 양형 0호출, finalize sentencing null."""
+    snapshot = make_snapshot(result="disagree", vote_counts={"agree": 1, "disagree": 3})
+    result = run(snapshot=snapshot)
+    assert result.roles()["sentencing"] == 0
+    assert result.roles()["writer"] == 2
+    req = result.finalize()
+    assert req.sentencing is None
+    assert req.draft.meme_tag == "REJECTED"
+
+
+def test_03_out_of_list_sentence_clipped_to_top_rank(caplog: pytest.LogCaptureFixture) -> None:
+    """③ 허용 목록 밖 형량 → rank 최대로 절삭 + 감사 로그.
+
+    fallback 을 최대 rank 와 다르게(`probation`) 둬 fallback 으로 채우는 구현을 거른다.
+    """
+    policy = fixture("case-snapshot-taxi")["jury"]["policy"]
+    snapshot = make_snapshot(policy={**policy, "fallback_sentence": "probation"})
+    llm = ScriptedLLM(sequences={"sentencing": [{**SENTENCING_FIXTURE, "sentence": "life"}]})
+    with caplog.at_level(logging.WARNING, logger="geoji_ai.graphs.sentencing"):
+        result = run(llm, snapshot=snapshot)
+    assert result.finalize().sentencing.sentence == "oneDay"
+    assert result.state["sentencing_source"] == "AI"
+    assert any(getattr(r, "audit", None) == "SENTENCE_CLIPPED" for r in caplog.records)
+
+
+def test_04_sentencing_timeout_falls_back_to_rule() -> None:
+    """④ 양형 timeout → `policy.fallback_sentence`, reason null, `sentencing_source=RULE`."""
+    llm = ScriptedLLM(errors={"sentencing": LLMError("TIMEOUT")})
+    result = run(llm)
+    assert result.state["sentencing_source"] == "RULE"
+    sentencing = result.finalize().sentencing
+    assert sentencing.sentence == "oneDay"  # fallback_sentence
+    assert sentencing.sentencing_reason is None
+    assert [c.error for c in result.state["calls"] if c.role == "sentencing"] == ["TIMEOUT"]
+
+
+def test_04b_sentencing_without_budget_is_not_called() -> None:
+    """④ 보강: 양형 예산이 없으면 호출하지 않고 RULE."""
+    snapshot = make_snapshot()
+    # sentencing 예약 = writer 6 + evaluator 4 + 0.5 → 남은 10s 면 budget ≤ 0
+    result = run(snapshot=snapshot, backend_kwargs={"remaining_s": 10.0})
+    assert result.roles()["sentencing"] == 0
+    assert result.state["sentencing_source"] == "RULE"
+
+
+def test_05_long_reason_replaced_by_template_without_reevaluation() -> None:
+    """⑤ `sentencing_reason` 101자 → 템플릿 치환 `reason_source=TEMPLATE`, 재검수 없음."""
+    llm = ScriptedLLM(
+        sequences={"sentencing": [{**SENTENCING_FIXTURE, "sentencing_reason": "가" * 101}]}
+    )
+    result = run(llm)
+    sentencing = result.finalize().sentencing
+    assert sentencing.sentencing_reason == "형량: 징역 1일 (내일 하루 무지출)"
+    assert sentencing.reason_source == "TEMPLATE"
+    assert result.roles()["evaluator"] == 1
+    assert result.roles()["sentencing"] == 1
+
+
+def test_05b_reason_check_failure_substitutes_and_reevaluates() -> None:
+    """검수관 `sentencing_reason_check` 실패 → D-19 치환 → 재검수 1회(코디네이터 9/14)."""
+    llm = ScriptedLLM(sequences={"evaluator": [evaluation_reason_failed(), None]})
+    result = run(llm)
+    sentencing = result.finalize().sentencing
+    assert sentencing.sentence == fixture_sentencing().sentence
+    assert sentencing.sentencing_reason == "형량: 징역 1일 (내일 하루 무지출)"
+    assert sentencing.reason_source == "TEMPLATE"
+    assert result.roles()["evaluator"] == 2
+    second = user_payload(result.calls_of("evaluator")[-1])["sentencing"]
+    assert second["sentencing_reason"] == "형량: 징역 1일 (내일 하루 무지출)"
+    assert_finalize_hash_is_last_evaluated(result)
+    assert result.backend.failed == []
+
+
+def test_06_hell_writer_failure_gives_partial_template() -> None:
+    """⑥ 서기 `hell` 만 실패 → `spicy` AI + `hell` TEMPLATE, finalize·검수 draft 에 둘 다."""
+    result = run(ScriptedLLM(FakeScenario.INTENSITY_FAIL))
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [
+        ("spicy", "AI"),
+        ("hell", "TEMPLATE"),
+    ]
+    evaluated = user_payload(result.calls_of("evaluator")[0])["draft"]
+    assert [(t["intensity"], t["source"]) for t in evaluated["texts"]] == [
+        ("spicy", "AI"),
+        ("hell", "TEMPLATE"),
+    ]
+    assert result.roles()["evaluator"] == 1
+    assert result.backend.failed == []
+
+
+def test_07_missing_intensity_in_report_becomes_template() -> None:
+    """⑦ 검수 보고서 강도 누락 → 그 강도 TEMPLATE(바뀐 draft 는 한 번 더 검수)."""
+    llm = ScriptedLLM(sequences={"evaluator": [evaluation_without("hell"), None]})
+    result = run(llm)
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [
+        ("spicy", "AI"),
+        ("hell", "TEMPLATE"),
+    ]
+    assert result.roles()["evaluator"] == 2
+    evaluated = user_payload(result.calls_of("evaluator")[-1])["draft"]
+    assert [(t["intensity"], t["source"]) for t in evaluated["texts"]] == [
+        ("spicy", "AI"),
+        ("hell", "TEMPLATE"),
+    ]
+    assert_finalize_hash_is_last_evaluated(result)
+    assert result.backend.failed == []
+
+
+def test_08_evaluator_error_reports_eval_failed() -> None:
+    """⑧ 검수관 오류 → 전 강도 TEMPLATE + `generation_failed(EVAL_FAILED)`, finalize 0."""
+    llm = ScriptedLLM(errors={"evaluator": LLMError("SERVER")})
+    result = run(llm)
+    assert result.backend.finalized == []
+    assert result.backend.failed == ["EVAL_FAILED"]
+    assert set(result.state["draft_sources"].values()) == {"TEMPLATE"}
+    assert result.jobs.completed == ["job-1"]
+
+
+def test_09_finalize_stale_discards_and_completes() -> None:
+    """⑨ finalize 409 STALE → complete, generation_failed 0."""
+    result = run(backend_kwargs={"finalize_error": Rejected(409, "STALE_GENERATION")})
+    assert len(result.backend.finalized) == 1
+    assert result.backend.failed == []
+    assert result.jobs.completed == ["job-1"]
+    assert result.jobs.failures == []
+
+
+def test_10_finalize_422_reports_schema_invalid() -> None:
+    """⑩ finalize 422 → `generation_failed(SCHEMA_INVALID)`."""
+    result = run(backend_kwargs={"finalize_error": Rejected(422, "INVALID_DRAFT")})
+    assert result.backend.failed == ["SCHEMA_INVALID"]
+    assert result.jobs.completed == ["job-1"]
+
+
+@pytest.mark.parametrize(
+    ("code", "failed"),
+    [("DEADLINE_EXCEEDED", []), ("EVIDENCE_INVALIDATED", ["EVIDENCE_INVALIDATED"])],
+)
+def test_10b_finalize_other_409(code: str, failed: list[str]) -> None:
+    """미리 정한 해석: 409 DEADLINE → 폐기, EVIDENCE_INVALIDATED → generation_failed."""
+    result = run(backend_kwargs={"finalize_error": Rejected(409, code)})
+    assert result.backend.failed == failed
+    assert result.jobs.completed == ["job-1"]
+
+
+def test_11_regenerate_uses_fixed_sentencing() -> None:
+    """⑪ `REGENERATE` → 양형 0호출·고정 형량 그대로."""
+    fixed = {"sentence": "probation", "sentencing_reason": "고정된 이유", "reason_source": "AI"}
+    result = run(backend_kwargs={"fixed": fixed}, kind="TEXT_RETRY")
+    assert result.state["mode"] == "REGENERATE"
+    assert result.state["sentencing_source"] == "FIXED"
+    assert result.roles()["sentencing"] == 0
+    assert result.roles()["writer"] == 2  # target_intensities 전부
+    req = result.finalize()
+    assert [t.intensity for t in req.draft.texts] == ["spicy", "hell"]
+    sentencing = req.sentencing
+    assert (sentencing.sentence, sentencing.sentencing_reason, sentencing.reason_source) == (
+        "probation",
+        "고정된 이유",
+        "AI",
+    )
+
+
+def test_12_finalize_hash_equals_evaluated_draft_hash() -> None:
+    """⑫ finalize `draft_hash == evaluation_draft_hash` = 검수에 넘긴 초안 hash."""
+    result = run()
+    assert result.roles()["evaluator"] == 1
+    assert_finalize_hash_is_last_evaluated(result)
+
+
+def test_13_writer_delay_leaves_no_evaluator_budget() -> None:
+    """⑬ 서기 지연으로 남은 시간 < 검수 예약 → 검수 미시작·`DEADLINE_EXCEEDED`."""
+    clock = FakeClock()
+
+    def delay(role: str) -> None:
+        if role == "writer":
+            clock.now += 4.5  # 두 강도 합 9초
+
+    snapshot = make_snapshot(result="disagree", vote_counts={"agree": 1, "disagree": 3})
+    result = run(
+        ScriptedLLM(before=delay),
+        snapshot=snapshot,
+        backend_kwargs={"remaining_s": 9.3},
+        clock=clock,
+    )
+    assert result.roles()["writer"] == 2
+    assert result.roles()["evaluator"] == 0
+    assert result.backend.finalized == []
+    assert result.backend.failed == ["DEADLINE_EXCEEDED"]
+
+
+def test_13b_writer_not_started_without_evaluator_time() -> None:
+    """⑬ 보강: 검수 시간을 확보할 수 없으면 새 서기 호출을 시작하지 않는다."""
+    snapshot = make_snapshot(result="disagree", vote_counts={"agree": 1, "disagree": 3})
+    result = run(snapshot=snapshot, backend_kwargs={"remaining_s": 4.4})
+    assert result.roles()["writer"] == 0
+    assert result.backend.failed == ["DEADLINE_EXCEEDED"]
+
+
+def test_14_input_minimization() -> None:
+    """⑭ 양형관·검수관에 말투 예시·드립 후보 없음, `spicy` 서기 시스템에 `hell` 섹션 없음."""
+    result = run()
+    sentencing = all_content(result.calls_of("sentencing"))
+    evaluator = all_content(result.calls_of("evaluator"))
+    for text in (sentencing, evaluator):
+        assert "style_examples" not in text
+        assert "banter_candidates" not in text
+        assert CANDIDATE_MARK not in text
+    writers = {
+        call.schema["properties"]["intensity"]["enum"][0]: call
+        for call in result.calls_of("writer")
+    }
+    spicy_system = writers["spicy"].messages[0]["content"]
+    assert "### SPICY" in spicy_system
+    assert "### HELL" not in spicy_system
+    assert CANDIDATE_MARK in all_content([writers["spicy"]])
+    assert CANDIDATE_MARK not in all_content([writers["hell"]])
+    assert "style_examples" not in writers["spicy"].messages[-1]["content"]
+
+
+@pytest.mark.parametrize(
+    "llm_factory",
+    [
+        lambda: FakeLLM(),
+        lambda: ScriptedLLM(FakeScenario.INTENSITY_FAIL),
+        lambda: ScriptedLLM(sequences={"evaluator": [evaluation_without("spicy"), None]}),
+    ],
+    ids=["ok", "writer-fail", "evaluator-swap"],
+)
+def test_15_sentencing_unchanged_on_writer_and_evaluator_paths(
+    llm_factory: Callable[[], FakeLLM],
+) -> None:
+    """⑮ 형량 불변: 서기·검수 경로 어디서도 finalize `sentencing` 이 양형 결과와 같다."""
+    result = run(llm_factory())
+    assert result.finalize().sentencing == fixture_sentencing()
+    assert result.state["sentencing"] == fixture_sentencing()
+
+
+# ---------------------------------------------------------------------------
+# 그 밖(노드 동작 표)
+# ---------------------------------------------------------------------------
+
+
+def test_begin_409_discards_without_model_calls() -> None:
+    result = run(backend_kwargs={"begin_error": Rejected(409, "STALE_GENERATION")})
+    assert result.llm.calls == []
+    assert result.backend.finalized == [] and result.backend.failed == []
+    assert result.jobs.completed == ["job-1"]
+
+
+def test_missing_prep_uses_minimal_dossier() -> None:
+    """prep 없음 → MINIMAL(코드 Evidence F0 만), 조서 호출 없음."""
+    result = run(prep=None)
+    assert result.state["dossier_source"] == "MINIMAL"
+    assert set(result.state["dossier"].label_map) == {"F0"}
+    assert "context" not in result.roles()
+
+
+def test_all_writers_failed_reports_vendor_unavailable() -> None:
+    llm = ScriptedLLM(errors={"writer": LLMError("SERVER")})
+    result = run(llm)
+    assert result.roles()["evaluator"] == 0
+    assert result.backend.failed == ["VENDOR_UNAVAILABLE"]
+
+
+def test_backend_unavailable_fails_job() -> None:
+    class Unavailable(Exception):
+        error_code = "BACKEND_UNAVAILABLE"
+        retry_after_s = 5
+
+    result = run(backend_kwargs={"finalize_error": Unavailable()})
+    assert result.jobs.failures == [("BACKEND_UNAVAILABLE", 5)]
+    assert result.jobs.completed == []
