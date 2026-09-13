@@ -12,6 +12,8 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, NonNegativeInt
 
 from geoji_ai.contracts.intake import Category, IntakeResult, PostType
+from geoji_ai.contracts.sentencing import ReasonSource
+from geoji_ai.contracts.writer import BanterStrategy
 from geoji_ai.domain.intensity import Intensity
 
 
@@ -27,6 +29,7 @@ __all__ = [
     "Audience",
     "CaseSnapshot",
     "Category",
+    "CommentSnapshot",
     "JurySnapshot",
     "JuryStatus",
     "PostType",
@@ -34,6 +37,7 @@ __all__ = [
     "RoomSnapshot",
     "SentenceCode",
     "SentencingPolicy",
+    "VerdictFinal",
     "VerdictResult",
 ]
 
@@ -125,6 +129,38 @@ class JurySnapshot(BaseModel):
     default_intensity: Intensity
 
 
+class VerdictFinal(BaseModel):
+    """확정 판결 요약. RETAIN 스냅샷에만 온다(10 §4.1 제안).
+
+    `sentence` 는 문자열이다. 허용 목록 대조는 코드가 한다 — `SentencingDecision` 과 같다.
+    유죄가 아니면 null.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    sentence: str | None
+    sentence_source: Literal["AI", "RULE"] | None
+    sentencing_reason: Annotated[str, Field(max_length=100)] | None
+    reason_source: ReasonSource | None
+    applied_intensity: Intensity
+    banter_strategy: BanterStrategy | None
+
+
+class CommentSnapshot(BaseModel):
+    """RETAIN 대상 댓글(10 §4.1 제안). `post_status` 값 목록은 백엔드 소유라 문자열이다."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    comment_id: str
+    version: Annotated[int, Field(ge=1)]
+    room_id: str
+    post_id: str
+    post_status: str
+    author_id: str
+    content: Annotated[str, Field(max_length=1000)]
+    created_at: datetime
+
+
 class CaseSnapshot(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -143,3 +179,6 @@ class CaseSnapshot(BaseModel):
     room_snapshots: Annotated[list[RoomSnapshot], Field(max_length=50)]
     intake_result: IntakeResult | None
     jury: JurySnapshot | None
+    # RETAIN 확장(10 §4.1 제안). 선택 필드라 `required` 에 없고, 기존 스냅샷은 그대로 유효하다.
+    verdict_final: VerdictFinal | None = None
+    comment: CommentSnapshot | None = None

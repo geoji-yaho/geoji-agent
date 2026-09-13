@@ -46,6 +46,19 @@
       ],
       "type": "object"
     },
+    "BanterStrategy": {
+      "enum": [
+        "CHEAPER_ALTERNATIVE",
+        "FREE_ALTERNATIVE",
+        "DIY_REPLACEMENT",
+        "PREMISE_REJECTION",
+        "EXCUSE_STRIPPING",
+        "NECESSITY_APPROVAL",
+        "REPEAT_OFFENSE",
+        "ROOM_RULE_CALLBACK"
+      ],
+      "type": "string"
+    },
     "CategoryReview": {
       "additionalProperties": false,
       "properties": {
@@ -89,6 +102,50 @@
         "status",
         "suggested_category",
         "confidence"
+      ],
+      "type": "object"
+    },
+    "CommentSnapshot": {
+      "additionalProperties": false,
+      "description": "RETAIN 대상 댓글(10 §4.1 제안). `post_status` 값 목록은 백엔드 소유라 문자열이다.",
+      "properties": {
+        "comment_id": {
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "room_id": {
+          "type": "string"
+        },
+        "post_id": {
+          "type": "string"
+        },
+        "post_status": {
+          "type": "string"
+        },
+        "author_id": {
+          "type": "string"
+        },
+        "content": {
+          "maxLength": 1000,
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "comment_id",
+        "version",
+        "room_id",
+        "post_id",
+        "post_status",
+        "author_id",
+        "content",
+        "created_at"
       ],
       "type": "object"
     },
@@ -353,6 +410,83 @@
       ],
       "type": "object"
     },
+    "VerdictFinal": {
+      "additionalProperties": false,
+      "description": "확정 판결 요약. RETAIN 스냅샷에만 온다(10 §4.1 제안).\n\n`sentence` 는 문자열이다. 허용 목록 대조는 코드가 한다 — `SentencingDecision` 과 같다.\n유죄가 아니면 null.",
+      "properties": {
+        "sentence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sentence_source": {
+          "anyOf": [
+            {
+              "enum": [
+                "AI",
+                "RULE"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sentencing_reason": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason_source": {
+          "anyOf": [
+            {
+              "enum": [
+                "AI",
+                "TEMPLATE"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "applied_intensity": {
+          "$ref": "#/$defs/Intensity"
+        },
+        "banter_strategy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BanterStrategy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "sentence",
+        "sentence_source",
+        "sentencing_reason",
+        "reason_source",
+        "applied_intensity",
+        "banter_strategy"
+      ],
+      "type": "object"
+    },
     "VerdictResult": {
       "description": "배심원 평결. 각하(`dismissed`)는 선고 작업을 만들지 않으므로 여기 없다.",
       "enum": [
@@ -462,6 +596,28 @@
               "type": "null"
             }
           ]
+        },
+        "verdict_final": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VerdictFinal"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "comment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CommentSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
