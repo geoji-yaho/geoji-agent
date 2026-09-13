@@ -3,7 +3,9 @@
 `load_case → recall_candidates → resolve_sources → build_db_evidence → analyze_reason →
 persist_dossier → generate_banter → validate_banter → persist_banter`
 
-모델 호출은 조서(`context`) 1회와 드립 후보(`banter`) 강도마다 1회뿐이다. 조서 저장에 성공하면
+모델 호출은 조서(`context`) 1회와 드립 후보(`banter`) 강도마다 1회뿐이다. `llm` 이 게이트웨이
+(`ScopedLLM`)면 원장·재사용을 거친다. 노드 이름 `context`(call_index 0)·`banter`(call_index = 대상
+강도 순서), 예산 키 `budget_key_for_post(post_id)`, 기한 없음. 조서 저장에 성공하면
 `DOSSIER_READY`, 드립까지 되면 `COMPLETE`. **드립 실패가 조서를 되돌리지 않는다.**
 
 실행 문맥(포트·설정·세마포어)은 `PrepareDeps` 로 받아 노드 클로저에 묶는다. state 는
@@ -26,6 +28,7 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 
 from geoji_ai.application.build_evidence import build_evidence, target_pack
+from geoji_ai.application.llm_gateway import CallScope, ScopedLLM, case_scope
 from geoji_ai.contracts.case import CaseSnapshot, VerdictResult
 from geoji_ai.contracts.jobs import Job, PreparePayload, parse_payload
 from geoji_ai.contracts.llm_schemas import banter_schema, context_schema, with_enums
@@ -119,7 +122,7 @@ class PrepareDeps:
     semaphore: asyncio.Semaphore
     generation_id: str
     memory: MemoryPort | None = None
-    llm: LLMPort | None = None
+    llm: LLMPort | ScopedLLM | None = None
     prompt_version: str = field(default_factory=prompt_bundle_version)
 
 
@@ -355,31 +358,51 @@ def dossier_from_resolved(
 
 
 async def call_context(
-    llm: LLMPort,
+    llm: LLMPort | ScopedLLM,
     semaphore: asyncio.Semaphore,
     settings: Settings,
     snapshot: CaseSnapshot,
     dossier: Dossier,
     *,
     timeout_s: float | None = None,
+    scope: CallScope | None = None,
 ) -> tuple[Dossier, dict[str, Any] | None]:
     """조서 1호출 → `merge_inferred_facts`. 호출 오류는 호출자에게 올린다.
 
-    `timeout_s` 가 없으면 `WRITER_NODE_TIMEOUT_SECONDS`(그래프 B 값).
+    `timeout_s` 가 없으면 `WRITER_NODE_TIMEOUT_SECONDS`(그래프 B 값). `llm` 이 게이트웨이면 `scope`
+    가 필요하고, 합친 뒤 출력을 `node_results` 에 남긴다(timeout·재시도는 게이트웨이가 건다).
     """
     timeout = float(settings.WRITER_NODE_TIMEOUT_SECONDS) if timeout_s is None else timeout_s
+    messages = _context_messages(snapshot, dossier.facts)
+    scoped = None
     async with semaphore:
-        result = await asyncio.wait_for(
-            llm.structured_call(
+        if isinstance(llm, ScopedLLM):
+            if scope is None:
+                raise ValueError("게이트웨이 호출에는 CallScope 가 필요하다")
+            scoped = await llm.scoped_call(
+                scope,
                 role="context",
-                messages=_context_messages(snapshot, dossier.facts),
+                messages=messages,
                 schema=context_schema(),
                 timeout_s=timeout,
                 max_output_tokens=settings.CONTEXT_MAX_OUTPUT_TOKENS,
-            ),
-            timeout=timeout,
-        )
-    return merge_inferred_facts(dossier, result.output)
+            )
+            result = scoped.result
+        else:
+            result = await asyncio.wait_for(
+                llm.structured_call(
+                    role="context",
+                    messages=messages,
+                    schema=context_schema(),
+                    timeout_s=timeout,
+                    max_output_tokens=settings.CONTEXT_MAX_OUTPUT_TOKENS,
+                ),
+                timeout=timeout,
+            )
+    merged = merge_inferred_facts(dossier, result.output)
+    if scoped is not None and isinstance(llm, ScopedLLM) and isinstance(result.output, Mapping):
+        await llm.remember(scoped)
+    return merged
 
 
 # --- 그래프 -----------------------------------------------------------------------
@@ -389,6 +412,17 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
     """노드 9개를 묶은 컴파일된 그래프. `run` 은 실행마다 새로 준다."""
     ctx = run or _Run()
     settings = deps.settings
+
+    def scope(state: PrepareState, node: str, call_index: int) -> CallScope:
+        return case_scope(
+            state["snapshot"],
+            node=node,
+            call_index=call_index,
+            job_id=state["job"].id,
+            generation_id=deps.generation_id,
+            prompt_version=deps.prompt_version,
+            policy_version=settings.GUARDRAIL_POLICY_VERSION,
+        )
 
     async def load_case(state: PrepareState) -> dict[str, Any]:
         job = state["job"]
@@ -472,7 +506,12 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
             return {}
         try:
             merged, reason_analysis = await call_context(
-                deps.llm, deps.semaphore, settings, state["snapshot"], dossier
+                deps.llm,
+                deps.semaphore,
+                settings,
+                state["snapshot"],
+                dossier,
+                scope=scope(state, "context", 0),
             )
         except Exception as exc:  # 코드 Evidence 만으로 계속(05 §3.2).
             log.warning("context_failed", error=type(exc).__name__)
@@ -520,30 +559,49 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
         schema = with_enums(banter_schema(), **{"candidates[].fits[]": list(_FITS)})
         timeout_s = float(settings.WRITER_NODE_TIMEOUT_SECONDS)
 
-        async def one(intensity: Intensity) -> tuple[Intensity, list[Candidate] | None]:
+        async def one(
+            intensity: Intensity, position: int
+        ) -> tuple[Intensity, list[Candidate] | None]:
+            scoped = None
             try:
                 examples = await deps.preparation.approved_banter_examples(
                     intensity, snapshot.category, settings.STYLE_EXAMPLE_LIMIT
                 )
+                messages = _banter_messages(snapshot, intensity, allowed, examples)
                 async with deps.semaphore:
-                    result = await asyncio.wait_for(
-                        llm.structured_call(
+                    if isinstance(llm, ScopedLLM):
+                        scoped = await llm.scoped_call(
+                            scope(state, "banter", position),
                             role="banter",
-                            messages=_banter_messages(snapshot, intensity, allowed, examples),
+                            messages=messages,
                             schema=schema,
                             timeout_s=timeout_s,
                             max_output_tokens=settings.BANTER_MAX_OUTPUT_TOKENS,
-                        ),
-                        timeout=timeout_s,
-                    )
+                        )
+                        result = scoped.result
+                    else:
+                        result = await asyncio.wait_for(
+                            llm.structured_call(
+                                role="banter",
+                                messages=messages,
+                                schema=schema,
+                                timeout_s=timeout_s,
+                                max_output_tokens=settings.BANTER_MAX_OUTPUT_TOKENS,
+                            ),
+                            timeout=timeout_s,
+                        )
             except Exception as exc:  # 그 강도 후보 없음.
                 log.warning("banter_failed", intensity=intensity.value, error=type(exc).__name__)
                 return intensity, None
             if result.output is None:
                 return intensity, None
-            return intensity, _parse_candidates(result.output)
+            candidates = _parse_candidates(result.output)
+            if scoped is not None and isinstance(llm, ScopedLLM) and candidates:
+                await llm.remember(scoped)
+            return intensity, candidates
 
-        results = await asyncio.gather(*(one(i) for i in _target_intensities(snapshot)))
+        targets = _target_intensities(snapshot)
+        results = await asyncio.gather(*(one(i, n) for n, i in enumerate(targets)))
         banter: dict[Intensity, list[Candidate]] = {}
         for intensity, candidates in results:
             if candidates is not None:

@@ -4,7 +4,7 @@ OpenAI 와 xAI 는 같은 chat.completions API 를 쓴다. 벤더마다 클라�
 재시도는 하지 않는다(`max_retries=0`). 재시도·백오프·예산 판단은 호출자가 한다
 (`domain/retries.py`). 실패는 06 §3.1 표대로 `LLMError(kind)` 로만 낸다.
 성공이 아닌 응답(잘림·거절·파싱 실패)은 `usage`·`cost` 를 예외에 실어 원장이 쓰게 한다.
-`settings` → 어댑터 조립은 작업 5·6 몫이다.
+`settings` → 어댑터 조립은 `adapters/llm_router.py`.
 """
 
 from __future__ import annotations
@@ -147,10 +147,13 @@ def _parse_output(content: str | None) -> dict[str, Any]:
     return value
 
 
-def _status_kind(status: int) -> Literal["SCHEMA", "SERVER"]:
-    # strict 스키마 거절은 400 이다. 그 밖 4xx(401·403·404 등)는 06 §3.1 표 밖이라
-    # 기존대로 SERVER 로 둔다(작업 6 보고서 미결).
-    if status == 400:
+def _status_kind(status: int) -> Literal["AUTH", "SCHEMA", "SERVER"]:
+    # 401·403 → AUTH(재시도 없음, degraded 카운트 안 함). strict 스키마 거절 400 과 그 밖 4xx 는
+    # 요청이 틀린 것이라 SCHEMA. 5xx(와 표 밖 상태)는 SERVER.
+    # 429 는 `RateLimitError` 가 먼저 받는다.
+    if status in (401, 403):
+        return "AUTH"
+    if 400 <= status < 500:
         return "SCHEMA"
     return "SERVER"
 

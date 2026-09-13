@@ -26,6 +26,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 from typing import Any, Protocol
 
+from geoji_ai.application.llm_gateway import ScopedLLM
 from geoji_ai.contracts.jobs import Job, SentencePayload, TextRetryPayload, parse_payload
 from geoji_ai.graphs.sentencing import SentenceDeps, build_sentence_graph, initial_state
 from geoji_ai.ports.backend import BackendPort
@@ -92,7 +93,7 @@ class SentenceContext(Protocol):
 
     jobs: JobsPort
     backend: BackendPort
-    llm: LLMPort
+    llm: LLMPort | ScopedLLM
     semaphore: asyncio.Semaphore
     settings: Any
     generation_id: str

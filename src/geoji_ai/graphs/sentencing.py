@@ -4,7 +4,8 @@
 writer(강도 fan-out) → join → deterministic_validate → evaluator ⇄ writer_repair → finalize |
 generation_failed`.
 
-원장·재시도·degraded 기록은 작업 6(여기서는 no-op).
+원장·재시도·degraded·`node_results` 재사용은 `deps.llm` 이 게이트웨이(`ScopedLLM`)일 때
+`application/llm_gateway.py` 가 한다. 아니면(테스트 가짜 `LLMPort`) 원장 없이 부른다.
 
 해석(보고서 "계획서에 반영할 것"):
 
@@ -25,9 +26,19 @@ generation_failed`.
   hash 규칙 우선). 그것도 통과하지 못하면 `EVAL_FAILED`
 - finalize 422 repair 는 AI 강도 전부를 다시 쓴다(백엔드 응답에 강도가 없다). 뒤 검수는 전 강도
 - join: 강도 일부 누락 ∧ AI 강도 있음 → `SCHEMA_INVALID`(서버 검증 5항). AI 강도 없음 →
-  `VENDOR_UNAVAILABLE`(예산으로 시작 못 한 강도가 있으면 `DEADLINE_EXCEEDED`)
-- `hell` 별도 검수는 `role="evaluator"` 호출을 둘로 나눈다. `MODEL_EVALUATOR_HELL` 로 모델을
-  고르는 라우팅은 LLM 라우터(작업 6) 몫이다. 두 보고서의 검사 필드는 AND 로 합친다
+  서기 오류에 `BUDGET` 이 있으면 `BUDGET_EXCEEDED`, 시간 예산으로 시작 못 한 강도가 있으면
+  `DEADLINE_EXCEEDED`, 나머지(xAI `DEGRADED` 포함) `VENDOR_UNAVAILABLE`
+- `hell` 별도 검수는 `role="evaluator"` 호출을 둘로 나눈다. 게이트웨이 경로에서 hell 호출은
+  `model_override=MODEL_EVALUATOR_HELL` 로 라우터가 모델을 고른다.
+  두 보고서의 검사 필드는 AND 로 합친다
+- 검수 호출 오류: `BUDGET` → `BUDGET_EXCEEDED`, `DEGRADED`·`AUTH` → `VENDOR_UNAVAILABLE`, 그 밖 →
+  `EVAL_FAILED`. 셋 다 전 강도 TEMPLATE
+- 원장 `call_index`(코디네이터 9/14 결정 3): 서기 `repair_count×3 + target 안 강도 순서`, 검수
+  `검수 라운드×2 + (hell 별도면 1)`, 양형·조서 0. 검수 라운드는 state `eval_round` 로 센다
+- 게이트웨이 경로의 timeout·재시도는 게이트웨이가 시도마다 건다(그래프 `wait_for` 가 재시도를 자르지
+  않게). 세마포어는 재시도 대기 동안에도 쥐고 있다
+- `node_results` 는 검증을 통과한 출력만: 양형은 `parse_sentencing` 뒤, 서기는 `TextDraft`·강도·각도
+  검사 뒤, 검수는 보고서에 전역 형식 실패가 없을 때(`remember`)
 - `db_now` 는 핸들러가 준다(`application.sentence_case`: `job.updated_at` + 경과 monotonic)
 """
 
@@ -46,6 +57,12 @@ from langgraph.graph import END, START, StateGraph
 from pydantic import ValidationError
 
 from geoji_ai.application.build_evidence import build_evidence
+from geoji_ai.application.llm_gateway import (
+    ScopedLLM,
+    case_scope,
+    evaluator_call_index,
+    writer_call_index,
+)
 from geoji_ai.contracts.case import CaseSnapshot, JurySnapshot
 from geoji_ai.contracts.evaluation import EvaluationReport
 from geoji_ai.contracts.finalize import FinalizeRequest, ModelIds
@@ -89,6 +106,14 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
+#: 호출 결과 확정. 출력 검증에 성공한 뒤 부른다(게이트웨이 경로면 `node_results` 저장).
+Commit = Callable[[], Awaitable[None]]
+
+
+async def _no_commit() -> None:
+    """원장 없는 경로의 확정. 아무것도 하지 않는다."""
+
+
 #: `SentencingDecision.sentencing_reason` 상한(01 §3.2, `contracts/sentencing.py`).
 SENTENCING_REASON_MAX = 100
 #: MINIMAL 조서의 근거 수. 백엔드 근거 없이 코드가 만들 수 있는 것은 F0 뿐이다.
@@ -105,6 +130,10 @@ EVAL_FAILED = "EVAL_FAILED"
 SCHEMA_INVALID = "SCHEMA_INVALID"
 DEADLINE_EXCEEDED = "DEADLINE_EXCEEDED"
 EVIDENCE_INVALIDATED = "EVIDENCE_INVALIDATED"
+BUDGET_EXCEEDED = "BUDGET_EXCEEDED"
+
+#: 벤더를 쓸 수 없어 생긴 `LLMError.kind`(06 §3.1). 검수에서 `VENDOR_UNAVAILABLE` 로 옮긴다.
+_VENDOR_BLOCKED_KINDS = frozenset({"DEGRADED", "AUTH"})
 
 # 백엔드 거부 코드(10 §5)
 _STALE_GENERATION = "STALE_GENERATION"
@@ -148,6 +177,8 @@ class SentenceGraphState(SentenceState, total=False):
     eval_kept: dict[str, tuple[dict[str, Any], dict[str, Any]]]
     #: 조건 간선이 읽는 다음 노드.
     route: str
+    #: 이 실행에서 끝난 검수 라운드 수. 검수 `call_index` 에 쓴다.
+    eval_round: int
 
 
 class ValidPrepLike(Protocol):
@@ -170,7 +201,7 @@ class PreparationLike(Protocol):
 @dataclass
 class SentenceDeps:
     backend: BackendPort
-    llm: LLMPort
+    llm: LLMPort | ScopedLLM
     semaphore: asyncio.Semaphore
     settings: Any
     generation_id: str
@@ -208,6 +239,7 @@ def initial_state(
         repair_avoid={},
         eval_kept={},
         route="",
+        eval_round=0,
     )
 
 
@@ -257,6 +289,16 @@ def _error_name(exc: BaseException) -> str:
     if isinstance(exc, TimeoutError):
         return "TIMEOUT"
     return type(exc).__name__
+
+
+def _vendor_failure_code(records: Iterable[CallRecord], default: str) -> str:
+    """검수 호출 기록의 오류 kind → 생성 실패 코드. 예산 > 벤더 불가 > `default`."""
+    errors = {record.error for record in records}
+    if "BUDGET" in errors:
+        return BUDGET_EXCEEDED
+    if errors & _VENDOR_BLOCKED_KINDS:
+        return VENDOR_UNAVAILABLE
+    return default
 
 
 def _dumps(value: Any) -> str:
@@ -336,22 +378,56 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
     """그래프 C 를 컴파일한다. 실행마다 새로 만들어도 된다(체크포인터 없음)."""
     settings = deps.settings
 
+    gateway = deps.llm if isinstance(deps.llm, ScopedLLM) else None
+
     async def call_model(
+        state: Mapping[str, Any],
         node: str,
-        deadline: Deadline,
         *,
         role: LLMRole,
         messages: list[dict],
         schema: dict,
         max_output_tokens: int,
-    ) -> LLMResult | None:
-        """세마포어 안에서 예산을 계산한다. 예산이 없으면 호출하지 않고 None."""
+        call_index: int = 0,
+        model_override: str | None = None,
+    ) -> tuple[LLMResult, Commit] | None:
+        """세마포어 안에서 예산을 계산한다. 예산이 없으면 호출하지 않고 None.
+
+        (결과, 확정)을 돌려준다. 확정은 호출자가 출력 검증에 성공한 뒤 부른다.
+        """
+        deadline: Deadline = state["deadline"]
         async with deps.semaphore:
             timeout = deadline.node_timeout(node, settings)
             if timeout is None:
                 return None
-            return await asyncio.wait_for(
-                deps.llm.structured_call(
+            if gateway is not None:
+                scope = case_scope(
+                    state["snapshot"],
+                    node=node,
+                    call_index=call_index,
+                    job_id=state["job"].id,
+                    generation_id=deps.generation_id,
+                    prompt_version=deps.prompt_version,
+                    policy_version=settings.GUARDRAIL_POLICY_VERSION,
+                    model_override=model_override,
+                    remaining_s=deadline.remaining_s,
+                    reserve_s=reserve_after(node, settings),
+                )
+                scoped = await gateway.scoped_call(
+                    scope,
+                    role=role,
+                    messages=messages,
+                    schema=schema,
+                    timeout_s=timeout,
+                    max_output_tokens=max_output_tokens,
+                )
+
+                async def commit() -> None:
+                    await gateway.remember(scoped)
+
+                return scoped.result, commit
+            result = await asyncio.wait_for(
+                deps.llm.structured_call(  # type: ignore[union-attr]
                     role=role,
                     messages=messages,
                     schema=schema,
@@ -360,6 +436,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 ),
                 timeout,
             )
+            return result, _no_commit
 
     def template_for(
         intensity: Intensity, jury: JurySnapshot, sentencing: SentencingDecision | None, post: str
@@ -517,8 +594,25 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         )
         if timeout > 0:
             try:
+                scope = case_scope(
+                    snapshot,
+                    node="context",
+                    call_index=0,
+                    job_id=state["job"].id,
+                    generation_id=deps.generation_id,
+                    prompt_version=deps.prompt_version,
+                    policy_version=settings.GUARDRAIL_POLICY_VERSION,
+                    remaining_s=state["deadline"].remaining_s,
+                    reserve_s=reserve_after(WRITER, settings),
+                )
                 dossier, _ = await call_context(
-                    deps.llm, deps.semaphore, settings, snapshot, dossier, timeout_s=timeout
+                    deps.llm,
+                    deps.semaphore,
+                    settings,
+                    snapshot,
+                    dossier,
+                    timeout_s=timeout,
+                    scope=scope,
                 )
             except Exception as exc:  # 코드 Evidence 만으로 계속(05 §5.2).
                 calls.append(CallRecord("context", None, settings.MODEL_JUDGMENT, _error_name(exc)))
@@ -612,18 +706,20 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         ]
         schema = sentencing_schema([str(item.code) for item in jury.policy.allowed_sentences])
         try:
-            result = await call_model(
+            called = await call_model(
+                state,
                 SENTENCING,
-                state["deadline"],
                 role="sentencing",
                 messages=messages,
                 schema=schema,
                 max_output_tokens=settings.SENTENCING_MAX_OUTPUT_TOKENS,
             )
-            if result is None:
+            if called is None:
                 logger.info("양형 예산 없음 → RULE")
                 return {**rule_sentencing(jury), "calls": calls}
+            result, commit = called
             decision = parse_sentencing(result.output, jury)
+            await commit()
         except (LLMError, TimeoutError, ValueError) as exc:
             calls.append(CallRecord("sentencing", None, settings.MODEL_JUDGMENT, _error_name(exc)))
             logger.warning("양형관 실패 %s → RULE", _error_name(exc))
@@ -681,16 +777,18 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         ]
         schema = writer_schema([intensity.value], [angle.value], candidate_ids or None)
         try:
-            result = await call_model(
+            called = await call_model(
+                state,
                 WRITER,
-                state["deadline"],
                 role="writer",
                 messages=messages,
                 schema=schema,
                 max_output_tokens=settings.WRITER_MAX_OUTPUT_TOKENS,
+                call_index=writer_call_index(offset, _targets(jury).index(intensity)),
             )
-            if result is None:
+            if called is None:
                 return ("SKIPPED", None, None)
+            result, commit = called
             if result.output is None:
                 raise ValueError(f"서기 출력 없음({result.stop_reason})")
             output = dict(result.output)
@@ -700,6 +798,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             if text.intensity != intensity or text.attack_angle != angle:
                 raise ValueError("서버 지정 강도·각도와 다르다")
             hints = MemeHints.model_validate(hints_raw) if hints_raw is not None else None
+            await commit()
         except (LLMError, TimeoutError, ValueError) as exc:
             record = CallRecord("writer", intensity, settings.MODEL_WRITER, _error_name(exc))
             return ("FAILED", None, record)
@@ -758,7 +857,13 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         targets = _targets(_jury(state))
         sources = state.get("draft_sources") or {}
         if not any(sources.get(i) == "AI" for i in targets):
-            code = DEADLINE_EXCEEDED if state.get("writer_budget_skipped") else VENDOR_UNAVAILABLE
+            writer_errors = {c.error for c in state["calls"] if c.role == "writer"}
+            if "BUDGET" in writer_errors:
+                code = BUDGET_EXCEEDED
+            elif state.get("writer_budget_skipped"):
+                code = DEADLINE_EXCEEDED
+            else:
+                code = VENDOR_UNAVAILABLE
             return {"failure": code}
         missing = set(targets) - set(state.get("drafts") or {})
         if missing:
@@ -780,8 +885,9 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         writer_draft: WriterDraft,
         decision: SentencingDecision | None,
         scope: Sequence[Intensity],
-    ) -> tuple[str, dict[str, Any] | None, list[CallRecord]]:
-        """scope 강도만 검수한다. (`OK`|`SKIPPED`|`FAILED`, 합친 출력, 호출 기록)."""
+        eval_round: int,
+    ) -> tuple[str, dict[str, Any] | None, list[CallRecord], list[Commit]]:
+        """scope 강도만 검수한다. (`OK`|`SKIPPED`|`FAILED`, 합친 출력, 호출 기록, 확정 목록)."""
         jury = _jury(state)
         policy_version = settings.GUARDRAIL_POLICY_VERSION
         evidence = (
@@ -794,7 +900,9 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         if hell_apart and len(scope) > 1:
             groups = [[i for i in scope if i != Intensity.hell], [Intensity.hell]]
 
-        async def one(group: list[Intensity]) -> tuple[str, dict[str, Any] | None, CallRecord]:
+        async def one(
+            group: list[Intensity],
+        ) -> tuple[str, dict[str, Any] | None, CallRecord, Commit | None]:
             is_hell = hell_apart and group == [Intensity.hell]
             subset = writer_draft.model_copy(
                 update={"texts": [t for t in writer_draft.texts if Intensity(t.intensity) in group]}
@@ -827,32 +935,41 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             tag = Intensity.hell if is_hell else None
             model = settings.MODEL_EVALUATOR_HELL if is_hell else settings.MODEL_JUDGMENT
             try:
-                result = await call_model(
+                called = await call_model(
+                    state,
                     EVALUATOR,
-                    state["deadline"],
                     role="evaluator",
                     messages=messages,
                     schema=evaluator_schema([i.value for i in group]),
                     max_output_tokens=settings.EVALUATOR_MAX_OUTPUT_TOKENS,
+                    call_index=evaluator_call_index(eval_round, is_hell),
+                    model_override=settings.MODEL_EVALUATOR_HELL if is_hell else None,
                 )
-                if result is None:
-                    return ("SKIPPED", None, CallRecord("evaluator", tag, model, "NO_BUDGET"))
+                if called is None:
+                    skipped = CallRecord("evaluator", tag, model, "NO_BUDGET")
+                    return ("SKIPPED", None, skipped, None)
+                result, commit = called
                 if result.output is None:
                     raise ValueError(f"검수관 출력 없음({result.stop_reason})")
             except (LLMError, TimeoutError, ValueError) as exc:
-                return ("FAILED", None, CallRecord("evaluator", tag, model, _error_name(exc)))
-            return ("OK", dict(result.output), CallRecord("evaluator", tag, result.model_id, None))
+                broken = CallRecord("evaluator", tag, model, _error_name(exc))
+                return ("FAILED", None, broken, None)
+            record = CallRecord("evaluator", tag, result.model_id, None)
+            return ("OK", dict(result.output), record, commit)
 
         outcomes = await asyncio.gather(*(one(group) for group in groups))
-        records = [record for kind, _, record in outcomes if record.error != "NO_BUDGET"]
-        kinds = {kind for kind, _, _ in outcomes}
+        records = [record for _, _, record, _ in outcomes if record.error != "NO_BUDGET"]
+        commits = [commit for _, _, _, commit in outcomes if commit is not None]
+        kinds = {kind for kind, _, _, _ in outcomes}
         if "FAILED" in kinds:
-            return ("FAILED", None, records)
+            return ("FAILED", None, records, [])
         if "SKIPPED" in kinds:
-            return ("SKIPPED", None, records)
-        return ("OK", _merge_reports([output for _, output, _ in outcomes if output]), records)
+            return ("SKIPPED", None, records, [])
+        merged = _merge_reports([output for _, output, _, _ in outcomes if output])
+        return ("OK", merged, records, commits)
 
-    async def evaluator(state: SentenceGraphState) -> dict[str, Any]:
+    async def run_evaluator(state: SentenceGraphState, rounds: list[int]) -> dict[str, Any]:
+        """검수 루프. `rounds[0]` 은 이 실행의 다음 검수 라운드 번호다(call_index 용)."""
         jury = _jury(state)
         targets = _targets(jury)
         order = {i.value: n for n, i in enumerate(targets)}
@@ -877,14 +994,18 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             reused = {key: entry for key, (text, entry) in kept.items() if current.get(key) == text}
             kept = {}
             scope = [i for i in targets if i.value not in reused] or targets
-            kind, output, records = await evaluate(state, writer_draft, decision, scope)
+            kind, output, records, commits = await evaluate(
+                state, writer_draft, decision, scope, rounds[0]
+            )
+            rounds[0] += 1
             calls.extend(records)
             if kind == "SKIPPED":
                 logger.info("검수 예산 없음 → 검수 미시작")
                 return {"calls": calls, "failure": DEADLINE_EXCEEDED, "eval_kept": {}}
             if kind == "FAILED" or output is None:
-                logger.warning("검수관 오류 → 전 강도 TEMPLATE")
-                return failed()
+                code = _vendor_failure_code(records, EVAL_FAILED)
+                logger.warning("검수관 오류 %s → 전 강도 TEMPLATE", code)
+                return failed(code)
 
             fresh = [e for e in output.get("texts") or [] if isinstance(e, Mapping)]
             fresh_keys = {_key(e.get("intensity")) for e in fresh}
@@ -898,6 +1019,8 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             }
             issues = validate_evaluation(report, targets, policy_version)
             if not issues:
+                for commit in commits:
+                    await commit()
                 return {
                     "calls": calls,
                     "evaluation": EvaluationReport.model_validate(report),
@@ -929,6 +1052,8 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 elif not (issue.path.startswith("texts") and issue.code in _PER_TEXT_CODES):
                     logger.warning("검수 전역 실패: %s %s", issue.code, issue.path)
                     return failed()
+            for commit in commits:
+                await commit()
             if reason_failed:
                 substituted = (
                     None
@@ -991,6 +1116,11 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             sources = rebuilt["draft_sources"]
 
         return failed()
+
+    async def evaluator(state: SentenceGraphState) -> dict[str, Any]:
+        rounds = [state.get("eval_round", 0)]
+        update = await run_evaluator(state, rounds)
+        return {**update, "eval_round": rounds[0]}
 
     async def writer_repair(state: SentenceGraphState) -> dict[str, Any]:
         """실패 강도만 각도 +1·"피할 것" 전달로 다시 쓴다. 양형·조서는 고정. 실패 → TEMPLATE."""
