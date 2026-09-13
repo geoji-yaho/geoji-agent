@@ -37,6 +37,19 @@ psql "$DATABASE_URL" -c "select kind,status,attempts,owner_id,lease_until,last_e
 우리 러너가 적용하지 않는다**(02 §3.6). `ai_worker`·`backend` role 은 Supabase 에서 백엔드가 만든다
 (10 §2). 로컬에서는 통합 테스트가 만든다.
 
+### M2 수직 흐름 (03 §4.3)
+
+가짜 백엔드(`tests/fakes/backend_app.py`)에 판결 `v1`/`p1` 이 심어져 있다. 워커와 가짜 백엔드는
+같은 로컬 토큰을 쓴다(값은 아무거나. 비어 있으면 워커 호출이 401 이다).
+
+```bash
+SERVICE_AUTH_TOKEN=local-dev uv run uvicorn tests.fakes.backend_app:app --port 8200 &   # 가짜 백엔드
+BACKEND_INTERNAL_URL=http://localhost:8200 SERVICE_AUTH_TOKEN=local-dev uv run geoji-ai worker --reaper &
+uv run scripts/enqueue_job.py --kind SENTENCE --verdict v1 --version 1 --post p1
+curl -s localhost:8200/posts/p1/verdict | jq '.sentence_status, .text_status, .sentence_source, .view.source'   # FINAL TEMPLATE_READY RULE TEMPLATE
+uv run scripts/probe_writer_latency.py --provider openai --role sentencing --n 5   # 실측은 키가 있을 때만
+```
+
 ### 게이트
 
 ```bash

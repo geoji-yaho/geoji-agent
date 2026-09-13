@@ -90,8 +90,10 @@ def test_worker_id_는_host_pid_slot():
 
 
 async def test_슬롯은_자기_kinds_만_집는다(
-    jobs: PostgresJobs, enqueue: Enqueue, fetch_job: FetchJob
+    jobs: PostgresJobs, enqueue: Enqueue, fetch_job: FetchJob, monkeypatch: pytest.MonkeyPatch
 ):
+    # 03 이 HANDLERS 를 스텁으로 교체했다. 런타임의 fail 경로를 보려고 옛 핸들러를 고정한다.
+    monkeypatch.setitem(dispatch.HANDLERS, "PREPARE", dispatch.NotImplementedHandler())
     assert SLOT_KINDS["SENTENCE"] == ("SENTENCE",)
     assert SLOT_KINDS["BACKGROUND"] == ("TEXT_RETRY", "RETAIN")
     job_id = await _prepare_payload_job(enqueue)
@@ -247,8 +249,10 @@ async def test_종료하면_진행_중_job_이_release_된다(
 
 
 async def test_스텁_핸들러가_NOT_IMPLEMENTED_로_되돌린다(
-    jobs: PostgresJobs, enqueue: Enqueue, fetch_job: FetchJob
+    jobs: PostgresJobs, enqueue: Enqueue, fetch_job: FetchJob, monkeypatch: pytest.MonkeyPatch
 ):
+    # 03 이 HANDLERS 를 스텁으로 교체했다. 런타임의 fail 경로를 보려고 옛 핸들러를 고정한다.
+    monkeypatch.setitem(dispatch.HANDLERS, "PREPARE", dispatch.NotImplementedHandler())
     worker = Worker(jobs, make_settings(WORKER_SLOTS={"PREPARE": 1}))
     job_id = await _prepare_payload_job(enqueue)
 
@@ -268,8 +272,15 @@ async def test_스텁_핸들러가_NOT_IMPLEMENTED_로_되돌린다(
 
 
 async def test_네_kind_모두_스텁으로_처리된다(
-    jobs: PostgresJobs, engine: AsyncEngine, enqueue: Enqueue, fetch_job: FetchJob
+    jobs: PostgresJobs,
+    engine: AsyncEngine,
+    enqueue: Enqueue,
+    fetch_job: FetchJob,
+    monkeypatch: pytest.MonkeyPatch,
 ):
+    # 03 이 HANDLERS 를 스텁으로 교체했다. 런타임의 fail 경로를 보려고 옛 핸들러를 고정한다.
+    for kind in ("PREPARE", "SENTENCE", "TEXT_RETRY", "RETAIN"):
+        monkeypatch.setitem(dispatch.HANDLERS, kind, dispatch.NotImplementedHandler())
     # 기본 슬롯(SENTENCE 2 · PREPARE 1 · BACKGROUND 1)으로 4 kind 를 다 집는다.
     worker = Worker(jobs, make_settings())
     ids = {

@@ -24,10 +24,13 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from geoji_ai.adapters.backend_http import BackendHttp, bind_trace
 from geoji_ai.adapters.postgres_jobs import PostgresJobs, make_engine, reap
 from geoji_ai.contracts.jobs import Job
 from geoji_ai.core.config import Settings, secret_value
 from geoji_ai.core.logging import bind_trace_id, get_logger
+from geoji_ai.core.startup import StartupError
+from geoji_ai.ports.backend import BackendPort
 from geoji_ai.ports.jobs import JobsPort
 from geoji_ai.workers.dispatch import SLOT_KINDS, HandlerContext, handler_for
 from geoji_ai.workers.heartbeat import start_heartbeat
@@ -67,6 +70,7 @@ class Worker:
         *,
         reaper: bool = False,
         engine: AsyncEngine | None = None,
+        backend: BackendPort | None = None,
     ) -> None:
         unknown = set(settings.WORKER_SLOTS) - set(SLOT_KINDS)
         if unknown:
@@ -80,6 +84,8 @@ class Worker:
         self._settings = settings
         self._reaper = reaper
         self._engine = engine
+        # `run_worker` 가 `BackendHttp` 를 넣는다. 테스트는 가짜 백엔드 클라이언트를 넣는다.
+        self._backend = backend
         self._shutdown = asyncio.Event()
         # 프로세스 전역 세마포어. 슬롯이 몇 개든 하나를 공유한다(02 §3.3 동시성).
         self._semaphore = asyncio.Semaphore(settings.MODEL_CONCURRENCY_LIMIT)
@@ -132,6 +138,8 @@ class Worker:
     async def run_job(self, job: Job, worker_id: str) -> None:
         """job 하나를 처리한다. heartbeat 가 lease 를 잃으면 `CancelledError` 가 상위로 간다."""
         bind_trace_id(job.trace_id)
+        # 백엔드 호출의 `X-Trace-Id`. 포트 시그니처에 자리가 없어 어댑터 컨텍스트로 준다.
+        bind_trace(job.trace_id)
         generation_id = job.generation_id or ""
         ctx = HandlerContext(
             jobs=self._jobs,
@@ -139,6 +147,7 @@ class Worker:
             settings=self._settings,
             generation_id=generation_id,
             worker_id=worker_id,
+            backend=self._backend,  # type: ignore[arg-type]  # None 은 백엔드 없는 테스트뿐
         )
         handler = handler_for(job.kind)
         handler_task = asyncio.create_task(handler(job, ctx), name=f"handler:{job.kind}")
@@ -259,13 +268,18 @@ def _install_sigterm(worker: Worker) -> None:
 
 async def run_worker(settings: Settings, *, reaper: bool = False) -> None:
     """CLI 진입점(`geoji-ai worker [--reaper]`)이 부른다."""
+    backend_url = settings.BACKEND_INTERNAL_URL.strip()
+    if not backend_url:
+        raise StartupError("BACKEND_INTERNAL_URL 이 비어 있다. 워커는 백엔드 내부 API 가 필요하다.")
     engine = make_engine(secret_value(settings, "DATABASE_URL"))
     jobs: JobsPort = PostgresJobs(engine, lease_s=settings.JOB_LEASE_SECONDS)
-    worker = Worker(jobs, settings, reaper=reaper, engine=engine)
+    backend = BackendHttp(backend_url, secret_value(settings, "SERVICE_AUTH_TOKEN"))
+    worker = Worker(jobs, settings, reaper=reaper, engine=engine, backend=backend)
     _install_sigterm(worker)
     log.info("worker_started", slots=settings.WORKER_SLOTS, reaper=reaper)
     try:
         await worker.run()
     finally:
+        await backend.aclose()
         await engine.dispose()
         log.info("worker_stopped")
