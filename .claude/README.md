@@ -53,10 +53,9 @@ CLAUDE.md              늘 지켜야 하는 것. 세션마다 로드
 | ---------------------- | -------------------------------------------------- | ------------------------------ |
 | `geoji-spec-auditor`   | 계획서에서 카드·파일·계약·테스트 케이스 확인, 미결정 판정 | `_workspace/01_spec.md`        |
 | `geoji-implementer`    | 코드와 테스트 작성                                 | 소스·테스트, `_workspace/02_impl.md` |
-| `geoji-code-reviewer`  | 의존 방향, 계약 미러, enum, 프롬프트 위치, 단일 정의 | `_workspace/03_code_review.md` |
 | `geoji-test-verifier`  | §4.2 케이스 대조, ruff·pytest 게이트, 벤더·DB 격리  | `_workspace/03_test.md`        |
 
-넷을 언제 어떤 순서로 부르는지는 `geoji-harness` 스킬이 정한다. 에이전트를 더하거나 역할을 바꾸면 그 스킬의 표와 Phase도 함께 고친다.
+셋을 언제 어떤 순서로 부르는지는 `geoji-harness` 스킬이 정한다. 에이전트를 더하거나 역할을 바꾸면 그 스킬의 표와 Phase도 함께 고친다.
 
 ## 슬래시 커맨드
 
