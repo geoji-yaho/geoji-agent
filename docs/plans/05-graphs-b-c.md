@@ -99,6 +99,7 @@ class SentenceState(TypedDict):
 | 노드 | 동작 | 실패 시 |
 |---|---|---|
 | `load_case` | `backend.snapshot(job)` → `CaseSnapshot`. `post_version`·`audience_version` 이 job payload 와 다르면 job 종료(구버전 이벤트) | fail(BACKEND_UNAVAILABLE) 재시도 |
+| `load_reusable_prep` | 9/14 D-27: 같은 post 의 기존 조서 중 조서 키(`dossiers.snapshot_hash` = 게시물 필드·`intake_result`·방 규칙 버전) ∧ `prompt_version` ∧ `invalidated_at IS NULL` ∧ dossier `privacy_versions` == 스냅샷이면 조서 모델 호출 없이 재사용. 드립은 `trial_prep.banter_json` 강도별 `{key, candidates}` 중 키가 맞는 강도만 재사용 | 맞는 것이 없으면 기존대로 새로 만든다 |
 | `recall_candidates` | `memory.recall_user(author, category, before=created_at, limit=20)` + `recall_room(각 방)`. 0.5초 `wait_for` | 빈 후보로 계속 |
 | `resolve_sources` | `backend.resolve_evidence(job, {candidates, include: [rules, aggregates, recent_verdicts, style_comments if flag]})` | 빈 응답으로 계속(코드 F0·AGGREGATE 없음 → F0 만) |
 | `build_db_evidence` | 04 `build_evidence` → pack ≤ 12, `label_map` | — |
@@ -107,7 +108,7 @@ class SentenceState(TypedDict):
 | `generate_banter` | 강도마다 1호출(Grok): 입력 = 허용 Evidence(라벨), 사건 타입, 강도, 승인 예시 ≤ 3(`ai.banter_examples approved=true`), 말투 예시(플래그). 출력 후보 3~5, `fits` 양쪽 계열 | 그 강도 후보 없음 |
 | `validate_banter` | `REPEAT_OFFENSE`·`ROOM_RULE_CALLBACK` 인데 `evidence_labels` 비면 삭제, 없는 라벨 삭제, `DEATH_WORDS` 삭제, `mild`·`spicy` 에 `PROFANITY` 삭제 | — |
 | `persist_banter` | `trial_prep.banter_json` 최초 1회 채움 → `COMPLETE` | `DOSSIER_READY` 유지 |
-`input_hash` = sha256(canonical(snapshot 의 post·audience·room_snapshots·privacy_versions·intake_result)). 프롬프트 버전이 바뀌면 새 행.
+`input_hash` = sha256(canonical(snapshot 의 post·audience·room_snapshots·privacy_versions·intake_result)). 프롬프트 버전이 바뀌면 새 행. 9/14 D-27: 이 해시에 더해 조서 키 = `dossiers.snapshot_hash`, 드립 키 = `banter_json` 강도별 `{key, candidates}`(키 = 조서 id + 강도 + `prompt_version`).
 
 ### 3.3 그래프 C (`graphs/sentencing.py`, proposal2 §5.3)
 | 노드 | 동작 |
