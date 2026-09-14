@@ -24,7 +24,9 @@ AI 파트(`geoji-agent`)가 백엔드 담당에게 알려야 하는 것을 모�
 |---|---|---|---|
 | `GET /health/live` | 200 `{"status":"ok"}` | 프로세스 생존. compose healthcheck 에 쓴다. 무인증 | 지금 |
 | `GET /health/ready` | 200 또는 503 `{"status":"not_ready","missing":[키 이름]}` | 키·DB 준비 여부. 503 이면 트래픽을 보내지 않는다. 무인증 | 지금(키), 작업 2(DB) |
-| `POST /internal/v1/intake` | `IntakeResult` | 심문관. 백엔드가 호출. `Authorization: Bearer <SERVICE_AUTH_TOKEN>` | 작업 3 스텁(§4 9/14 줄), 작업 7 실제 |
+| `POST /internal/v1/intake` | `IntakeResult` | 심문관. 백엔드가 호출. `Authorization: Bearer <SERVICE_AUTH_TOKEN>`. 실제 모델 호출·폴백·422 규칙은 §4 9/14 intake 라우트 줄 | 지금(작업 7 실제) |
+| `GET /internal/v1/metrics/snapshot` | JSON(지표마다 `source: process\|db`) | 운영 지표 스냅샷. 서비스 인증 | 지금 |
+| `GET /internal/v1/trials/{post_id}/trace` | JSON(라벨·코드·개수·시각, 원문 없음). 기록 없으면 404 `TRACE_NOT_FOUND` | 데모 C 내부 trace 화면. 서비스 인증. 프록시 주체는 §5 | 지금 |
 
 ## 3. 복사해 갈 파일
 
@@ -35,12 +37,30 @@ AI 파트(`geoji-agent`)가 백엔드 담당에게 알려야 하는 것을 모�
 | `database/migrations/001_ai_jobs.sql`·`002_preparation_evidence.sql`·`003_memory_call_ledger.sql` | 적용만(복사 불필요) | `DATABASE_URL=<Session Pooler URL> uv run geoji-ai migrate` 로 우리가 적용한다. 번호 순·`ai.schema_migrations` 기록·재적용 no-op·advisory lock 으로 동시 실행 안전. **001~003 만** 적용하고 004 는 백엔드 소유. **파일에 `CREATE ROLE` 이 없다** — `ai_worker`·`ai_api`·`backend` role 을 먼저 만들어야 `GRANT` 가 통과한다. 권한 표는 각 SQL 파일 끝 |
 | `src/geoji_ai/adapters/postgres_jobs.py` 의 `REAPER_SQL` | 백엔드 스케줄러, 5초 주기 | 02 §3.5 원문 그대로. 운영에서 워커 `--reaper` 는 끈다. TEXT_RETRY `FAILED` 뒤 다음 round 예약과 SENTENCE `CANCELLED` 뒤 폴백은 백엔드 watchdog 몫(10 §7) |
 | `contracts/fixtures/templates-v1.json` | 백엔드 저장소, 버전 고정 | watchdog·generation-failed 폴백 문구(10 §10). 치환 토큰 `{n}`·`{m}`·`{sentence_label}` (9/11 `{형량 라벨}` → `{sentence_label}` 로 바뀜) |
+| `geoji-ai ledger-sweep --older-than 24h` | 실행만(이미지 명령) | 결과 불명(UNKNOWN) 호출의 예약액을 확정한다. 백엔드 스케줄러 또는 cron 하루 1회, `DATABASE_URL` 필요(08 §3.2) |
+| `scripts/seed_agent_db.py` | 실행만(우리 저장소) | 데모 시드(드립 예시·데모 C 메모리). 멱등. 인자는 `--help`(08 §3.5). `meme_catalog` 은 백엔드 `meme_images` 소유라 만들지 않는다 |
+| `docs/runbook.md` | 참조 | 헬스·알림·비용 경고·롤백·동결·토큰 회전 절차(08 §3.6). 리허설 체크리스트 포함 |
 | `contracts/*-v1.schema.json` 7종 | 참조 | 계약 정본. enum 은 프론트 값(`mild/spicy/hell`, `guilty/notGuilty/agree/disagree/dismissed`, `probation/oneDay/life`, `spent/considering`). 서버의 대문자 enum 은 백엔드가 맞춘다(10 §15.2 D-21) |
 
 ## 4. 계약에서 백엔드가 알아야 할 것
 
 | 날짜 | 항목 | 내용 | 출처 | 상태 |
 |---|---|---|---|---|
+| 9/14 | `generation-failed` 코드 분포 | 서기가 전부 시간 초과로 실패하면 `VENDOR_UNAVAILABLE` 대신 `DEADLINE_EXCEEDED`. 둘 다 TEXT_RETRY round 예약 코드라 분기는 같고 집계 분포만 바뀐다 | 08 §3.5, 10 §4.6 | 미전달 |
+| 9/14 | 노드 timeout 환경변수 | `*_NODE_TIMEOUT_SECONDS`·`INTAKE_TIMEOUT_SECONDS` 가 소수를 받는다(기본값 불변) | 08 §3.5 | 미전달 |
+| 9/14 | watchdog 뒤 job 상태 | 늦은 성공 뒤 이전 job 상태가 08 §3.1 `complete` 와 10 §6-4 `CANCELLED` 로 어긋난다. 우리 테스트는 `CANCELLED`(워커 complete 0행)로 고정. 실제 구현 확인(§5) | 10 §6, 08 §3.1 | 미전달 |
+| 9/14 | finalize `meme_hints.emotion` enum | writer-draft-v1·finalize-v1 의 `meme_hints.emotion` 이 문자열(≤30)에서 6종 enum(`DISAPPROVAL`·`ABSURD_SERIOUSNESS`·`SMUG`·`PITY`·`CELEBRATION`·`RESIGNATION`)으로 좁혀짐, `schema_version` 1. 짤 점수 `+2 감정 일치` 대조값. 스키마 복사본 갱신 | 08 §3.4, 01 §6.1 | 미전달 |
+| 9/14 | `lease_expired_total` | 워커는 관측하지 않는다. 운영 reaper(백엔드, 02 §3.5 `REAPER_SQL`)가 회수 건수를 kind 별로 남겨야 지표가 생긴다 | 08 §3.3 | 미전달 |
+| 9/14 | 형량 규칙 위반 422 코드 | finalize 422 가 `INVALID_DRAFT` 하나라 형량 규칙 위반 알림을 가를 수 없다. 별도 코드 필요 여부 회신(§5) | 08 §3.3, 10 §5 | 미전달 |
+| 9/14 | 10 §4.4 강도 집합 검증 | TEXT_RETRY finalize 에서는 "강도 집합 = target_intensities" 를 **⊆ target** 으로 완화 필요. 받은 강도만 갱신, 나머지 강도 기존 행 유지 | 10 §4.4·§4.5 10번 | 미전달 |
+| 9/14 | TEXT_RETRY payload `intensities[]` | 워커가 선택 필드로 받는다. 없으면 target 전체. 일부 강도만 TEMPLATE 이면 그 강도만 보내 달라. target 밖 강도면 `generation_failed(SCHEMA_INVALID)` | 10 §3·§4.5 10번 | 미전달 |
+| 9/14 | TEXT_RETRY 실패 시 저장 없음 | round 안 서기·검증·검수 실패는 TEMPLATE finalize 없이 `generation_failed`(`EVAL_FAILED`·`DEADLINE_EXCEEDED` 등)만. 다음 round 예약은 백엔드 | 08 §3.2 | 미전달 |
+| 9/14 | `ledger-sweep` 실행 주기 | §3 `geoji-ai ledger-sweep` 를 하루 1회. 스케줄은 우리가 만들지 않았다 | 08 §3.2 | 미전달 |
+| 9/14 | `ai.llm_calls` UNKNOWN 정리 표시 | 정리된 행은 `status='UNKNOWN'` 그대로 `actual_micro_usd = estimated_max_micro_usd`. 집계 시 `UNKNOWN ∧ actual NOT NULL` = 정리됨 | 08 §3.2, 003 | 미전달 |
+| 9/14 | intake 라우트 실제 동작 | 스텁이 아니라 OpenAI `MODEL_JUDGMENT` 를 부른다. 키 없음·실패·timeout(4초 − 0.2) → `PASS`·`FALLBACK`·`message=""`·`category_review.confidence=0.0`(스텁은 `null`·`1.0`). 강한 인젝션·무관 텍스트는 모델 없이 `BLOCKED`. 필수값 위반 422 `detail={"code": ITEM_LENGTH\|REASON_LENGTH\|AMOUNT}` | 07 §3.1·§3.2 | 미전달 |
+| 9/14 | 제출 임시 예산 | `DATABASE_URL` 이 있으면 intake 호출이 `ai.case_budgets`·`ai.llm_calls` 에 `post_id='submission:{id}'` 로 기록, cap 1,034 micro-USD. 초과 시 `PASS`·`FALLBACK`(등록 허용) | 07 §3.4 | 미전달 |
+| 9/14 | intake 응답 에코 없음 | 응답에 `submission_id`·`payload_hash` 가 없다(01 계약에 필드 없음, 07 §3.1 과 어긋남). 요청·응답 묶기는 백엔드가 요청 쪽에서 | 07 §3.1, 01 | 미전달 |
+| 9/14 | 002 DDL `ai.evidence.fact_type` | 조서 kind `REASON_ANALYSIS` 가 CHECK 에 없어 저장하지 않는다. DDL 을 넓힐지 05 §3.2 를 줄일지 결정 뒤, 넓히면 마이그레이션 반영 필요 | 05 §3.2, 002 | 미전달 |
 | 9/14 | `draft_hash` canonical 규칙 | finalize 가 `draft_hash`·`evaluation_draft_hash` 를 같은 규칙으로 재계산해야 한다: `{"draft": WriterDraft, "sentencing": SentencingDecision 또는 null}` → 키·값 문자열 NFC → 키 정렬·구분자 `,` `:`·비 ASCII 이스케이프 없음 JSON → UTF-8 sha256 소문자 hex. 정의는 `src/geoji_ai/domain/draft_hash.py` | 05 §3.4, 10 §5 | 미전달 |
 | 9/14 | RETAIN snapshot 확장 필드 없을 때 | `verdict_final`·`jury`(sentence.finalized)·`comment`(comment.approved)가 없으면 워커는 행 0 으로 complete — **기억이 쌓이지 않는다**. 댓글 방이 `room_snapshots` 에 있어야 댓글 기억 저장 | 04 §3.3, 10 §4.1 | 미전달 |
 | 9/14 | RETAIN snapshot 404 규약 | RETAIN 원본(판결·댓글)이 삭제됐으면 snapshot 이 **404** 를 줘야 워커가 skip. 409 등은 skip 이 아니라 오류로 재시도 | 04 §3.5, 10 §4.1 | 미전달 |
@@ -66,6 +86,11 @@ AI 파트(`geoji-agent`)가 백엔드 담당에게 알려야 하는 것을 모�
 
 | 항목 | 무엇 | 기한 | 출처 |
 |---|---|---|---|
+| watchdog 뒤 job 상태 | 늦은 성공 뒤 이전 job 을 `CANCELLED`(10 §6-4)로 두는가, `complete`(08 §3.1)인가 | 미정 | 10 §6, 08 §3.1 |
+| 형량 규칙 위반 422 코드 | `INVALID_DRAFT` 외에 형량 규칙 위반 전용 코드를 둘 수 있는가 | 미정 | 10 §5 |
+| TEXT_RETRY 강도 집합 | finalize 검증을 TEXT_RETRY 에서 `⊆ target_intensities` 로 완화하고 `intensities[]` 를 payload 에 넣어 줄 수 있는가 | 미정 | 10 §3·§4.4 |
+| trace 프록시 주체 | `/internal/v1/trials/{post_id}/trace` 를 프론트에 누가 중계하는가 | 미정 | 10 §4.5·§14 |
+| `lease_expired_total` | 운영 reaper 회수 건수를 kind 별 로그·지표로 남길 수 있는가 | 미정 | 08 §3.3 |
 | `aggregates.burn_rate` 단위 | 0~1 비율인가(우리는 0~1 로 가정해 문장을 만든다) | 미정 | 10 §4.2 |
 | `recent_verdicts[].verdict_id` | 응답에 `verdict_id` 가 없어 PRIOR 근거 출처를 `POST/{post_id}/{post_version}` 로 둔다. `verdict_id`·`verdict_version` 을 넣어 줄 수 있는가 | 미정 | 10 §4.2 |
 | 데모 C 시드 식별자 | 백엔드 시드의 스타벅스 post 2개 `post_id`·`verdict_id`, 사용자·방 id, 시드 기준 시각(§3 시드 스크립트 입력) | 9/17 | 10 §12 |
