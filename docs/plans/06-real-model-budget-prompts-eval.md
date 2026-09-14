@@ -107,6 +107,7 @@ prompts/** 변경 ─▶ tests/evaluations/run_regression.py (골든 50사건 ×
 | `writer/common-v6.md` | v5.3 공통 + **사건 유형 절**(`spent`/`considering`): `agree` 는 `NECESSITY_APPROVAL` 계열 "억지로 비난하지 않되 후회는 본인 몫", `disagree` 는 전제 부정·대안 조롱. 형량·무지출 언급 금지. 예시는 다른 사건(스투시 반팔·키보드) |
 | `writer/mild-v6.md` | 순한맛 확장 — 예시(다른 사건): 배달 "야근한 날의 치킨은 이해해요. 다만 이번 달 세 번째라는 것만 기억해요." / 커피 "커피 한 잔이 하루를 바꾸죠. 열두 잔이면 통장이 바뀌고요." |
 | `writer/spicy-v6.md`·`hell-v6.md` | v5.3 유지 + `considering` 예시 1개씩 |
+| `writer/*-v5.4.md` | (9/14) v5.3 에서 `meme_tag` 문장 한 줄만 05 §3.5 규칙 4 에 맞춤(옛 문장 "징역 1일 → GUILTY_LIGHT" 는 정책 최고 rank 면 HEAVY 인 규칙과 어긋남). 서기 출력 `meme_tag` 는 그래프가 버리고 규칙 4 로 교정하므로 저장 결과는 같다. mild·spicy·hell 은 v5.3 과 같은 내용. v6 는 v5.4 기준. **회귀·사람 검수 전** |
 | `banter-v2.md` | 원칙 체크리스트 적용, 승인 예시 3개 참고·복사 금지 |
 | `sentencing-v1.md` | 가중·감경은 반드시 라벨, 예시 2개(다른 사건) |
 | `context-v1.md` | 유지 + 인젝션 의심 예시 |

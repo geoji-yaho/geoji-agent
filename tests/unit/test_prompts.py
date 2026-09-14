@@ -16,6 +16,7 @@ import pytest
 from geoji_ai.domain import lexicon
 from geoji_ai.prompts import (
     PROMPTS_DIR,
+    WRITER_VERSION,
     build_writer_system,
     load_prompt,
     prompt_bundle_version,
@@ -59,7 +60,7 @@ def test_writer_system_equals_probe_assembly(intensity: str) -> None:
 def test_spicy_system_has_no_hell_section() -> None:
     """⑧ `spicy` 결과에 `hell` 섹션 문자열 없음."""
     spicy = build_writer_system("spicy")
-    hell_section = load_prompt("writer/hell-v5.3.md").strip()
+    hell_section = load_prompt(f"writer/hell-{WRITER_VERSION}.md").strip()
     assert hell_section not in spicy
     assert "### HELL" not in spicy
     for line in (ln for ln in hell_section.splitlines() if ln.strip()):
@@ -74,6 +75,10 @@ def test_spicy_system_has_no_hell_section() -> None:
         "writer/mild-v5.3.md",
         "writer/spicy-v5.3.md",
         "writer/hell-v5.3.md",
+        "writer/common-v5.4.md",
+        "writer/mild-v5.4.md",
+        "writer/spicy-v5.4.md",
+        "writer/hell-v5.4.md",
         "sentencing-v1.md",
         "context-v1.md",
         "banter-v1.md",
@@ -150,6 +155,7 @@ def test_golden_items_not_in_prompt_examples() -> None:
 #: v6 에서 선언 줄이 없어지면 이 목록을 비워 단순 부재 검사로 좁힌다.
 WORN_PHRASE_DECLARATIONS = {
     ("writer/common-v5.3.md", "금지어"),
+    ("writer/common-v5.4.md", "금지어"),
     ("evaluator/guardrail-v2.md", "| 금지 | 금지 | 금지 |"),
 }
 
@@ -181,7 +187,7 @@ def _after(text: str, marker: str) -> str:
 
 def test_hell_profanity_list_equals_lexicon() -> None:
     """서기 hell 섹션·검수관 v2 표의 욕 목록 = `lexicon`."""
-    hell = load_prompt("writer/hell-v5.3.md")
+    hell = load_prompt(f"writer/hell-{WRITER_VERSION}.md")
     listed = _after(hell, "**이 목록 안에서만**:").strip().rstrip(".")
     assert tuple(word.strip() for word in listed.split(",")) == lexicon.HELL_ALLOWED_PROFANITY
 

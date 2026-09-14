@@ -2,7 +2,7 @@
   "schema_version": 2,
   "taxonomy_version": "verdict-meme-v1",
   "asset_path": "002-images-2.png",
-  "asset_sha256": "0233cf1a242f9aa9ecf866d58da7af5bc8d08897cce98af1b6ba34f296c3f2e7",
+  "asset_sha256": "da42692fa8e59e067cc2cf718cb93c156a4885ace5abb0d99c6aa48d27e0db8d",
   "classification": {
     "emotions": [
       "RESIGNATION",
@@ -39,7 +39,7 @@
   "generated_by": "b-meme/codex-visual-v2",
   "generated_at": "2026-09-12T08:32:34+00:00",
   "needs_review": false,
-  "tag": null,
+  "tag": "GUILTY_HEAVY",
   "strategies": [],
   "is_active": false,
   "description": "상단 컷에서 캐릭터가 '가난을 거꾸로 읽으면?'이라는 나뭇잎을 들고 있고, 하단 컷에서 창밖을 보던 주먹밥 캐릭터가 '난가? 아...'라며 눈물을 글썽인다.",

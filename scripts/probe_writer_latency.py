@@ -182,7 +182,7 @@ SYSTEM_PROMPT = """당신은 소비 재판 서비스 '떼거지'의 AI 판사 �
 - headline: 한 줄 드립. 30자 이내 (짧은 두 문장 허용). banter_candidates를 고르거나 더 날카롭게 고친다. 지정된 각도를 따른다.
 - statement: 2~3문장, 합쳐서 200자 이내. 공격 근거 1~2문장 + 뒤통수 1~2문장.
 - 표 수(3:1)와 형량은 화면에 따로 표시되므로 statement에 반복하지 않는다.
-- meme_tag는 평결·형량에 맞춘다: GUILTY_HEAVY(무기징역) / GUILTY_LIGHT(집행유예·징역 1일) / NOT_GUILTY / APPROVED / REJECTED.
+- meme_tag는 서버가 평결·형량으로 다시 정한다. 평결에 맞는 값을 넣는다: guilty는 GUILTY_HEAVY 또는 GUILTY_LIGHT(허용 형량 중 가장 무거우면 HEAVY) / notGuilty는 NOT_GUILTY / agree는 APPROVED / disagree는 REJECTED.
 """
 
 # ---------------------------------------------------------------------------

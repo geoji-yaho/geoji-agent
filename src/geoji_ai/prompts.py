@@ -26,7 +26,7 @@ __all__ = [
 #: 저장소 루트의 `prompts/`(src/geoji_ai/prompts.py 에서 두 단계 위).
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 
-WRITER_VERSION = "v5.3"
+WRITER_VERSION = "v5.4"
 
 #: 강도 섹션을 끼울 자리. 공통 파일에서 이 제목 바로 앞이다.
 _WRITER_OUTPUT_HEADER = "## 출력\n"
