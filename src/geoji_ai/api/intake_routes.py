@@ -1,15 +1,19 @@
-"""심문관 intake M2 스텁(03 §3.4, 10 §4).
+"""심문관 intake 라우트(07 §3.1, 10 §4).
 
-`POST /internal/v1/intake` 는 늘 `PASS`·`FALLBACK` 을 돌려준다. `mode=FINAL_CHECK` 도
-`PASS` 다. 모델·DB 를 부르지 않는다. 작업 5 가 심문관 본체로 교체한다.
+`POST /internal/v1/intake` 는 그래프 A(`graphs.intake.run_intake`)를 부른다. LLM(게이트웨이 또는
+라우터, 없으면 None)과 설정은 `app.state` 에서 읽는다. 코드 규칙의 필수값 위반은 422 이고
+detail 에는 코드만 넣는다(원문 금지).
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from geoji_ai.api.auth import require_service_token
 from geoji_ai.contracts.intake import IntakeRequest, IntakeResult
+from geoji_ai.core.config import get_settings
+from geoji_ai.domain.intake_rules import IntakeRuleError
+from geoji_ai.graphs.intake import run_intake
 
 __all__ = ["router"]
 
@@ -21,16 +25,10 @@ router = APIRouter(
 
 
 @router.post("/intake", response_model=IntakeResult)
-async def intake(req: IntakeRequest) -> IntakeResult:
-    return IntakeResult.model_validate(
-        {
-            "schema_version": 1,
-            "mode": req.mode,
-            "status": "PASS",
-            "item_review": {"status": "OK", "suggested_item": None},
-            "message": None,
-            "category_review": {"status": "OK", "suggested_category": None, "confidence": 1.0},
-            "injection_detected": False,
-            "intake_source": "FALLBACK",
-        }
-    )
+async def intake(req: IntakeRequest, request: Request) -> IntakeResult:
+    state = request.app.state
+    settings = getattr(state, "settings", None) or get_settings()
+    try:
+        return await run_intake(req, llm=getattr(state, "intake_llm", None), settings=settings)
+    except IntakeRuleError as err:
+        raise HTTPException(status_code=422, detail={"code": err.code}) from None
