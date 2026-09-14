@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from enum import StrEnum
 from typing import Literal
 
@@ -22,6 +23,7 @@ __all__ = [
     "classify_vendor_error",
     "ledger_status",
     "retry_allowed",
+    "writer_failure_code",
 ]
 
 
@@ -49,7 +51,10 @@ _VENDOR_ERROR_CODE: dict[str, str] = {
     "REFUSAL": "VENDOR_UNAVAILABLE",
     "RATE_LIMIT": "VENDOR_UNAVAILABLE",
     "SERVER": "VENDOR_UNAVAILABLE",
-    "TIMEOUT": "VENDOR_UNAVAILABLE",
+    # 상한 안에 시작해 시간 안에 끝나지 못한 호출은 시간 예산 실패다
+    # (08 §3.5 `WRITER_NODE_TIMEOUT_SECONDS=0.1` → `DEADLINE_EXCEEDED`, 10 §4.6).
+    # 연결 실패(TRANSPORT)는 벤더 쪽으로 둔다.
+    "TIMEOUT": "DEADLINE_EXCEEDED",
     "TRANSPORT": "VENDOR_UNAVAILABLE",
     "AUTH": "VENDOR_UNAVAILABLE",
     "DEGRADED": "VENDOR_UNAVAILABLE",
@@ -84,6 +89,22 @@ def classify_vendor_error(kind: str) -> str:
         return _VENDOR_ERROR_CODE[kind]
     except KeyError:
         raise ValueError(f"벤더 오류 분류 표(06 §3.1)에 없는 kind: {kind!r}") from None
+
+
+def writer_failure_code(errors: Iterable[str | None], *, budget_skipped: bool) -> str:
+    """서기가 AI 문구를 하나도 못 냈을 때의 생성 오류 코드(08 §3.5, 10 §4.6).
+
+    우선순위 예산 > 시간 > 벤더. 오류에 `BUDGET` 이 있으면 `BUDGET_EXCEEDED`, 시간 예산으로 시작하지
+    못한 강도가 있거나(`budget_skipped`) 분류가 `DEADLINE_EXCEEDED` 인 오류(TIMEOUT)가 있으면
+    `DEADLINE_EXCEEDED`, 그 밖(DEGRADED·AUTH·SERVER·검증 실패·모르는 kind·None)은
+    `VENDOR_UNAVAILABLE`.
+    """
+    kinds = {kind for kind in errors if kind is not None}
+    if "BUDGET" in kinds:
+        return "BUDGET_EXCEEDED"
+    if budget_skipped or any(_VENDOR_ERROR_CODE.get(kind) == "DEADLINE_EXCEEDED" for kind in kinds):
+        return "DEADLINE_EXCEEDED"
+    return "VENDOR_UNAVAILABLE"
 
 
 def ledger_status(kind: str) -> LedgerStatus:

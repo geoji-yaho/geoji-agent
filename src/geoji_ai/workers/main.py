@@ -437,6 +437,8 @@ async def run_worker(settings: Settings, *, reaper: bool = False) -> None:
             price_for,
             cost_tracker=cost_tracker,
             notifier=notifier,
+            # node_results 재사용·저장 전 현재 epoch 대조(08 §4.1)
+            stale_scopes=preparation.stale_scopes,
         )
     # queue oldest age 임계는 넘기지 않는다 — 값 미정(08 §4.1)이라 감시하지 않는다.
     worker = Worker(

@@ -65,6 +65,22 @@ def test_기본값이_계획서_표와_같다():
     assert settings.SERVICE_AUTH_TOKEN.get_secret_value() == ""
 
 
+def test_노드_timeout_은_소수를_환경변수로_받는다(monkeypatch: pytest.MonkeyPatch):
+    # 08 §3.5 예산 초과 리허설은 `WRITER_NODE_TIMEOUT_SECONDS=0.1` 로 기동한다.
+    for name in (
+        "INTAKE_TIMEOUT_SECONDS",
+        "SENTENCING_NODE_TIMEOUT_SECONDS",
+        "WRITER_NODE_TIMEOUT_SECONDS",
+        "EVALUATOR_NODE_TIMEOUT_SECONDS",
+    ):
+        monkeypatch.setenv(name, "0.1")
+    settings = Settings(_env_file=None)
+    assert settings.INTAKE_TIMEOUT_SECONDS == pytest.approx(0.1)
+    assert settings.SENTENCING_NODE_TIMEOUT_SECONDS == pytest.approx(0.1)
+    assert settings.WRITER_NODE_TIMEOUT_SECONDS == pytest.approx(0.1)
+    assert settings.EVALUATOR_NODE_TIMEOUT_SECONDS == pytest.approx(0.1)
+
+
 def test_큐_워커_설정_기본값이_계획서와_같다():
     # 작업 2 가 더한 두 필드. 값은 02 §3.3(종료 10초)·§3.5(reaper 5초).
     settings = Settings(_env_file=None)

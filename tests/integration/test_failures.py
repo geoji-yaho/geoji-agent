@@ -46,6 +46,7 @@ from geoji_ai.adapters.llm_router import RoleRoutedLLM, price_for
 from geoji_ai.adapters.postgres_call_ledger import PostgresCallLedger
 from geoji_ai.adapters.postgres_jobs import PostgresJobs, make_engine, reap
 from geoji_ai.adapters.postgres_memory import invalidate_scope
+from geoji_ai.adapters.postgres_preparation import PostgresPreparation
 from geoji_ai.application.llm_gateway import LLMGateway
 from geoji_ai.application.sentence_case import SentenceHandler
 from geoji_ai.contracts.case import CaseSnapshot
@@ -150,7 +151,13 @@ def _gateway(
         {"openai": judgment, "xai": writer},
         models={"openai": settings.MODEL_JUDGMENT, "xai": settings.MODEL_WRITER},
     )
-    return LLMGateway(router, ledger or PostgresCallLedger(engine), VendorHealth(), price_for)
+    return LLMGateway(
+        router,
+        ledger or PostgresCallLedger(engine),
+        VendorHealth(),
+        price_for,
+        stale_scopes=PostgresPreparation(engine).stale_scopes,
+    )
 
 
 async def _no_sleep(_: float) -> None:
@@ -543,16 +550,6 @@ async def test_03a_TEXT_RETRY_중_삭제면_finalize_0_EVIDENCE_INVALIDATED_node
     assert (verdict.text_version, verdict.text_sources) == before
 
 
-_D1_REASON = (
-    "D1 결함: 무효화 뒤에 끝난 호출의 출력을 게이트웨이 remember 가 옛 epoch 키로 "
-    "node_results 에 넣고(invalidated_at NULL), "
-    "옛 epoch 스냅샷의 다음 요청이 그 행을 재사용한다"
-    "(08 §3.1 '무효화 후 node_results 재사용 0'). "
-    "put·get 어디에도 현재 epoch 검사가 없다"
-)
-
-
-@pytest.mark.xfail(strict=True, reason=_D1_REASON)
 async def test_03b_무효화_뒤에_끝난_호출은_옛_epoch_로_node_results_에_남지_않는다(env: Env):
     await _retry_during_deletion(env)
     old_scope = {"scope_key": f"room:{ROOM_B}", "epoch": 1}
@@ -565,7 +562,6 @@ async def test_03b_무효화_뒤에_끝난_호출은_옛_epoch_로_node_results_
     assert live_old_epoch == []
 
 
-@pytest.mark.xfail(strict=True, reason=_D1_REASON)
 async def test_03c_무효화_뒤_옛_epoch_스냅샷의_다음_round_는_node_results_를_재사용하지_않는다(
     env: Env,
 ):
@@ -742,23 +738,13 @@ async def test_06_OpenAI_키_무효면_양형_RULE_검수_불가_TEMPLATE_VENDOR
 # --- ⑦ 예산 초과 ----------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "D2 결함: core/config.py WRITER_NODE_TIMEOUT_SECONDS 가 int 라 "
-        "계획서 값 0.1(08 §3.1·§3.5)을 환경변수·Settings 로 줄 수 없다(int_from_float)"
-    ),
-)
 def test_07a_WRITER_NODE_TIMEOUT_SECONDS_0_1_을_설정으로_줄_수_있다():
     settings = Settings(_env_file=None, WRITER_NODE_TIMEOUT_SECONDS=WRITER_TIMEOUT_OVER_BUDGET_S)
     assert settings.WRITER_NODE_TIMEOUT_SECONDS == WRITER_TIMEOUT_OVER_BUDGET_S
 
 
 def _over_budget_settings() -> Settings:
-    # 07a 결함 때문에 검증을 거치지 않는 model_copy 로 0.1 을 넣는다.
-    return make_settings().model_copy(
-        update={"WRITER_NODE_TIMEOUT_SECONDS": WRITER_TIMEOUT_OVER_BUDGET_S}
-    )
+    return make_settings(WRITER_NODE_TIMEOUT_SECONDS=WRITER_TIMEOUT_OVER_BUDGET_S)
 
 
 async def _run_over_budget(env: Env) -> tuple[dict[str, Any], datetime, datetime, float]:
@@ -798,15 +784,6 @@ async def test_07b_서기_예산_초과면_TEMPLATE_응답은_deadline_0_5s_안(
     assert finished <= deadline + timedelta(seconds=RESPONSE_SLACK_S)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "D3 결함: graphs/sentencing.py join 은 시간 예산으로 시작하지 못한 강도"
-        "(node_timeout None)만 DEADLINE_EXCEEDED 로 보고, "
-        "상한(WRITER_NODE_TIMEOUT_SECONDS) 안에 시작해 TIMEOUT 난 서기는 "
-        "VENDOR_UNAVAILABLE 로 보낸다. 08 §3.1·§3.5 기대는 DEADLINE_EXCEEDED"
-    ),
-)
 async def test_07c_서기_예산_초과_코드는_DEADLINE_EXCEEDED(env: Env):
     await _run_over_budget(env)
 
