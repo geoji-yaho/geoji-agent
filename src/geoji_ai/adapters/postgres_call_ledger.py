@@ -10,7 +10,8 @@
   모르면 보수적으로 `est_max` 를 spent 에 더하고 `actual_micro_usd`·`cost_ticks` 는 NULL 로 둔다.
   DDL 에 `cost_source` 컬럼이 없어 이 둘이 NULL 인 것이 "비용 모름" 표시다
 - `fail` 은 `error.usage`·`error.cost` 가 모두 None(응답 없음)이면 spent 에 0 을 더한다
-- `mark_unknown` 은 예약을 유지하고 spent 를 건드리지 않는다. 정리는 작업 8
+- `mark_unknown` 은 예약을 유지하고 spent 를 건드리지 않는다. 정리는 `sweep_unknown`
+  (`geoji-ai ledger-sweep`, 08 §3.2)
 - `node_results` 는 5요소 전부 일치 ∧ 만료 전 ∧ `invalidated_at IS NULL` 일 때만 돌려준다
 """
 
@@ -18,8 +19,9 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections import defaultdict
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import text
@@ -32,7 +34,7 @@ from geoji_ai.domain.budget import (
     node_result_expires_at,
     resolve_actual_micro_usd,
 )
-from geoji_ai.ports.ledger import BudgetExceeded, CallSpec
+from geoji_ai.ports.ledger import BudgetExceeded, CallSpec, SweepReport
 from geoji_ai.ports.llm import Cost, LLMError, LLMResult, Usage
 
 __all__ = ["VERSION_KEYS", "PostgresCallLedger"]
@@ -112,6 +114,32 @@ _MARK_UNKNOWN_SQL = text(
     UPDATE ai.llm_calls
     SET status = 'UNKNOWN', finished_at = now()
     WHERE id = CAST(:id AS uuid) AND status IN {_OPEN_STATUSES}
+    """
+)
+
+#: 정리 대상 UNKNOWN 행을 잠그고 `actual = est_max` 로 표시한다. 표시된 행은 다시 걸리지 않는다.
+_SWEEP_UNKNOWN_SQL = text(
+    """
+    UPDATE ai.llm_calls
+    SET actual_micro_usd = estimated_max_micro_usd
+    WHERE id IN (
+        SELECT id FROM ai.llm_calls
+        WHERE status = 'UNKNOWN'
+          AND actual_micro_usd IS NULL
+          AND started_at < now() - make_interval(secs => :older_than_s)
+        ORDER BY id
+        FOR UPDATE
+    )
+    RETURNING post_id, estimated_max_micro_usd
+    """
+)
+
+_SWEEP_BUDGET_SQL = text(
+    """
+    UPDATE ai.case_budgets
+    SET spent_micro_usd = spent_micro_usd + :amount,
+        reserved_micro_usd = reserved_micro_usd - :amount
+    WHERE post_id = :post_id
     """
 )
 
@@ -261,11 +289,66 @@ class PostgresCallLedger:
             )
 
     async def mark_unknown(self, call_id: str, error: LLMError) -> None:
-        """UNKNOWN. 예약 유지, spent 불변. 정리는 작업 8(`ledger-sweep`)."""
+        """UNKNOWN. 예약 유지, spent 불변. 정리는 `sweep_unknown`(`geoji-ai ledger-sweep`)."""
         async with self._engine.begin() as conn:
             result = await conn.execute(_MARK_UNKNOWN_SQL, {"id": call_id})
         if result.rowcount == 0:
             log.warning("ledger_mark_unknown_skipped", call_id=call_id, kind=error.kind)
+
+    async def sweep_unknown(self, older_than: timedelta) -> SweepReport:
+        """UNKNOWN 정리(08 §3.2). 한 트랜잭션.
+
+        대상은 `status='UNKNOWN' ∧ actual_micro_usd IS NULL ∧ started_at < now() − older_than`.
+        예약액(`estimated_max_micro_usd`)을 보수적으로 사용액으로 본다.
+
+        **표시 규칙**: DDL 003 CHECK 에 "정리됨" 상태가 없어 `status` 는 `UNKNOWN` 그대로 두고
+        `actual_micro_usd = estimated_max_micro_usd` 를 채운다. 따라서
+        `UNKNOWN ∧ actual_micro_usd IS NOT NULL` = 정리됨,
+        `UNKNOWN ∧ actual_micro_usd IS NULL` = 미정리다.
+        `mark_unknown` 은 `actual` 을 건드리지 않고, `settle`·`fail` 은 UNKNOWN 행을 바꾸지 않는다.
+
+        호출 행을 `FOR UPDATE` 로 잠근 뒤 키마다 `case_budgets` 를 `reserved −= Σest`,
+        `spent += Σest` 로 옮긴다. 키는 정렬 순서로 갱신한다(`_close` 와 같은 호출 → 예산 순서).
+        재실행하면 표시된 행이 걸리지 않아 0건이다. `post_id` 가 NULL 인 행은 예산 행이 없으므로
+        행 표시만 하고 건수·금액에는 넣되 키 수에는 넣지 않는다.
+        """
+        if older_than <= timedelta(0):
+            raise ValueError("older_than 은 양수여야 한다")
+        async with self._engine.begin() as conn:
+            rows = (
+                (
+                    await conn.execute(
+                        _SWEEP_UNKNOWN_SQL, {"older_than_s": older_than.total_seconds()}
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            per_key: dict[str, int] = defaultdict(int)
+            total = 0
+            for row in rows:
+                est = int(row["estimated_max_micro_usd"])
+                total += est
+                if row["post_id"] is not None:
+                    per_key[str(row["post_id"])] += est
+            keys = 0
+            for post_id in sorted(per_key):
+                await conn.execute(_LOCK_BUDGET_SQL, {"post_id": post_id})
+                updated = await conn.execute(
+                    _SWEEP_BUDGET_SQL, {"post_id": post_id, "amount": per_key[post_id]}
+                )
+                if updated.rowcount:
+                    keys += 1
+                else:
+                    log.warning("ledger_sweep_budget_missing")
+        report = SweepReport(calls=len(rows), micro_usd=total, budget_keys=keys)
+        log.info(
+            "ledger_sweep_done",
+            calls=report.calls,
+            micro_usd=report.micro_usd,
+            budget_keys=report.budget_keys,
+        )
+        return report
 
     async def _close(
         self,

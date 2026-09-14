@@ -240,14 +240,16 @@ class Env:
         settings: Settings | None = None,
         handler: Any | None = None,
         kind: str = "SENTENCE",
+        intensities: list[str] | None = None,
     ) -> str:
         if kind == "SENTENCE":
             job_id = await self.enqueue(
                 "SENTENCE", verdict_id=VERDICT_ID, verdict_version=1, post_id=POST_ID
             )
         else:
+            extra: dict[str, Any] = {} if intensities is None else {"intensities": intensities}
             job_id = await self.enqueue(
-                "TEXT_RETRY", verdict_id=VERDICT_ID, verdict_version=1, round=1
+                "TEXT_RETRY", verdict_id=VERDICT_ID, verdict_version=1, round=1, **extra
             )
         job = await self.jobs.claim([kind], WORKER_ID)
         assert job is not None and job.id == job_id

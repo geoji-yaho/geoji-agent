@@ -10,6 +10,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from geoji_ai.domain.intensity import Intensity
+
 JobKind = Literal["PREPARE", "SENTENCE", "TEXT_RETRY", "RETAIN"]
 JobStatus = Literal["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"]
 RetainEvent = Literal["sentence.finalized", "comment.approved"]
@@ -32,11 +34,18 @@ class SentencePayload(BaseModel):
 
 
 class TextRetryPayload(BaseModel):
+    """10 §3 표 `{verdict_id, verdict_version, round, intensities[]}`.
+
+    `intensities` 는 10 §4.5 10번이 `(제안)` 이라 선택 필드다. None 이면 `target_intensities` 전체를
+    다시 쓴다. 빈 목록은 다시 쓸 강도가 없어 거부한다.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
     verdict_id: str
     verdict_version: int
     round: int
+    intensities: Annotated[list[Intensity], Field(min_length=1)] | None = None
 
 
 class RetainPayload(BaseModel):
