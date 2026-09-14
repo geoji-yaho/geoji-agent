@@ -7,11 +7,13 @@
 from __future__ import annotations
 
 import ast
+import json
 import shutil
 from pathlib import Path
 
 import pytest
 
+from geoji_ai.domain import lexicon
 from geoji_ai.prompts import (
     PROMPTS_DIR,
     build_writer_system,
@@ -104,3 +106,87 @@ def test_bundle_version_changes_on_one_byte(tmp_path: Path) -> None:
 def test_unknown_intensity_rejected() -> None:
     with pytest.raises(ValueError):
         build_writer_system("MILD")
+
+
+# ---------------------------------------------------------------------------
+# 골든셋·어휘와 프롬프트(06 §4.2)
+# ---------------------------------------------------------------------------
+
+GOLDEN_DIR = REPO_ROOT / "tests" / "evaluations" / "golden"
+#: 골든 사건 소재와 겹치면 안 되는 프롬프트(서기·검수관 예시가 들어 있는 파일).
+EXAMPLE_PROMPTS = ("writer", "evaluator")
+
+
+def _golden_items() -> list[str]:
+    items: list[str] = []
+    for path in sorted(GOLDEN_DIR.glob("*.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                items.append(json.loads(line)["snapshot"]["item"])
+    return items
+
+
+def _example_prompt_text() -> str:
+    files = sorted(p for folder in EXAMPLE_PROMPTS for p in (PROMPTS_DIR / folder).rglob("*.md"))
+    assert files
+    return "\n".join(p.read_text(encoding="utf-8") for p in files)
+
+
+def test_golden_items_not_in_prompt_examples() -> None:
+    """골든 사건 `item`(과 2자 이상 낱말)이 서기·검수관 프롬프트에 없다."""
+    items = _golden_items()
+    assert len(items) == 50
+    prompts = _example_prompt_text()
+    hits = [
+        (item, word)
+        for item in items
+        for word in [item, *item.split()]
+        if len(word) >= 2 and word in prompts
+    ]
+    assert hits == []
+
+
+#: `WORN_PHRASES` 를 금지어로 선언하는 줄(prompts 수정 금지라 허용 위치를 못박는다).
+#: v6 에서 선언 줄이 없어지면 이 목록을 비워 단순 부재 검사로 좁힌다.
+WORN_PHRASE_DECLARATIONS = {
+    ("writer/common-v5.3.md", "금지어"),
+    ("evaluator/guardrail-v2.md", "| 금지 | 금지 | 금지 |"),
+}
+
+
+def test_worn_phrases_only_as_ban() -> None:
+    """`WORN_PHRASES` 가 프롬프트 예시 문장에 없다. 알려진 금지 선언 줄에만 나온다."""
+    hits = {
+        path.relative_to(PROMPTS_DIR).as_posix()
+        for path in sorted(PROMPTS_DIR.rglob("*.md"))
+        for line in path.read_text(encoding="utf-8").splitlines()
+        for phrase in lexicon.WORN_PHRASES
+        if phrase in line
+        and not any(
+            path.relative_to(PROMPTS_DIR).as_posix() == name and marker in line
+            for name, marker in WORN_PHRASE_DECLARATIONS
+        )
+    }
+    assert hits == set()
+    for name, marker in WORN_PHRASE_DECLARATIONS:
+        lines = (PROMPTS_DIR / name).read_text(encoding="utf-8").splitlines()
+        declared = [line for line in lines if marker in line]
+        assert sum(p in line for line in declared for p in lexicon.WORN_PHRASES) == 1, name
+
+
+def _after(text: str, marker: str) -> str:
+    start = text.index(marker) + len(marker)
+    return text[start:].splitlines()[0]
+
+
+def test_hell_profanity_list_equals_lexicon() -> None:
+    """서기 hell 섹션·검수관 v2 표의 욕 목록 = `lexicon`."""
+    hell = load_prompt("writer/hell-v5.3.md")
+    listed = _after(hell, "**이 목록 안에서만**:").strip().rstrip(".")
+    assert tuple(word.strip() for word in listed.split(",")) == lexicon.HELL_ALLOWED_PROFANITY
+
+    guardrail = load_prompt("evaluator/guardrail-v2.md")
+    allowed = _after(guardrail, "hell 허용 목록(").split(")")[0]
+    assert tuple(allowed.split("·")) == lexicon.HELL_ALLOWED_PROFANITY
+    profanity = _after(guardrail, "| 비속어(").split(")")[0]
+    assert tuple(profanity.split("·")) == lexicon.PROFANITY
