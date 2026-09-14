@@ -13,6 +13,7 @@ import hmac
 
 from fastapi import HTTPException, Request, status
 
+from geoji_ai.api.errors import api_error
 from geoji_ai.core.config import Settings, get_settings, secret_value
 
 __all__ = ["require_service_token"]
@@ -25,10 +26,8 @@ def _settings(request: Request) -> Settings:
 
 
 def _unauthorized() -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail={"code": "UNAUTHORIZED"},
-        headers={"WWW-Authenticate": "Bearer"},
+    return api_error(
+        status.HTTP_401_UNAUTHORIZED, "UNAUTHORIZED", headers={"WWW-Authenticate": "Bearer"}
     )
 
 

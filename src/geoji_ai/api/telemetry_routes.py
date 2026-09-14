@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from geoji_ai.api.auth import require_service_token
+from geoji_ai.api.errors import api_error
 from geoji_ai.core.config import get_settings, secret_value
 from geoji_ai.core.logging import get_logger
 from geoji_ai.telemetry.metrics import REGISTRY, MetricsRegistry
@@ -46,9 +47,7 @@ def _engine(request: Request) -> AsyncEngine:
     settings = getattr(request.app.state, "settings", None) or get_settings()
     url = secret_value(settings, "DATABASE_URL").strip()
     if not url:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail={"code": "DB_UNAVAILABLE"}
-        )
+        raise api_error(status.HTTP_503_SERVICE_UNAVAILABLE, "DB_UNAVAILABLE")
     from geoji_ai.adapters.postgres_jobs import make_engine
 
     engine = make_engine(url)
@@ -81,7 +80,5 @@ async def trial_trace(post_id: str, request: Request) -> dict[str, Any]:
 
     trace = await PostgresTelemetry(_engine(request)).trace(post_id)
     if trace is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail={"code": "TRACE_NOT_FOUND"}
-        )
+        raise api_error(status.HTTP_404_NOT_FOUND, "TRACE_NOT_FOUND")
     return trace

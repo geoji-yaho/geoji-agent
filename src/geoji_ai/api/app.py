@@ -22,7 +22,7 @@ from fastapi import FastAPI
 from geoji_ai.adapters.llm_router import build_llm, price_for
 from geoji_ai.adapters.postgres_call_ledger import PostgresCallLedger
 from geoji_ai.adapters.postgres_jobs import make_engine
-from geoji_ai.api import health, intake_routes, telemetry_routes
+from geoji_ai.api import errors, health, intake_routes, telemetry_routes
 from geoji_ai.application.llm_gateway import LLMGateway
 from geoji_ai.core.config import Settings, get_settings, secret_value
 from geoji_ai.core.logging import configure_logging
@@ -67,6 +67,7 @@ def create_app(settings: Settings | None = None, *, intake_llm: Any = _UNSET) ->
     app.state.settings = settings
     app.state.intake_engine = None
     app.state.intake_llm = _build_intake_llm(settings, app) if intake_llm is _UNSET else intake_llm
+    errors.install(app)
     app.include_router(health.router)
     app.include_router(intake_routes.router)
     app.include_router(telemetry_routes.router)
