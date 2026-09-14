@@ -46,6 +46,7 @@ AI 파트(`geoji-agent`)가 백엔드 담당에게 알려야 하는 것을 모�
 
 | 날짜 | 항목 | 내용 | 출처 | 상태 |
 |---|---|---|---|---|
+| 9/14 | ledger-sweep RESERVED 정리 | `--older-than` 보다 오래된 `RESERVED` 호출도 `UNKNOWN` 으로 바꿔 예약액을 spent 로 확정한다(취소·강제 종료로 남은 예약). 출력에 RESERVED 건수 추가. 크론 설정은 바꿀 것 없음 | 08 §3.2, 06 §3.2 | 미전달 |
 | 9/14 | `generation-failed` 코드 분포 | 서기가 전부 시간 초과로 실패하면 `VENDOR_UNAVAILABLE` 대신 `DEADLINE_EXCEEDED`. 둘 다 TEXT_RETRY round 예약 코드라 분기는 같고 집계 분포만 바뀐다 | 08 §3.5, 10 §4.6 | 미전달 |
 | 9/14 | 노드 timeout 환경변수 | `*_NODE_TIMEOUT_SECONDS`·`INTAKE_TIMEOUT_SECONDS` 가 소수를 받는다(기본값 불변) | 08 §3.5 | 미전달 |
 | 9/14 | watchdog 뒤 job 상태 | 늦은 성공 뒤 이전 job 상태가 08 §3.1 `complete` 와 10 §6-4 `CANCELLED` 로 어긋난다. 우리 테스트는 `CANCELLED`(워커 complete 0행)로 고정. 실제 구현 확인(§5) | 10 §6, 08 §3.1 | 미전달 |
