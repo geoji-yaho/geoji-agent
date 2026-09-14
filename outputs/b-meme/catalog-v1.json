@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "assets": [
+    {
+      "asset_key": "run1-images-1",
+      "asset_path": "outputs/b-meme/run-1/001-images-1.png",
+      "metadata_path": "outputs/b-meme/run-1/001-images-1.metadata.v2.json",
+      "tag": "GUILTY_HEAVY",
+      "strategies": [],
+      "suggested_object_key": "memes/seed/run1-images-1/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "run1-images-2",
+      "asset_path": "outputs/b-meme/run-1/002-images-2.png",
+      "metadata_path": "outputs/b-meme/run-1/002-images-2.metadata.v2.json",
+      "tag": "GUILTY_HEAVY",
+      "strategies": [],
+      "suggested_object_key": "memes/seed/run1-images-2/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "skill-test-images-3",
+      "asset_path": "outputs/b-meme/skill-test-20260911/001-images-3.png",
+      "metadata_path": "outputs/b-meme/skill-test-20260911/001-images-3.metadata.json",
+      "tag": "GUILTY_HEAVY",
+      "strategies": [],
+      "suggested_object_key": "memes/seed/skill-test-images-3/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "skill-test-images-8",
+      "asset_path": "outputs/b-meme/skill-test-20260911/002-images-8.png",
+      "metadata_path": "outputs/b-meme/skill-test-20260911/002-images-8.metadata.json",
+      "tag": "GUILTY_HEAVY",
+      "strategies": [],
+      "suggested_object_key": "memes/seed/skill-test-images-8/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "skill-test-images-9",
+      "asset_path": "outputs/b-meme/skill-test-20260911/003-images-9.png",
+      "metadata_path": "outputs/b-meme/skill-test-20260911/003-images-9.metadata.json",
+      "tag": "GUILTY_HEAVY",
+      "strategies": [],
+      "suggested_object_key": "memes/seed/skill-test-images-9/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "aeng-doratna",
+      "asset_path": "outputs/b-meme/run-20260915-agent-team-project/001-aeng_doratna.png",
+      "metadata_path": "outputs/b-meme/run-20260915-agent-team-project/001-aeng_doratna.metadata.json",
+      "tag": "REJECTED",
+      "strategies": [],
+      "suggested_object_key": "memes/seed/aeng-doratna/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "disappointed",
+      "asset_path": "outputs/b-meme/run-20260915-agent-team-project/002-disappointed.png",
+      "metadata_path": "outputs/b-meme/run-20260915-agent-team-project/002-disappointed.metadata.json",
+      "tag": "GUILTY_LIGHT",
+      "strategies": [],
+      "suggested_object_key": "memes/seed/disappointed/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "empty-wallet",
+      "asset_path": "outputs/b-meme/run-20260915-agent-team-project/003-empty_wallet.png",
+      "metadata_path": "outputs/b-meme/run-20260915-agent-team-project/003-empty_wallet.metadata.json",
+      "tag": "GUILTY_HEAVY",
+      "strategies": [],
+      "suggested_object_key": "memes/seed/empty-wallet/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "gokyungpyo-shock",
+      "asset_path": "outputs/b-meme/run-20260915-agent-team-project/004-gokyungpyo_shock.png",
+      "metadata_path": "outputs/b-meme/run-20260915-agent-team-project/004-gokyungpyo_shock.metadata.json",
+      "tag": "GUILTY_HEAVY",
+      "strategies": [],
+      "suggested_object_key": "memes/seed/gokyungpyo-shock/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "park-stop-it",
+      "asset_path": "outputs/b-meme/run-20260915-agent-team-project/005-park_stop_it.png",
+      "metadata_path": "outputs/b-meme/run-20260915-agent-team-project/005-park_stop_it.metadata.json",
+      "tag": "REJECTED",
+      "strategies": [],
+      "suggested_object_key": "memes/seed/park-stop-it/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    }
+  ]
+}

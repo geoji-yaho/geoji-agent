@@ -1,0 +1,249 @@
+{
+  "schema_version": 1,
+  "assets": [
+    {
+      "asset_key": "run1-images-1",
+      "asset_path": "outputs/b-meme/run-1/001-images-1.png",
+      "metadata_path": "outputs/b-meme/run-1/001-images-1.metadata.v2.json",
+      "asset_sha256": "20d4616a37d6349bb5ec98591705f5482155bed89199f50cfc7f2caab3d8825b",
+      "byte_size": 1303392,
+      "mime_type": "image/png",
+      "width": 896,
+      "height": 1200,
+      "tag": "GUILTY_HEAVY",
+      "strategies": [],
+      "emotions": [
+        "RESIGNATION"
+      ],
+      "keywords": [
+        "돈없음",
+        "체념",
+        "자조",
+        "거렁뱅이"
+      ],
+      "suggested_object_key": "memes/seed/run1-images-1/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "run1-images-2",
+      "asset_path": "outputs/b-meme/run-1/002-images-2.png",
+      "metadata_path": "outputs/b-meme/run-1/002-images-2.metadata.v2.json",
+      "asset_sha256": "da42692fa8e59e067cc2cf718cb93c156a4885ace5abb0d99c6aa48d27e0db8d",
+      "byte_size": 1190395,
+      "mime_type": "image/png",
+      "width": 1024,
+      "height": 1024,
+      "tag": "GUILTY_HEAVY",
+      "strategies": [],
+      "emotions": [
+        "RESIGNATION",
+        "ABSURD_SERIOUSNESS"
+      ],
+      "keywords": [
+        "가난",
+        "체념",
+        "자조",
+        "돈없음"
+      ],
+      "suggested_object_key": "memes/seed/run1-images-2/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "skill-test-images-3",
+      "asset_path": "outputs/b-meme/skill-test-20260911/001-images-3.png",
+      "metadata_path": "outputs/b-meme/skill-test-20260911/001-images-3.metadata.json",
+      "asset_sha256": "45303cd4c74a449312ad632092ae70ea8aecae4b1690ddaa27a6af8e544c8a20",
+      "byte_size": 2596931,
+      "mime_type": "image/png",
+      "width": 1446,
+      "height": 1087,
+      "tag": "GUILTY_HEAVY",
+      "strategies": [],
+      "emotions": [
+        "ABSURD_SERIOUSNESS"
+      ],
+      "keywords": [
+        "거지왕",
+        "등장",
+        "진지함"
+      ],
+      "suggested_object_key": "memes/seed/skill-test-images-3/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "skill-test-images-8",
+      "asset_path": "outputs/b-meme/skill-test-20260911/002-images-8.png",
+      "metadata_path": "outputs/b-meme/skill-test-20260911/002-images-8.metadata.json",
+      "asset_sha256": "61a90593bef70c615ac4f21cb774b2b6c5e32003affe240a8f84430f7cbdd69c",
+      "byte_size": 2250967,
+      "mime_type": "image/png",
+      "width": 1420,
+      "height": 1108,
+      "tag": "GUILTY_HEAVY",
+      "strategies": [],
+      "emotions": [
+        "RESIGNATION"
+      ],
+      "keywords": [
+        "돈없음",
+        "체념",
+        "담담함"
+      ],
+      "suggested_object_key": "memes/seed/skill-test-images-8/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "skill-test-images-9",
+      "asset_path": "outputs/b-meme/skill-test-20260911/003-images-9.png",
+      "metadata_path": "outputs/b-meme/skill-test-20260911/003-images-9.metadata.json",
+      "asset_sha256": "df6974ab269b5276857061959ff29e85ede9aedecd8028bda7c15b6e16367e7d",
+      "byte_size": 2099905,
+      "mime_type": "image/png",
+      "width": 1254,
+      "height": 1254,
+      "tag": "GUILTY_HEAVY",
+      "strategies": [],
+      "emotions": [
+        "ABSURD_SERIOUSNESS"
+      ],
+      "keywords": [
+        "지갑",
+        "당황",
+        "현실부정"
+      ],
+      "suggested_object_key": "memes/seed/skill-test-images-9/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "aeng-doratna",
+      "asset_path": "outputs/b-meme/run-20260915-agent-team-project/001-aeng_doratna.png",
+      "metadata_path": "outputs/b-meme/run-20260915-agent-team-project/001-aeng_doratna.metadata.json",
+      "asset_sha256": "5e4479ae88c98dbfec222d5456669141fe85d9cd0cf0920cafcce7e7b2122dae",
+      "byte_size": 2151869,
+      "mime_type": "image/png",
+      "width": 1268,
+      "height": 1240,
+      "tag": "REJECTED",
+      "strategies": [],
+      "emotions": [
+        "DISAPPROVAL"
+      ],
+      "keywords": [
+        "황당",
+        "불쾌",
+        "의심",
+        "휴대폰",
+        "도랏나"
+      ],
+      "suggested_object_key": "memes/seed/aeng-doratna/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "disappointed",
+      "asset_path": "outputs/b-meme/run-20260915-agent-team-project/002-disappointed.png",
+      "metadata_path": "outputs/b-meme/run-20260915-agent-team-project/002-disappointed.metadata.json",
+      "asset_sha256": "8d44f526cfc398ca904fbe47f209e5f0f649a4bcdbf4c05e9569d2409bebddba",
+      "byte_size": 1937641,
+      "mime_type": "image/png",
+      "width": 1254,
+      "height": 1254,
+      "tag": "GUILTY_LIGHT",
+      "strategies": [],
+      "emotions": [
+        "RESIGNATION"
+      ],
+      "keywords": [
+        "실망",
+        "체념",
+        "억지웃음",
+        "예상함",
+        "곁눈질"
+      ],
+      "suggested_object_key": "memes/seed/disappointed/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "empty-wallet",
+      "asset_path": "outputs/b-meme/run-20260915-agent-team-project/003-empty_wallet.png",
+      "metadata_path": "outputs/b-meme/run-20260915-agent-team-project/003-empty_wallet.metadata.json",
+      "asset_sha256": "287a6111cfe4d5b879c72be14d0a17fed3d1cbc65944f8ff30d2467ac6ad015a",
+      "byte_size": 1562224,
+      "mime_type": "image/png",
+      "width": 1586,
+      "height": 992,
+      "tag": "GUILTY_HEAVY",
+      "strategies": [],
+      "emotions": [
+        "PITY",
+        "ABSURD_SERIOUSNESS"
+      ],
+      "keywords": [
+        "돈없음",
+        "빈지갑",
+        "당황",
+        "충격",
+        "곤란"
+      ],
+      "suggested_object_key": "memes/seed/empty-wallet/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "gokyungpyo-shock",
+      "asset_path": "outputs/b-meme/run-20260915-agent-team-project/004-gokyungpyo_shock.png",
+      "metadata_path": "outputs/b-meme/run-20260915-agent-team-project/004-gokyungpyo_shock.metadata.json",
+      "asset_sha256": "07d30d1e892db67e263123de6f570fac040e226d952fce167e5622be9f4ce19f",
+      "byte_size": 1937575,
+      "mime_type": "image/png",
+      "width": 1339,
+      "height": 1175,
+      "tag": "GUILTY_HEAVY",
+      "strategies": [],
+      "emotions": [
+        "ABSURD_SERIOUSNESS"
+      ],
+      "keywords": [
+        "충격",
+        "당황",
+        "황당",
+        "놀람",
+        "말문막힘"
+      ],
+      "suggested_object_key": "memes/seed/gokyungpyo-shock/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "park-stop-it",
+      "asset_path": "outputs/b-meme/run-20260915-agent-team-project/005-park_stop_it.png",
+      "metadata_path": "outputs/b-meme/run-20260915-agent-team-project/005-park_stop_it.metadata.json",
+      "asset_sha256": "e0a838c6ee4af5c6864f33e0775fcbf6a79da1f0472af6fe4e09da5df6373875",
+      "byte_size": 2175964,
+      "mime_type": "image/png",
+      "width": 1406,
+      "height": 1119,
+      "tag": "REJECTED",
+      "strategies": [],
+      "emotions": [
+        "DISAPPROVAL"
+      ],
+      "keywords": [
+        "지겨움",
+        "짜증",
+        "그만",
+        "경고",
+        "피곤"
+      ],
+      "suggested_object_key": "memes/seed/park-stop-it/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    }
+  ]
+}

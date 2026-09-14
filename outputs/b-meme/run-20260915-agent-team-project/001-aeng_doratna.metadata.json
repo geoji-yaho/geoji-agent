@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "001-aeng_doratna.png",
+  "asset_sha256": "5e4479ae88c98dbfec222d5456669141fe85d9cd0cf0920cafcce7e7b2122dae",
+  "classification": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "황당",
+      "불쾌",
+      "의심",
+      "휴대폰",
+      "도랏나"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "눈살을 찌푸리고 이를 드러낸 불쾌하고 의심스러운 표정",
+        "pose": "분홍색 휴대폰을 보며 반대편 손을 귀 옆에 든 상반신 구도",
+        "captions": [
+          "앵. 도랏나"
+        ]
+      }
+    ],
+    "evidence": "휴대폰을 곁눈질하며 찌푸린 표정과 '앵. 도랏나'라는 반응이 강한 못마땅함을 나타낸다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-14T15:39:52+00:00",
+  "needs_review": false,
+  "tag": "REJECTED",
+  "strategies": [],
+  "is_active": false
+}

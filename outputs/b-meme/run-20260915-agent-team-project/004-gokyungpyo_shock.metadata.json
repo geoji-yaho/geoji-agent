@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "004-gokyungpyo_shock.png",
+  "asset_sha256": "07d30d1e892db67e263123de6f570fac040e226d952fce167e5622be9f4ce19f",
+  "classification": {
+    "emotions": [
+      "ABSURD_SERIOUSNESS"
+    ],
+    "keywords": [
+      "충격",
+      "당황",
+      "황당",
+      "놀람",
+      "말문막힘"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "눈을 반쯤 뜨고 입을 작게 벌린 과장된 충격 표정",
+        "pose": "턱을 당기고 고개를 살짝 기울인 야외 얼굴 클로즈업",
+        "captions": []
+      }
+    ],
+    "evidence": "실제 상황보다 과도하게 진지하고 황당한 충격 표정 자체가 밈의 웃음을 만든다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-14T15:39:52+00:00",
+  "needs_review": false,
+  "tag": "GUILTY_HEAVY",
+  "strategies": [],
+  "is_active": false
+}

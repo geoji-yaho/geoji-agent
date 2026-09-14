@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "005-park_stop_it.png",
+  "asset_sha256": "e0a838c6ee4af5c6864f33e0775fcbf6a79da1f0472af6fe4e09da5df6373875",
+  "classification": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "지겨움",
+      "짜증",
+      "그만",
+      "경고",
+      "피곤"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "눈을 가늘게 뜨고 입을 벌린 지치고 못마땅한 표정",
+        "pose": "고개를 뒤와 옆으로 기울인 채 앉아 있는 가슴 위 구도",
+        "captions": [
+          "지겨워",
+          "그만해라 이 자식아..."
+        ]
+      }
+    ],
+    "evidence": "지친 표정과 그만하라는 직접적인 자막이 강한 못마땅함과 짜증을 나타낸다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-14T15:39:52+00:00",
+  "needs_review": false,
+  "tag": "REJECTED",
+  "strategies": [],
+  "is_active": false
+}
