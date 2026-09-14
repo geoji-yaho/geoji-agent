@@ -14,8 +14,13 @@ generation_failed`.
 - MINIMAL·INLINE dossier 도 `preparation.save_dossier` 로 저장한다(finalize `dossier_id` 가
   `ai.dossiers` 에 있게). `trial_prep` 행은 만들지 않는다. 저장 직전 epoch 불일치면
   `generation_failed(EVIDENCE_INVALIDATED)`
-- INLINE 조서 timeout = `min(WRITER 상한, 남은 − reserve_after(writer))`.
-  05 §3.1 에 조서 예산이 없다
+- INLINE 조서(9/14 D-25): 서기 상한 + 검수 상한 + finalize 예약(`inline_context_reserve`)을 먼저
+  남긴다. `남은 − 예약 > 0` ∧ 남은 ≥ `INLINE_CONTEXT_MIN_REMAINING_MS`(하한 보조)일 때만 시작하고,
+  timeout = `min(WRITER 상한, 남은 − 예약)`. 기본 상한(서기 6·검수 4)이면 10초 마감에서
+  사실상 MINIMAL
+- 모델 호출 직전 epoch 불일치(게이트웨이 `EvidenceInvalidated`, 9/14 D-26)는 어느 노드든
+  `failure=EVIDENCE_INVALIDATED` → `generation_failed`, finalize 0. 서기·검수 fan-out 은 한
+  호출이라도 무효면 전체 무효(TEMPLATE 치환 아님)
 - repair 조건 "남은 ≥ 5s" 는 05 §3.3 값(`REPAIR_MIN_REMAINING_S`), 횟수는 `IMMEDIATE_REPAIR_MAX`.
   `REGENERATE`(TEXT_RETRY) 는 repair 하지 않는다(05 §1 "round 안 보정 없음")
 - repair 대상은 검수관이 `pass=false` 로 판정한 AI 강도다. 보고서에서 빠졌거나 형식이 틀린 강도는
@@ -86,7 +91,14 @@ from geoji_ai.contracts.llm_schemas import evaluator_schema, sentencing_schema, 
 from geoji_ai.contracts.sentencing import SentencingDecision
 from geoji_ai.contracts.writer import MemeHints, TextDraft, WriterDraft
 from geoji_ai.domain.attack_angles import ANGLE_GUIDES, pick
-from geoji_ai.domain.budget import EVALUATOR, SENTENCING, WRITER, Deadline, reserve_after
+from geoji_ai.domain.budget import (
+    EVALUATOR,
+    SENTENCING,
+    WRITER,
+    Deadline,
+    inline_context_reserve,
+    reserve_after,
+)
 from geoji_ai.domain.draft_hash import draft_hash
 from geoji_ai.domain.intensity import Intensity
 from geoji_ai.domain.retries import writer_failure_code
@@ -325,6 +337,13 @@ def _vendor_failure_code(records: Iterable[CallRecord], default: str) -> str:
 
 def _dumps(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False)
+
+
+def _raise_if_exception(item: Any) -> Any:
+    """`gather(return_exceptions=True)` 결과 하나. 예외면 올린다."""
+    if isinstance(item, BaseException):
+        raise item
+    return item
 
 
 def _case_view(snapshot: CaseSnapshot) -> dict[str, Any]:
@@ -666,8 +685,12 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         if _regenerate(state):
             # 삭제·무효 prep 을 대신할 inline 조서도 부르지 않는다(08 §3.2).
             return {"route": _ROUTE_MINIMAL}
-        remaining_ms = state["deadline"].remaining_s() * 1000
-        inline = remaining_ms >= settings.INLINE_CONTEXT_MIN_REMAINING_MS
+        remaining_s = state["deadline"].remaining_s()
+        # D-25: 서기·검수·finalize 시간을 먼저 남기고 남는 시간이 있을 때만. 하한 설정은 보조.
+        inline = (
+            remaining_s - inline_context_reserve(settings) > 0
+            and remaining_s * 1000 >= settings.INLINE_CONTEXT_MIN_REMAINING_MS
+        )
         return {"route": _ROUTE_INLINE if inline else _ROUTE_MINIMAL}
 
     async def minimal_dossier_node(state: SentenceGraphState) -> dict[str, Any]:
@@ -688,9 +711,10 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             logger.warning("inline resolve-evidence 실패 %s → F0 만", type(exc).__name__)
             resolved = None
         dossier = dossier_from_resolved(snapshot, resolved, settings)
+        reserve = inline_context_reserve(settings)
         timeout = min(
             float(settings.WRITER_NODE_TIMEOUT_SECONDS),
-            state["deadline"].remaining_s() - reserve_after(WRITER, settings),
+            state["deadline"].remaining_s() - reserve,
         )
         if timeout > 0:
             try:
@@ -703,7 +727,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     prompt_version=deps.prompt_version,
                     policy_version=settings.GUARDRAIL_POLICY_VERSION,
                     remaining_s=state["deadline"].remaining_s,
-                    reserve_s=reserve_after(WRITER, settings),
+                    reserve_s=reserve,
                 )
                 dossier, _ = await call_context(
                     deps.llm,
@@ -714,6 +738,8 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     timeout_s=timeout,
                     scope=scope,
                 )
+            except EvidenceInvalidated:
+                raise  # D-26: 노드 래퍼가 EVIDENCE_INVALIDATED 로 옮긴다.
             except Exception as exc:  # 코드 Evidence 만으로 계속(05 §5.2).
                 calls.append(CallRecord("context", None, settings.MODEL_JUDGMENT, _error_name(exc)))
                 logger.warning("inline 조서 실패 %s → 코드 Evidence 만", _error_name(exc))
@@ -914,9 +940,12 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         jury = _jury(state)
         decision: SentencingDecision | None = state.get("sentencing")
         post_id = state["snapshot"].post_id
-        outcomes = await asyncio.gather(
-            *(write_one(state, i, offset, avoid.get(i)) for i in intensities)
+        gathered = await asyncio.gather(
+            *(write_one(state, i, offset, avoid.get(i)) for i in intensities),
+            return_exceptions=True,
         )
+        # 한 강도라도 무효(D-26)면 전체 무효. 모든 호출이 끝난 뒤 올린다.
+        outcomes = [_raise_if_exception(item) for item in gathered]
         calls = list(state["calls"])
         drafts: dict[Intensity, TextDraft] = dict(state.get("drafts") or {})
         sources: dict[Intensity, Literal["AI", "TEMPLATE"]] = dict(state.get("draft_sources") or {})
@@ -1056,7 +1085,8 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             record = CallRecord("evaluator", tag, result.model_id, None)
             return ("OK", dict(result.output), record, commit)
 
-        outcomes = await asyncio.gather(*(one(group) for group in groups))
+        gathered = await asyncio.gather(*(one(group) for group in groups), return_exceptions=True)
+        outcomes = [_raise_if_exception(item) for item in gathered]
         records = [record for _, _, record, _ in outcomes if record.error != "NO_BUDGET"]
         commits = [commit for _, _, _, commit in outcomes if commit is not None]
         kinds = {kind for kind, _, _, _ in outcomes}
@@ -1402,6 +1432,12 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             started = time.monotonic()
             try:
                 update = await fn(state)
+            except EvidenceInvalidated as exc:
+                # D-26: 모델 호출 직전 epoch 불일치. 저장 없이 generation_failed 로 보낸다.
+                logger.info(
+                    "모델 호출 직전 epoch 불일치 %s → %s", exc.scope_keys, EVIDENCE_INVALIDATED
+                )
+                update = {"failure": EVIDENCE_INVALIDATED}
             except BaseException as exc:
                 emit(state, started, ok=False, fallback_reason=type(exc).__name__)
                 raise
@@ -1494,8 +1530,9 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         graph.add_conditional_edges(
             node, after_dossier, ["sentencing", "writer", "generation_failed"]
         )
-    graph.add_edge("sentencing", "writer")
-    graph.add_edge("writer", "join")
+    # 양형·서기·보정은 D-26 무효(failure)면 generation_failed 로 간다.
+    graph.add_conditional_edges("sentencing", failed_or("writer"), ["writer", "generation_failed"])
+    graph.add_conditional_edges("writer", failed_or("join"), ["join", "generation_failed"])
     graph.add_conditional_edges(
         "join", failed_or("deterministic_validate"), ["deterministic_validate", "generation_failed"]
     )
@@ -1505,7 +1542,11 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
     graph.add_conditional_edges(
         "evaluator", after_evaluator, ["finalize", "writer_repair", "generation_failed"]
     )
-    graph.add_edge("writer_repair", "deterministic_validate")
+    graph.add_conditional_edges(
+        "writer_repair",
+        failed_or("deterministic_validate"),
+        ["deterministic_validate", "generation_failed"],
+    )
     graph.add_conditional_edges(
         "finalize", after_finalize, [END, "writer_repair", "generation_failed"]
     )

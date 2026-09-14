@@ -345,17 +345,22 @@ async def test_01_Banter_실패해도_DOSSIER_READY_조서로_선고한다(env: 
 # --- ② prep 없을 때 ---------------------------------------------------------------
 
 
+#: D-25(9/14) 로 서기 상한 + 검수 상한 + finalize 예약을 남긴 뒤에만 즉석 조서를 부른다. 기본 상한
+#: (6·4)에서는 10초 안에 들어가지 않아, INLINE 경로는 상한을 낮춘 설정으로 본다(제품 값 아님).
+_LOW_CAPS: dict[str, Any] = {"WRITER_NODE_TIMEOUT_SECONDS": 2, "EVALUATOR_NODE_TIMEOUT_SECONDS": 2}
+
+
 @pytest.mark.parametrize(
-    ("remaining_s", "source"),
-    [(8.4, "MINIMAL"), (9.0, "INLINE")],
-    ids=["8.4s_MINIMAL", "9s_INLINE"],
+    ("remaining_s", "caps", "source"),
+    [(8.4, {}, "MINIMAL"), (10.0, {}, "MINIMAL"), (10.0, _LOW_CAPS, "INLINE")],
+    ids=["8.4s_MINIMAL", "기본상한_10s_MINIMAL", "서기2_검수2_10s_INLINE"],
 )
 async def test_02_prep_없으면_남은시간으로_MINIMAL_또는_INLINE(
-    env: Env, remaining_s: float, source: str
+    env: Env, remaining_s: float, caps: dict[str, Any], source: str
 ):
     llm = PlannedLLM(FakeLLM(outputs={"context": CONTEXT_OK}))
 
-    job_id = await env.sentence(llm, remaining_s=remaining_s)
+    job_id = await env.sentence(llm, remaining_s=remaining_s, settings=make_settings(**caps))
 
     assert (await env.fetch_job(job_id))["status"] == "SUCCEEDED"
     # MINIMAL·INLINE 모두 dossier 를 저장한다. trial_prep 은 만들지 않는다.

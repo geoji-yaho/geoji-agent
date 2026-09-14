@@ -27,6 +27,7 @@ from geoji_ai.domain.budget import est_max_micro_usd, request_hash
 from geoji_ai.domain.vendor_health import DEGRADED_THRESHOLD, VendorHealth
 from geoji_ai.ports.ledger import BudgetExceeded, CallSpec
 from geoji_ai.ports.llm import Cost, LLMError, LLMResult, Usage
+from geoji_ai.ports.preparation import EvidenceInvalidated
 
 MODEL = "gpt-5.6-luna"
 PRICES = {"gpt-5.6-luna": (0.20, 1.20), "gpt-5.6-terra": (2.00, 12.00)}
@@ -596,11 +597,11 @@ class EpochFeed:
 @pytest.mark.parametrize(
     ("seed", "answers", "reused", "lookups", "put"),
     [
-        (True, (["user:u1"],), False, 0, 0),  # ⓐ 이미 무효화: 저장된 결과가 있어도 조회 0·저장 0
+        # ⓐ 이미 무효화는 D-26 으로 호출 자체를 막는다(아래 test_D26_*)
         (False, ([], ["user:u1"]), False, 1, 0),  # ⓑ 호출 중 epoch +1: 저장 0
         (True, ([],), True, 1, 0),  # ⓒ 일치: 기존처럼 hit(재사용 결과는 넣지 않는다)
     ],
-    ids=["stale_before", "stale_during_call", "current"],
+    ids=["stale_during_call", "current"],
 )
 async def test_07e_현재_epoch_과_다르면_node_results_를_조회도_저장도_하지_않는다(
     seed: bool, answers: tuple[list[str], ...], reused: bool, lookups: int, put: int
@@ -636,18 +637,69 @@ async def test_07f_epoch_일치면_새_호출_결과를_저장하고_확인_예�
     async def broken(_: Any) -> list[str]:
         raise RuntimeError("db down")
 
+    # D-26: 확인 실패는 원장 예약 실패와 같은 TRANSPORT 다. 호출·예약·조회 0.
     b = rig(stale_scopes=broken)
-    scoped = await call(b)  # 확인 실패는 호출을 막지 않는다
-    await b.gateway.remember(scoped)
-    assert len(b.inner.calls) == 1
-    assert (b.ledger.lookups, b.ledger.put) == (0, [])
+    with pytest.raises(LLMError) as caught:
+        await call(b)
+    assert caught.value.kind == "TRANSPORT"
+    assert len(b.inner.calls) == 0
+    assert (b.ledger.reserved, b.ledger.lookups, b.ledger.put) == ([], 0, [])
 
     # privacy_versions 모양이 틀려 쌍을 못 만들어도 확인 실패로 본다(예외가 새지 않는다)
     m = rig(stale_scopes=EpochFeed([]))
-    malformed = await call(m, scope(privacy_versions=[{"scope": "user:u1"}]))
-    await m.gateway.remember(malformed)
-    assert len(m.inner.calls) == 1
-    assert (m.ledger.lookups, m.ledger.put) == (0, [])
+    with pytest.raises(LLMError) as malformed:
+        await call(m, scope(privacy_versions=[{"scope": "user:u1"}]))
+    assert malformed.value.kind == "TRANSPORT"
+    assert len(m.inner.calls) == 0
+    assert (m.ledger.reserved, m.ledger.lookups, m.ledger.put) == ([], 0, [])
+
+
+# --- D-26 모델 호출 직전 epoch 확인(9/14, 10 §8·§15.5) ------------------------------------
+
+
+async def test_D26_epoch_가_바뀐_뒤_호출하면_inner_0_reserve_0_EvidenceInvalidated():
+    ledger = FakeLedger()
+    # 저장된 재사용 결과가 있어도 무효 epoch 로는 조회하지 않는다.
+    seeded = rig(ledger=ledger)
+    await seeded.gateway.remember(await call(seeded))
+    ledger.reserved.clear()
+    ledger.settled.clear()
+    ledger.lookups = 0
+
+    feed = EpochFeed(["user:u1"])
+    r = rig(ledger=ledger, stale_scopes=feed)
+
+    with pytest.raises(EvidenceInvalidated) as caught:
+        await call(r)
+
+    assert caught.value.error_code == "EVIDENCE_INVALIDATED"
+    assert caught.value.scope_keys == ["user:u1"]
+    assert r.inner.calls == []
+    assert ledger.reserved == []
+    assert ledger.lookups == 0
+    assert (ledger.settled, ledger.failed, ledger.unknown) == ([], [], [])
+    assert feed.asked == [[("user:u1", 1)]]
+
+
+async def test_D26_재시도_직전_epoch_가_바뀌면_재시도하지_않고_같은_원장_행을_한_번_닫는다():
+    feed = EpochFeed([], ["user:u1"])
+    r = rig(LLMError("SERVER"), ok_result(), stale_scopes=feed)
+
+    with pytest.raises(EvidenceInvalidated):
+        await call(r)
+
+    assert len(r.inner.calls) == 1
+    assert len(r.ledger.reserved) == 1
+    assert r.ledger.settled == []
+    assert len(r.ledger.failed) + len(r.ledger.unknown) == 1
+    assert len(feed.asked) == 2  # 첫 시도 전·재시도 전
+
+
+async def test_D26_stale_scopes_가_없으면_기존대로_호출한다():
+    r = rig()
+    scoped = await call(r)
+    assert scoped.reused is False
+    assert len(r.inner.calls) == 1
 
 
 # --- ⑧ 인증 오류 ---------------------------------------------------------------------

@@ -105,22 +105,34 @@ class PreparationPort(Protocol):
         ...
 
     async def save_prep(
-        self, dossier: Dossier, snapshot: CaseSnapshot, prompt_version: str
+        self,
+        dossier: Dossier,
+        snapshot: CaseSnapshot,
+        prompt_version: str,
+        *,
+        reuse_dossier: bool = False,
     ) -> PrepSaveResult:
         """한 트랜잭션: epoch 재확인(불일치면 `EvidenceInvalidated`) → 같은 키 행이 있으면 그대로
-        반환(`reused=True`) → 없으면 dossier·evidence·sources + `trial_prep(DOSSIER_READY)`."""
+        반환(`reused=True`) → 없으면 dossier·evidence·sources + `trial_prep(DOSSIER_READY)`.
+
+        `reuse_dossier` 면(9/14 D-27) 이미 저장된 `dossier` 를 가리키는 `trial_prep` 새 행만 넣고
+        dossier·evidence·sources 는 다시 넣지 않는다."""
         ...
 
     async def save_banter(self, prep_id: str, banter: Mapping[Intensity, list[Candidate]]) -> bool:
         """`banter_json IS NULL ∧ status='DOSSIER_READY'` 일 때만 채우고 `COMPLETE`.
 
+        강도마다 `{key: banter_key(dossier_id, 강도, prompt_version), candidates}` 로 쓴다(D-27).
         채웠으면 True."""
         ...
 
     async def load_valid_prep(
         self, snapshot: CaseSnapshot, prompt_version: str
     ) -> ValidPrep | None:
-        """post_id·input_hash·prompt_version 일치 ∧ 무효화 안 됨 ∧ dossier epoch == 스냅샷."""
+        """무효화 안 됨 ∧ prompt_version 일치 ∧ dossier epoch == 스냅샷인 준비 자료.
+
+        ① `input_hash` 완전 일치 행이 있으면 그 행(드립 전부). ② 없으면(9/14 D-27) 조서 키
+        (`dossier_key`) 일치 행 중 최신 — 드립은 드립 키가 맞는 강도만. epoch 불일치면 None."""
         ...
 
     async def approved_banter_examples(
