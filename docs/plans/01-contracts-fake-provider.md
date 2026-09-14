@@ -261,4 +261,4 @@ uv run uvicorn geoji_ai.api.app:app --port 8100 & curl -s localhost:8100/health/
 **CT-04** — ~~[x] 부록 A 원문 보존 / [x] v1·v2 기대값(`open_questions`) / [x] 합성 8개 / [x] 템플릿 JSON~~(9/11 완료 — 16개. `PROFANITY_OUT_OF_LIST` 는 `open_questions` 로 열어 둠)
 **CT-05** — ~~[x] `intensity` / [x] `lexicon` 목록·적용 표 / [x] `attack_angles` / [x] `validation` 구조 2함수~~(9/11 완료 — `WORN_PHRASES` 1개, `pick` 바깥 `% 6`)
 **CT-06** — ~~[x] Protocol 5종·데이터클래스 / [x] fake 시나리오·`calls[]`~~(9/11 완료 — fake 출력은 fixture 파일에서만)
-**CT-07** — ~~[x] enum 치환~~(9/11 완료 — 01·계약 전부 프론트 값) / [ ] CaseSnapshot 회신 반영(**9/11 서버 `d0f9fd5` 에 필드 없음, 회신 대기.** `docs/backend-handoff.md` §5) / [ ] INDEX §8.4 기록
+**CT-07** — ~~[x] enum 치환~~(9/11 완료 — 01·계약 전부 프론트 값) / [ ] CaseSnapshot 회신 반영(**9/11 서버 `d0f9fd5` 에 필드 없음, 회신 대기.** 10 §14) / [ ] INDEX §8.4 기록
