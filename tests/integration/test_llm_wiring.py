@@ -122,7 +122,13 @@ def wire(
         model_adapters={settings.MODEL_EVALUATOR_HELL: hell_llm} if hell_llm else None,
     )
     ledger = PostgresCallLedger(engine, cap_micro_usd=cap)
-    gateway = LLMGateway(router, ledger, health or VendorHealth(), price_for)
+    gateway = LLMGateway(
+        router,
+        ledger,
+        health or VendorHealth(),
+        price_for,
+        stale_scopes=PostgresPreparation(engine).stale_scopes,
+    )
     return Wired(gateway, judgment, writer, hell_llm)
 
 

@@ -26,8 +26,9 @@ generation_failed`.
   hash 규칙 우선). 그것도 통과하지 못하면 `EVAL_FAILED`
 - finalize 422 repair 는 AI 강도 전부를 다시 쓴다(백엔드 응답에 강도가 없다). 뒤 검수는 전 강도
 - join: 강도 일부 누락 ∧ AI 강도 있음 → `SCHEMA_INVALID`(서버 검증 5항). AI 강도 없음 →
-  서기 오류에 `BUDGET` 이 있으면 `BUDGET_EXCEEDED`, 시간 예산으로 시작 못 한 강도가 있으면
-  `DEADLINE_EXCEEDED`, 나머지(xAI `DEGRADED` 포함) `VENDOR_UNAVAILABLE`
+  `domain.retries.writer_failure_code`. 서기 오류에 `BUDGET` 이 있으면 `BUDGET_EXCEEDED`,
+  시간 예산으로 시작 못 한 강도나 `TIMEOUT` 난 서기가 있으면 `DEADLINE_EXCEEDED`(08 §3.5),
+  나머지(xAI `DEGRADED`·`AUTH` 포함) `VENDOR_UNAVAILABLE`
 - `hell` 별도 검수는 `role="evaluator"` 호출을 둘로 나눈다. 게이트웨이 경로에서 hell 호출은
   `model_override=MODEL_EVALUATOR_HELL` 로 라우터가 모델을 고른다.
   두 보고서의 검사 필드는 AND 로 합친다
@@ -50,8 +51,8 @@ generation_failed`.
   모두 이 집합이다. `target_intensities` 밖 강도가 있으면 호출 없이 `SCHEMA_INVALID`(계획서에 없음)
 - 예산 = `min(begin deadline, begin 노드 시작 + TEXT_RETRY_TIMEOUT_SECONDS)`. round 안 보정 없음
 - 어느 강도든 서기 실패·예산 없음·⑤ 실패·검수 실패면 TEMPLATE 을 새로 finalize 하지 않고 저장 없이
-  `generation_failed` 다. 서기는 join 코드 규칙(`BUDGET_EXCEEDED`·`DEADLINE_EXCEEDED`·
-  `VENDOR_UNAVAILABLE`), ⑤·검수 거부·불완전은 `EVAL_FAILED`, 검수 호출 오류는 INITIAL 과 같은 표.
+  `generation_failed` 다. 서기는 join 코드 규칙(`writer_failure_code`: 예산 > 시간·TIMEOUT > 벤더),
+  ⑤·검수 거부·불완전은 `EVAL_FAILED`, 검수 호출 오류는 INITIAL 과 같은 표.
   다음 round 는 백엔드가 예약한다
 """
 
@@ -88,6 +89,7 @@ from geoji_ai.domain.attack_angles import ANGLE_GUIDES, pick
 from geoji_ai.domain.budget import EVALUATOR, SENTENCING, WRITER, Deadline, reserve_after
 from geoji_ai.domain.draft_hash import draft_hash
 from geoji_ai.domain.intensity import Intensity
+from geoji_ai.domain.retries import writer_failure_code
 from geoji_ai.domain.validation import apply_text_rules, validate_evaluation
 from geoji_ai.graphs.preparation import call_context, dossier_from_resolved, evidence_include
 from geoji_ai.graphs.states import CallRecord, Candidate, SentenceState
@@ -957,13 +959,10 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         sources = state.get("draft_sources") or {}
         not_ai = [i for i in targets if sources.get(i) != "AI"]
         if len(not_ai) == len(targets) or (_regenerate(state) and not_ai):
-            writer_errors = {c.error for c in state["calls"] if c.role == "writer"}
-            if "BUDGET" in writer_errors:
-                code = BUDGET_EXCEEDED
-            elif state.get("writer_budget_skipped"):
-                code = DEADLINE_EXCEEDED
-            else:
-                code = VENDOR_UNAVAILABLE
+            writer_errors = [c.error for c in state["calls"] if c.role == "writer"]
+            code = writer_failure_code(
+                writer_errors, budget_skipped=bool(state.get("writer_budget_skipped"))
+            )
             return {"failure": code}
         missing = set(targets) - set(state.get("drafts") or {})
         if missing:

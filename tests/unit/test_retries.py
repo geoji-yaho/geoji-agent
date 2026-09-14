@@ -12,6 +12,7 @@ from geoji_ai.domain.retries import (
     classify_vendor_error,
     ledger_status,
     retry_allowed,
+    writer_failure_code,
 )
 
 
@@ -47,7 +48,7 @@ def test_unknown_code_rejected() -> None:
         ("REFUSAL", "VENDOR_UNAVAILABLE", "FAILED"),
         ("RATE_LIMIT", "VENDOR_UNAVAILABLE", "FAILED"),
         ("SERVER", "VENDOR_UNAVAILABLE", "FAILED"),
-        ("TIMEOUT", "VENDOR_UNAVAILABLE", "UNKNOWN"),
+        ("TIMEOUT", "DEADLINE_EXCEEDED", "UNKNOWN"),
         ("TRANSPORT", "VENDOR_UNAVAILABLE", "UNKNOWN"),
     ],
 )
@@ -131,6 +132,38 @@ def test_added_kinds_map_to_generation_codes(kind: str, code: str) -> None:
 
 def test_auth_ledger_status_is_failed() -> None:
     assert ledger_status("AUTH") == "FAILED"
+
+
+@pytest.mark.parametrize(
+    ("errors", "skipped", "code"),
+    [
+        (["BUDGET", "TIMEOUT"], True, "BUDGET_EXCEEDED"),
+        (["TIMEOUT", "TIMEOUT"], False, "DEADLINE_EXCEEDED"),
+        ([], True, "DEADLINE_EXCEEDED"),
+        (["AUTH", "AUTH"], False, "VENDOR_UNAVAILABLE"),
+        (["DEGRADED"], False, "VENDOR_UNAVAILABLE"),
+        (["TIMEOUT", "AUTH"], False, "DEADLINE_EXCEEDED"),
+        (["ValidationError", None], False, "VENDOR_UNAVAILABLE"),
+        ([], False, "VENDOR_UNAVAILABLE"),
+        (["BUDGET", "AUTH"], False, "BUDGET_EXCEEDED"),
+    ],
+    ids=[
+        "budget_first",
+        "timeout",
+        "skipped",
+        "auth",
+        "degraded",
+        "timeout_auth",
+        "unknown",
+        "empty",
+        "budget_only",
+    ],
+)
+def test_writer_failure_code_budget_over_deadline_over_vendor(
+    errors: list[str | None], skipped: bool, code: str
+) -> None:
+    """08 §3.5·10 §4.6: 서기 전부 실패 코드. 우선순위 예산 > 시간 > 벤더."""
+    assert writer_failure_code(errors, budget_skipped=skipped) == code
 
 
 @pytest.mark.parametrize("kind", ["DEGRADED", "BUDGET"])

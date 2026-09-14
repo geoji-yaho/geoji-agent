@@ -29,6 +29,9 @@
 - inner 가 `LLMError` 가 아닌 예외를 내면 `TRANSPORT`(원장 UNKNOWN)로 보되 벤더 장애로 세지 않는다
 - `node_results` 에는 **검증된 출력만** 넣는다. 게이트웨이는 검증을 모르므로 호출자(그래프)가 파싱·
   검증에 성공한 뒤 `remember(scoped)` 를 부른다. 조회·저장 오류는 로그만 남기고 호출을 막지 않는다
+- 재사용 조회 전과 저장 직전에 `CallScope.privacy_versions` 를 현재 `ai.privacy_epochs` 와 비교한다
+  (주입 `stale_scopes`, 08 §4.1·06 §3.2). 다르거나 확인이 실패하면 조회 miss·저장 안 함이고 호출은
+  그대로 한다. 무효화 SQL(04 §3.5)이 채우는 `node_results.invalidated_at` 과 이중 방어다
 
 이 모듈은 SQLAlchemy·어댑터를 import 하지 않는다.
 """
@@ -69,6 +72,7 @@ __all__ = [
     "RoutedLLM",
     "ScopedLLM",
     "ScopedResult",
+    "StaleScopes",
     "case_scope",
     "evaluator_call_index",
     "privacy_versions_json",
@@ -79,6 +83,9 @@ __all__ = [
 log = get_logger(__name__)
 
 PriceLookup = Callable[[str], "tuple[float, float] | None"]
+
+#: 현재 epoch 대조. `PreparationPort.stale_scopes` 와 같은 모양이다. 빈 목록이면 일치.
+StaleScopes = Callable[[Iterable[tuple[str, int]]], Awaitable[list[str]]]
 
 #: 서기 강도 슬롯 수. 보정 라운드마다 서기 `call_index` 가 이만큼 밀린다.
 WRITER_SLOTS = len(ALL_INTENSITIES)
@@ -239,6 +246,7 @@ class LLMGateway:
         cost_tracker: DailyCostTracker | None = None,
         notifier: AlertNotifier | None = None,
         today: Callable[[], date] = utc_today,
+        stale_scopes: StaleScopes | None = None,
     ) -> None:
         self._inner = inner
         self._ledger = ledger
@@ -249,6 +257,8 @@ class LLMGateway:
         self._cost_tracker = cost_tracker
         self._notifier = notifier
         self._today = today
+        # 현재 privacy epoch 대조(08 §4.1). 없으면 대조하지 않는다.
+        self._stale_scopes = stale_scopes
 
     async def scoped_call(
         self,
@@ -277,7 +287,9 @@ class LLMGateway:
         versions = NodeResultKey(
             rhash, model_id, scope.prompt_version, scope.policy_version, scope.privacy_versions
         ).versions()
-        cached = await self._lookup(rhash, versions, scope)
+        cached = None
+        if await self._epoch_current(scope.privacy_versions, scope.node):
+            cached = await self._lookup(rhash, versions, scope)
         if cached is not None:
             log.info("llm_node_result_reused", node=scope.node, call_index=scope.call_index)
             return ScopedResult(
@@ -375,12 +387,32 @@ class LLMGateway:
             return
         if result.output is None or result.stop_reason != "stop":
             return
+        # 호출 중 삭제(epoch +1)면 옛 epoch 키로 넣지 않는다.
+        if not await self._epoch_current(scoped.versions.get("privacy_versions"), None):
+            return
         try:
             await self._ledger.put_node_result(
                 scoped.call_id, scoped.request_hash, scoped.versions, result.output
             )
         except Exception as exc:
             log.warning("node_result_put_failed", error=type(exc).__name__)
+
+    async def _epoch_current(self, privacy_versions: Any, node: str | None) -> bool:
+        """`privacy_versions` 가 현재 epoch 과 같은가. 확인할 수 없으면(예외) False."""
+        if self._stale_scopes is None:
+            return True
+        try:
+            pairs = _epoch_pairs(privacy_versions)
+            if not pairs:
+                return True
+            stale = await self._stale_scopes(pairs)
+        except Exception as exc:
+            log.warning("node_result_epoch_check_failed", node=node, error=type(exc).__name__)
+            return False
+        if stale:
+            log.info("llm_node_result_stale_epoch", node=node, scopes=list(stale))
+            return False
+        return True
 
     async def _lookup(
         self, rhash: str, versions: dict[str, Any], scope: CallScope
@@ -407,6 +439,11 @@ class LLMGateway:
             await getattr(self._ledger, action)(call_id, value)
         except Exception as exc:
             log.error("ledger_close_failed", action=action, error=type(exc).__name__)
+
+
+def _epoch_pairs(privacy_versions: Any) -> list[tuple[str, int]]:
+    """jsonb 모양 `[{"scope_key": .., "epoch": ..}]` → `(scope_key, epoch)` 쌍."""
+    return [(str(item["scope_key"]), int(item["epoch"])) for item in privacy_versions or []]
 
 
 def _reused_result(output: dict[str, Any], vendor: str, model_id: str) -> LLMResult:

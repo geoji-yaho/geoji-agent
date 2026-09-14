@@ -58,12 +58,13 @@ class Settings(BaseSettings):
     GUARDRAIL_POLICY_VERSION: Literal["guardrail-v1", "guardrail-v2"] = "guardrail-v2"
 
     # 시간 예산
-    INTAKE_TIMEOUT_SECONDS: int = 4
+    # 노드 timeout 은 float 다. 예산 초과 리허설이 0.1 을 준다(08 §3.5).
+    INTAKE_TIMEOUT_SECONDS: float = 4.0
     FIRST_RESULT_TARGET_SECONDS: int = 10
     REPAIR_PATH_BUDGET_SECONDS: int = 15
-    SENTENCING_NODE_TIMEOUT_SECONDS: int = 3
-    WRITER_NODE_TIMEOUT_SECONDS: int = 6
-    EVALUATOR_NODE_TIMEOUT_SECONDS: int = 4
+    SENTENCING_NODE_TIMEOUT_SECONDS: float = 3.0
+    WRITER_NODE_TIMEOUT_SECONDS: float = 6.0
+    EVALUATOR_NODE_TIMEOUT_SECONDS: float = 4.0
 
     # 큐·워커 (작업 2)
     WORKER_POLL_MS: int = 250

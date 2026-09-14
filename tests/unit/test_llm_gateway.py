@@ -186,12 +186,13 @@ def rig(
     health: RecordingHealth | None = None,
     vendor: str = "openai",
     hang: bool = False,
+    stale_scopes: Any = None,
 ) -> Rig:
     ledger = ledger or FakeLedger()
     inner = FakeInner(*script, vendor=vendor, hang=hang)
     health = health or RecordingHealth()
     sleeps = Sleeps()
-    gateway = LLMGateway(inner, ledger, health, PRICES.get, sleep=sleeps)
+    gateway = LLMGateway(inner, ledger, health, PRICES.get, sleep=sleeps, stale_scopes=stale_scopes)
     return Rig(gateway, ledger, inner, health, sleeps)
 
 
@@ -495,6 +496,78 @@ async def test_07d_출력이_없는_결과는_remember_해도_넣지_않는다()
     r = rig(empty)
     await r.gateway.remember(await call(r))
     assert r.ledger.put == []
+
+
+class EpochFeed:
+    """가짜 현재 epoch 공급(`PreparationPort.stale_scopes` 모양).
+
+    부를 때마다 `answers` 를 하나씩 쓰고, 마지막 답은 계속 쓴다.
+    """
+
+    def __init__(self, *answers: list[str]) -> None:
+        self.answers = list(answers)
+        self.asked: list[list[tuple[str, int]]] = []
+
+    async def __call__(self, privacy_versions: Any) -> list[str]:
+        self.asked.append(list(privacy_versions))
+        return self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
+
+
+@pytest.mark.parametrize(
+    ("seed", "answers", "reused", "lookups", "put"),
+    [
+        (True, (["user:u1"],), False, 0, 0),  # ⓐ 이미 무효화: 저장된 결과가 있어도 조회 0·저장 0
+        (False, ([], ["user:u1"]), False, 1, 0),  # ⓑ 호출 중 epoch +1: 저장 0
+        (True, ([],), True, 1, 0),  # ⓒ 일치: 기존처럼 hit(재사용 결과는 넣지 않는다)
+    ],
+    ids=["stale_before", "stale_during_call", "current"],
+)
+async def test_07e_현재_epoch_과_다르면_node_results_를_조회도_저장도_하지_않는다(
+    seed: bool, answers: tuple[list[str], ...], reused: bool, lookups: int, put: int
+):
+    """08 §4.1 "무효화 후 node_results 재사용 0", 06 §3.2."""
+    ledger = FakeLedger()
+    if seed:
+        seeded = rig(ledger=ledger)
+        await seeded.gateway.remember(await call(seeded))
+        assert ledger.put == ["call-1"]
+        ledger.lookups = 0
+        ledger.put.clear()
+
+    feed = EpochFeed(*answers)
+    r = rig(ledger=ledger, stale_scopes=feed)
+    scoped = await call(r)
+    await r.gateway.remember(scoped)
+
+    assert scoped.reused is reused
+    assert len(r.inner.calls) == (0 if reused else 1)
+    assert ledger.lookups == lookups
+    assert len(ledger.put) == put
+    assert feed.asked[0] == [("user:u1", 1)]
+
+
+async def test_07f_epoch_일치면_새_호출_결과를_저장하고_확인_예외면_저장하지_않는다():
+    feed = EpochFeed([])
+    r = rig(stale_scopes=feed)
+    await r.gateway.remember(await call(r))
+    assert r.ledger.put == ["call-1"]
+    assert len(feed.asked) == 2  # 조회 전·저장 직전
+
+    async def broken(_: Any) -> list[str]:
+        raise RuntimeError("db down")
+
+    b = rig(stale_scopes=broken)
+    scoped = await call(b)  # 확인 실패는 호출을 막지 않는다
+    await b.gateway.remember(scoped)
+    assert len(b.inner.calls) == 1
+    assert (b.ledger.lookups, b.ledger.put) == (0, [])
+
+    # privacy_versions 모양이 틀려 쌍을 못 만들어도 확인 실패로 본다(예외가 새지 않는다)
+    m = rig(stale_scopes=EpochFeed([]))
+    malformed = await call(m, scope(privacy_versions=[{"scope": "user:u1"}]))
+    await m.gateway.remember(malformed)
+    assert len(m.inner.calls) == 1
+    assert (m.ledger.lookups, m.ledger.put) == (0, [])
 
 
 # --- ⑧ 인증 오류 ---------------------------------------------------------------------
