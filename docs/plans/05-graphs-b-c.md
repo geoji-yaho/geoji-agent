@@ -92,7 +92,7 @@ class SentenceState(TypedDict):
     repair_count: int; draft_hash: str | None; calls: list[CallRecord]; failure: str | None
 ```
 - `Deadline.from_db(deadline_at, db_now)`: DB 시간과 로컬 monotonic 의 차이로 남은 시간을 만든다. 호스트 clock 을 신뢰하지 않는다(§14.1)
-- `node_timeout(name)` = `min(NODE_TIMEOUT[name], remaining − reserve_after(name))`. `reserve_after`: writer 뒤 evaluator 4s + finalize 0.5s, evaluator 뒤 finalize 0.5s. 계산 결과 ≤ 0 이면 그 노드를 **시작하지 않고** 폴백
+- `node_timeout(name)` = `min(NODE_TIMEOUT[name], remaining − reserve_after(name))`. `reserve_after`: writer 뒤 evaluator 4s + finalize 0.5s, evaluator 뒤 finalize 0.5s. 계산 결과 ≤ 0 이면 그 노드를 **시작하지 않고** 폴백. sentencing 뒤 예약은 두지 않는다(9/14 리뷰 수정, PR #33). **9/14 D-25:** 즉석 조서(`inline_context`)는 서기 상한 + 검수 상한 + finalize 0.5s 를 남긴 나머지 시간만 쓰고, 남는 시간이 없으면 시작하지 않고 `minimal_dossier`
 - 429 백오프가 남은 시간을 넘으면 즉시 폴백(작업 6 `retries.py` 가 결정, 작업 5 는 훅만)
 
 ### 3.2 그래프 B (`graphs/preparation.py`, proposal2 §5.2)
@@ -113,7 +113,7 @@ class SentenceState(TypedDict):
 | 노드 | 동작 |
 |---|---|
 | `begin_generation` | `backend.begin_generation(verdict_id, job, generation, verdict_version)` → 고정 형량(있으면 `sentencing_source=FIXED`)·`text_version`·`deadline_at`. 409 → 폐기·complete |
-| `load_valid_prep` | `trial_prep` 중 `post_id` 일치 ∧ `input_hash` 일치(스냅샷 재계산) ∧ `prompt_version` 일치 ∧ `invalidated_at IS NULL` ∧ dossier `privacy_versions` == 스냅샷. 없으면 남은 시간 ≥ `INLINE_CONTEXT_MIN_REMAINING_MS` 면 `inline_context`(04 build + 조서 1회, 드립 생략), 아니면 `minimal_dossier`(코드 Evidence 만) |
+| `load_valid_prep` | **9/14 D-27 부분 키:** 조서는 `post_id` 일치 ∧ 조서 키(게시물 필드·심문 결과·방 규칙 버전) 일치 ∧ `prompt_version` 일치 ∧ `invalidated_at IS NULL` ∧ dossier `privacy_versions` == 스냅샷(epoch 불일치면 재사용 없음). 드립 후보는 그 조서 + 강도별 키가 맞는 강도만 쓰고, 나머지 강도는 후보 없이 서기. (원문) `input_hash` 일치(스냅샷 재계산) 한 덩어리. 조서가 없으면 **D-25 계단**: 서기·검수·finalize 시간을 남기고도 시간이 있으면 `inline_context`(04 build + 조서 1회, 드립 생략), 아니면 `minimal_dossier`(코드 Evidence 만). (원문) 남은 시간 ≥ `INLINE_CONTEXT_MIN_REMAINING_MS` |
 | `sentencing` | `spent ∧ guilty ∧ FIXED 아님` 만. 입력: jury snapshot·허용 목록(`code, rank`)·Evidence pack·걸린 RULE. **방 말투 예시 없음.** 출력 `sentence` ∉ 허용 목록 → `rank` 최대(상한)로 절삭 + 감사 로그. timeout·오류 → `policy.fallback_sentence`, `reason=null`, `sentencing_source=RULE`. `sentencing_reason` > 100자 → **검수 실패로 취급하지 않고 즉시 템플릿 치환**(D-19, `reason_source=TEMPLATE`) |
 | `writer` (fan-out) | 강도마다 `asyncio.create_task`(세마포어 8 안): 입력 = 양형 결과(인용·수정 금지), Evidence(라벨), 그 강도 후보(`fits ∋ result`), 그 강도 말투 예시(플래그), `attack_angle = angles.pick(post_id, offset)`, **그 강도 섹션만의 시스템 프롬프트**. 출력 `TextDraft` 1개 + `meme_tag`·`meme_hints`(`default_intensity` 호출 값 채택). 실패 강도는 `draft_sources[i]=TEMPLATE`(`templates-v1.json`) |
 | `join` | 강도 집합 == `target_intensities` 확인. 전부 실패 → `generation_failed(VENDOR_UNAVAILABLE)` |
