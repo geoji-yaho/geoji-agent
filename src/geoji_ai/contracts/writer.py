@@ -39,6 +39,17 @@ class MemeTag(StrEnum):
     REJECTED = "REJECTED"
 
 
+# `meme_hints.emotion` 어휘(08 §3.4, 9/8 확정). 백엔드 짤 점수 규칙이 이 값으로 대조한다.
+# docstring 을 두지 않는다 — 생성 스키마에 description 으로 들어간다.
+class MemeEmotion(StrEnum):
+    DISAPPROVAL = "DISAPPROVAL"
+    ABSURD_SERIOUSNESS = "ABSURD_SERIOUSNESS"
+    SMUG = "SMUG"
+    PITY = "PITY"
+    CELEBRATION = "CELEBRATION"
+    RESIGNATION = "RESIGNATION"
+
+
 class Statement(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -50,7 +61,7 @@ class Statement(BaseModel):
 class MemeHints(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    emotion: Annotated[str, Field(max_length=30)]
+    emotion: MemeEmotion
     keywords: Annotated[list[Annotated[str, Field(max_length=30)]], Field(max_length=10)]
 
 

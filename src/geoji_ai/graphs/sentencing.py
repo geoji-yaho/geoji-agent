@@ -69,6 +69,7 @@ from typing import Any, Literal, Protocol
 from langgraph.graph import END, START, StateGraph
 from pydantic import ValidationError
 
+from geoji_ai.application import instrument
 from geoji_ai.application.build_evidence import build_evidence
 from geoji_ai.application.llm_gateway import (
     ScopedLLM,
@@ -77,7 +78,7 @@ from geoji_ai.application.llm_gateway import (
     writer_call_index,
 )
 from geoji_ai.contracts.case import CaseSnapshot, JurySnapshot
-from geoji_ai.contracts.evaluation import EvaluationReport
+from geoji_ai.contracts.evaluation import EvaluationReport, ViolationCode
 from geoji_ai.contracts.finalize import FinalizeRequest, ModelIds
 from geoji_ai.contracts.jobs import Job, SentencePayload, TextRetryPayload, parse_payload
 from geoji_ai.contracts.llm_schemas import evaluator_schema, sentencing_schema, writer_schema
@@ -104,6 +105,7 @@ from geoji_ai.ports.backend import (
 from geoji_ai.ports.llm import LLMError, LLMPort, LLMResult, LLMRole
 from geoji_ai.ports.preparation import Dossier, EvidenceInvalidated
 from geoji_ai.prompts import build_writer_system, load_prompt, prompt_bundle_version
+from geoji_ai.telemetry.alerts import AlertNotifier, finalize_db_error
 
 __all__ = [
     "MINIMAL_PACK_LIMIT",
@@ -192,6 +194,8 @@ class SentenceGraphState(SentenceState, total=False):
     route: str
     #: 이 실행에서 끝난 검수 라운드 수. 검수 `call_index` 에 쓴다.
     eval_round: int
+    #: 검수 실패로 `writer_repair` 에 보낸 강도(중복 없음). `evaluation_repair_rate` 분모.
+    eval_repaired: list[Intensity]
 
 
 class ValidPrepLike(Protocol):
@@ -225,6 +229,8 @@ class SentenceDeps:
     clock: Callable[[], float] = field(default=time.monotonic)
     prompt_version: str = field(default_factory=prompt_bundle_version)
     templates: Mapping[str, Any] | None = None
+    #: 운영 알림(08 §3.3 finalize DB 오류). None 이면 알리지 않는다.
+    notifier: AlertNotifier | None = None
 
 
 def initial_state(
@@ -253,6 +259,7 @@ def initial_state(
         eval_kept={},
         route="",
         eval_round=0,
+        eval_repaired=[],
     )
 
 
@@ -409,6 +416,34 @@ def _merge_reports(outputs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # 그래프
 # ---------------------------------------------------------------------------
+
+
+#: `evaluation_failure_total(code)` 라벨로 쓸 수 있는 값. 계약 밖 코드는 세지 않는다(라벨 보호).
+_VIOLATION_CODES = frozenset(code.value for code in ViolationCode)
+
+
+def _observe_violations(output: Mapping[str, Any], fresh: Sequence[Mapping[str, Any]]) -> None:
+    """검수관이 `pass=false` 로 낸 위반 코드마다 `evaluation_failure_total(code)` 를 1 올린다.
+
+    이번 호출의 출력만 센다(repair 뒤 이어 붙인 직전 통과 항목은 빼고).
+    """
+    checks = [output.get(name) for name in _EVALUATION_CHECKS] + list(fresh)
+    for check in checks:
+        if not isinstance(check, Mapping) or check.get("pass") is not False:
+            continue
+        for violation in check.get("violations") or []:
+            code = violation.get("code") if isinstance(violation, Mapping) else None
+            if code in _VIOLATION_CODES:
+                instrument.count("evaluation_failure_total", code=code)
+
+
+def _new_call_errors(state: Mapping[str, Any], update: Mapping[str, Any]) -> list[str]:
+    """이 노드가 더한 호출 기록의 오류 코드(폴백 원인). 원문 없음."""
+    calls = update.get("calls")
+    if not isinstance(calls, list):
+        return []
+    before = len(state.get("calls") or [])
+    return sorted({c.error for c in calls[before:] if getattr(c, "error", None)})
 
 
 def build_sentence_graph(deps: SentenceDeps) -> Any:
@@ -1073,6 +1108,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 return failed(code)
 
             fresh = [e for e in output.get("texts") or [] if isinstance(e, Mapping)]
+            _observe_violations(output, fresh)
             fresh_keys = {_key(e.get("intensity")) for e in fresh}
             entries_list = fresh + [e for k, e in reused.items() if k not in fresh_keys]
             entries_list.sort(key=lambda e: order.get(_key(e.get("intensity")) or "", len(order)))
@@ -1170,6 +1206,9 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     "sentencing": decision,
                     "repair_targets": rejected,
                     "repair_avoid": {i: _avoid(entries[i.value]) for i in rejected},
+                    "eval_repaired": list(
+                        dict.fromkeys([*(state.get("eval_repaired") or []), *rejected])
+                    ),
                     "eval_kept": keep,
                     "evaluation": None,
                     "draft_hash": None,
@@ -1256,6 +1295,8 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             code = getattr(exc, "code", None)
             if status == 409 and code in _DISCARD_ON_FINALIZE:
                 logger.info("finalize 409 %s — 폐기", code)
+                if code == _STALE_GENERATION:
+                    instrument.count("stale_finalize_total", kind=state["job"].kind)
                 return {"failure": None, "route": _ROUTE_END}
             if status == 409 and code == EVIDENCE_INVALIDATED:
                 return {"failure": EVIDENCE_INVALIDATED}
@@ -1278,7 +1319,16 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                         "route": _ROUTE_REPAIR,
                     }
                 return {"failure": SCHEMA_INVALID}
+            if not isinstance(status, int):
+                # 백엔드 4xx 거부가 아니다 — 5xx 재전송 소진·연결 불가 등 저장 경로 오류(08 §3.3
+                # "finalize DB 오류"). job 정리는 그대로 핸들러가 한다.
+                code_name = getattr(exc, "error_code", None) or type(exc).__name__
+                await instrument.notify(
+                    deps.notifier,
+                    finalize_db_error(job_kind=state["job"].kind, code=str(code_name)),
+                )
             raise
+        await observe_saved(state)
         return {"failure": None, "route": _ROUTE_END}
 
     async def generation_failed(state: SentenceGraphState) -> dict[str, Any]:
@@ -1289,7 +1339,89 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             generation_id=deps.generation_id,
             error_code=state["failure"],  # type: ignore[arg-type]
         )
+        if state["failure"] == EVIDENCE_INVALIDATED:
+            instrument.count("invalidated_evidence_total")
+        if _regenerate(state):
+            instrument.rate("retry_recovery_rate", False)
+        for intensity in state.get("eval_repaired") or []:
+            instrument.rate("evaluation_repair_rate", False, intensity=Intensity(intensity).value)
         return {}
+
+    async def observe_saved(state: SentenceGraphState) -> None:
+        """finalize 200 뒤 지표(08 §3.3). 입력을 못 만들면 로그만 남기고 넘어간다."""
+        try:
+            jury = _jury(state)
+            regenerate = _regenerate(state)
+            sources = state.get("draft_sources") or {}
+            targets = _scope(state)
+            # "평결 확정 → 첫 저장". 두 시각 모두 DB 기준(`jury.confirmed_at`, `db_now`).
+            elapsed = max(0.0, (await deps.db_now() - jury.confirmed_at).total_seconds())
+        except Exception as exc:
+            logger.warning("저장 지표 입력을 만들 수 없다: %s", type(exc).__name__)
+            return
+        if regenerate:
+            path = "regen"
+        else:
+            path = "guilty" if str(jury.result) == GUILTY else "other"
+        instrument.observe("first_result_latency_seconds", elapsed, path=path)
+        if regenerate:
+            instrument.rate("retry_recovery_rate", True)
+        else:
+            instrument.rate(
+                "template_first_rate", any(sources.get(i) == "TEMPLATE" for i in targets)
+            )
+        for intensity in state.get("eval_repaired") or []:
+            instrument.rate(
+                "evaluation_repair_rate",
+                sources.get(intensity) == "AI",
+                intensity=Intensity(intensity).value,
+            )
+
+    # --- 노드 로그 ------------------------------------------------------------
+
+    def logged(
+        name: str, fn: Callable[[SentenceGraphState], Awaitable[dict[str, Any]]]
+    ) -> Callable[[SentenceGraphState], Awaitable[dict[str, Any]]]:
+        """노드 한 번마다 `sentence_node` 로그(08 §3.3). 원문 없이 코드·지연·개수만."""
+
+        def emit(state: Mapping[str, Any], started: float, **fields: Any) -> None:
+            job = state.get("job")
+            instrument.node_log(
+                "sentence_node",
+                trace_id=getattr(job, "trace_id", None),
+                job_id=getattr(job, "id", None),
+                generation_id=deps.generation_id,
+                graph_name="sentencing",
+                node=name,
+                latency_ms=int((time.monotonic() - started) * 1000),
+                prompt_bundle_version=deps.prompt_version,
+                guardrail_policy_version=settings.GUARDRAIL_POLICY_VERSION,
+                **fields,
+            )
+
+        async def node(state: SentenceGraphState) -> dict[str, Any]:
+            started = time.monotonic()
+            try:
+                update = await fn(state)
+            except BaseException as exc:
+                emit(state, started, ok=False, fallback_reason=type(exc).__name__)
+                raise
+            update = update or {}
+            if name == "generation_failed":
+                failure = state.get("failure")
+            else:
+                failure = update.get("failure")
+            errors = _new_call_errors(state, update)
+            emit(
+                state,
+                started,
+                ok=failure is None,
+                fallback_reason=failure or (",".join(errors) if errors else None),
+                repair_count=update.get("repair_count", state.get("repair_count")),
+            )
+            return update
+
+        return node
 
     # --- 간선 ---------------------------------------------------------------
 
@@ -1336,18 +1468,21 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         return "writer_repair" if state.get("route") == _ROUTE_REPAIR else END
 
     graph = StateGraph(SentenceGraphState)
-    graph.add_node("begin_generation", begin_generation)
-    graph.add_node("load_valid_prep", load_valid_prep)
-    graph.add_node("inline_context", inline_context)
-    graph.add_node("minimal_dossier", minimal_dossier_node)
-    graph.add_node("sentencing", sentencing)
-    graph.add_node("writer", writer)
-    graph.add_node("join", join)
-    graph.add_node("deterministic_validate", deterministic_validate)
-    graph.add_node("evaluator", evaluator)
-    graph.add_node("writer_repair", writer_repair)
-    graph.add_node("finalize", finalize)
-    graph.add_node("generation_failed", generation_failed)
+    for node_name, node_fn in (
+        ("begin_generation", begin_generation),
+        ("load_valid_prep", load_valid_prep),
+        ("inline_context", inline_context),
+        ("minimal_dossier", minimal_dossier_node),
+        ("sentencing", sentencing),
+        ("writer", writer),
+        ("join", join),
+        ("deterministic_validate", deterministic_validate),
+        ("evaluator", evaluator),
+        ("writer_repair", writer_repair),
+        ("finalize", finalize),
+        ("generation_failed", generation_failed),
+    ):
+        graph.add_node(node_name, logged(node_name, node_fn))
 
     graph.add_edge(START, "begin_generation")
     graph.add_conditional_edges(

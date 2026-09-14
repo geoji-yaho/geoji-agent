@@ -39,8 +39,10 @@ import asyncio
 import math
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
+from datetime import date
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
+from geoji_ai.application.instrument import track_cost, utc_today
 from geoji_ai.core.logging import get_logger
 from geoji_ai.domain.budget import (
     NodeResultKey,
@@ -56,6 +58,7 @@ from geoji_ai.ports.llm import Cost, LLMError, LLMResult, LLMRole, Usage
 
 if TYPE_CHECKING:
     from geoji_ai.contracts.case import CaseSnapshot
+    from geoji_ai.telemetry.alerts import AlertNotifier, DailyCostTracker
 
 __all__ = [
     "EVALUATOR_SLOTS",
@@ -233,12 +236,19 @@ class LLMGateway:
         price_lookup: PriceLookup,
         *,
         sleep: Callable[[float], Awaitable[Any]] = asyncio.sleep,
+        cost_tracker: DailyCostTracker | None = None,
+        notifier: AlertNotifier | None = None,
+        today: Callable[[], date] = utc_today,
     ) -> None:
         self._inner = inner
         self._ledger = ledger
         self._health = health
         self._price_lookup = price_lookup
         self._sleep = sleep
+        # 비용 경고(08 §3.3). 워커가 프로세스에 하나씩 넣는다. 없으면 집계하지 않는다.
+        self._cost_tracker = cost_tracker
+        self._notifier = notifier
+        self._today = today
 
     async def scoped_call(
         self,
@@ -329,6 +339,7 @@ class LLMGateway:
             else:
                 await self._close("settle", call_id, result)
                 self._health.record_success(vendor)
+                await self._track_cost(result.cost)
                 return ScopedResult(result, False, call_id, rhash, versions)
 
             if from_vendor:
@@ -353,6 +364,8 @@ class LLMGateway:
                 await self._close("mark_unknown", call_id, error)
             else:
                 await self._close("fail", call_id, error)
+            # 벤더가 응답을 돌려준 실패(잘림·거절)는 과금된다. 비용을 알면 집계에 넣는다.
+            await self._track_cost(error.cost)
             raise error
 
     async def remember(self, scoped: ScopedResult) -> None:
@@ -377,6 +390,17 @@ class LLMGateway:
         except Exception as exc:
             log.warning("node_result_get_failed", node=scope.node, error=type(exc).__name__)
             return None
+
+    async def _track_cost(self, cost: Cost | None) -> None:
+        """일별 비용 집계 + 임계 경고. 계측 실패는 호출 결과를 바꾸지 않는다(`instrument`)."""
+        if self._cost_tracker is None or cost is None:
+            return
+        try:
+            day = self._today()
+        except Exception as exc:
+            log.warning("cost_day_failed", error=type(exc).__name__)
+            return
+        await track_cost(self._cost_tracker, self._notifier, cost.micro_usd, day=day)
 
     async def _close(self, action: str, call_id: str, value: Any) -> None:
         try:

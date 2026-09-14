@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 from typing import Protocol
 
+from geoji_ai.application import instrument
 from geoji_ai.application.llm_gateway import ScopedLLM
 from geoji_ai.contracts.jobs import Job
 from geoji_ai.core.config import Settings
@@ -70,6 +71,7 @@ class PrepareHandler:
         try:
             state = await run_preparation(job, deps)
         except EvidenceInvalidated as exc:
+            instrument.count("invalidated_evidence_total")
             await ctx.jobs.fail(
                 job.id,
                 ctx.worker_id,

@@ -35,7 +35,7 @@ from pydantic import BaseModel, ValidationError
 
 from geoji_ai.contracts.case import JurySnapshot
 from geoji_ai.contracts.sentencing import SentencingDecision
-from geoji_ai.contracts.writer import WriterDraft
+from geoji_ai.contracts.writer import MemeEmotion, WriterDraft
 from geoji_ai.domain import lexicon, validation
 from geoji_ai.domain.attack_angles import ANGLE_ORDER
 
@@ -63,10 +63,9 @@ __all__ = [
     "headline_dup_rate",
 ]
 
-#: `meme_hints.emotion` 어휘(08 §3.4, 9/8 확정). 계약 미러는 문자열(≤ 30)이라 여기서 대조한다.
-MEME_EMOTIONS: frozenset[str] = frozenset(
-    {"DISAPPROVAL", "ABSURD_SERIOUSNESS", "SMUG", "PITY", "CELEBRATION", "RESIGNATION"}
-)
+#: `meme_hints.emotion` 어휘(08 §3.4, 9/8 확정). 정의는 계약 미러 `MemeEmotion` 하나다.
+#: dict 로 들어온 초안(스키마 검사 전)도 대조하므로 값 집합으로 둔다.
+MEME_EMOTIONS: frozenset[str] = frozenset(e.value for e in MemeEmotion)
 
 #: headline 중복률 상한(06 §3.4 "≤ 10%").
 HEADLINE_DUP_RATE_MAX = 0.10

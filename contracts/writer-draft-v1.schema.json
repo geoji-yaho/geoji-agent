@@ -35,12 +35,22 @@
       ],
       "type": "string"
     },
+    "MemeEmotion": {
+      "enum": [
+        "DISAPPROVAL",
+        "ABSURD_SERIOUSNESS",
+        "SMUG",
+        "PITY",
+        "CELEBRATION",
+        "RESIGNATION"
+      ],
+      "type": "string"
+    },
     "MemeHints": {
       "additionalProperties": false,
       "properties": {
         "emotion": {
-          "maxLength": 30,
-          "type": "string"
+          "$ref": "#/$defs/MemeEmotion"
         },
         "keywords": {
           "items": {

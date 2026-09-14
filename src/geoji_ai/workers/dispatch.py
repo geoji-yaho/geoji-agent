@@ -28,6 +28,7 @@ from geoji_ai.ports.jobs import JobsPort
 from geoji_ai.ports.llm import LLMPort
 from geoji_ai.ports.memory import MemoryPort
 from geoji_ai.ports.preparation import PreparationPort
+from geoji_ai.telemetry.alerts import AlertNotifier, DailyCostTracker
 
 __all__ = [
     "DEFAULT_ROUTE_BY_KIND",
@@ -157,6 +158,10 @@ class HandlerContext:
     llm: LLMPort | ScopedLLM | None = None
     #: 재판 준비 저장 포트(05 GR-02). 워커가 `PostgresPreparation` 을 넣는다.
     preparation: PreparationPort | None = None
+    #: 운영 알림(08 §3.3). 워커가 프로세스에 하나를 넣는다. None 이면 알리지 않는다.
+    notifier: AlertNotifier | None = None
+    #: 일별 비용 집계(08 §3.3). 게이트웨이와 같은 객체다. None 이면 집계하지 않는다.
+    cost_tracker: DailyCostTracker | None = None
 
 
 class Handler(Protocol):
