@@ -36,6 +36,7 @@
 
 | 날짜 | 무엇이 바뀌었나 → 백엔드가 할 일 | 절 | 상태 |
 |---|---|---|---|
+| 9/14 | AI API 거부 본문 `{"code"}` 로 변경(옛 `{"detail": {"code"}}`), 스키마 위반은 422 `INVALID_REQUEST` → intake·trace 호출부가 `code` 를 최상위에서 읽는다 | §4·§4.7·§15.5 | 미전달 |
 | 9/14 | 계약 문서를 이 한 장으로 통일 → 옛 전달 파일 대신 이 문서만 본다 | §0 | 미전달 |
 | 9/14 | D-24 SENTENCE 게이트 `(제안)` → PREPARE 종료 또는 확정 + 30초까지 INSERT 대기, 마감은 INSERT + 10초 | §3·§6·§14 | 미전달 |
 | 9/14 | D-26 진행 중 작업 끄기 `(제안)` → 무효화 트랜잭션에서 영향 게시물의 진행 중 job `CANCELLED` | §8·§14 | 미전달 |
@@ -167,9 +168,9 @@ intake 동작 (9/14 코드 대조, 07 §3.1·§3.2·§3.4):
 | 정상 | OpenAI `MODEL_JUDGMENT` 호출. `intake_source=AI`. 모델 timeout = `INTAKE_TIMEOUT_SECONDS`(기본 4초) − 0.2초 |
 | 키 없음 · 벤더 실패 · timeout · 제출 예산 초과 | **200** `status=PASS`·`intake_source=FALLBACK`·`message=""`·`category_review{OK, null, 0.0}` — 등록을 허용한다 |
 | 강한 인젝션·무관 텍스트(코드 규칙) | 모델 호출 없이 `status=BLOCKED`·`intake_source=AI`·`message=null`·`injection_detected` 규칙 결과 |
-| 필수값 위반(`item` 공백 제거 뒤 1~30자, `reason` ≤ 200, `amount_krw > 0`) | **422** `{"detail": {"code": "ITEM_LENGTH"|"REASON_LENGTH"|"AMOUNT"}}` |
-| 스키마 위반(알 수 없는 필드·enum 밖) | 422(FastAPI 기본 본문) |
-| 인증 실패 | 401 `{"detail": {"code": "UNAUTHORIZED"}}` |
+| 필수값 위반(`item` 공백 제거 뒤 1~30자, `reason` ≤ 200, `amount_krw > 0`) | **422** `{"code": "ITEM_LENGTH"|"REASON_LENGTH"|"AMOUNT"}`(9/14 코드 대조, §4.7) |
+| 스키마 위반(알 수 없는 필드·enum 밖·길이 상한 초과·잘못된 JSON) | 422 `{"code": "INVALID_REQUEST"}`(9/14 코드 대조). 입력값은 본문에 싣지 않는다 |
+| 인증 실패 | 401 `{"code": "UNAUTHORIZED"}`(9/14 코드 대조) |
 
 - `mode=FINAL_CHECK` 는 `NEEDS_CLARIFICATION` 을 내지 않는다(결과에 `mode` 가 있는 이유, 9/11)
 - **응답에 `submission_id`·`payload_hash` 에코가 없다.** 요청과 응답을 묶는 것은 호출 쪽에서 한다(01 계약에 필드 없음, 07 §3.1 과 어긋남)
@@ -203,7 +204,7 @@ intake 동작 (9/14 코드 대조, 07 §3.1·§3.2·§3.4):
 
 ### 4.5 `(제안)` trace 조회
 - 데모 C 관측 화면용. AI API `GET /internal/v1/trials/{post_id}/trace`(서비스 인증) 를 백엔드가 프록시하거나 내부망에서 프론트가 직접. 응답: dossier 라벨·recall 출처·노드 타임라인·비용(원문 없음)
-- (9/14 코드 대조) **AI API 쪽은 구현됐다**(§16.2). 응답은 최신 dossier 라벨·fact_type·scope, 출처 개수, 노드 타임라인, 비용 — 원문·개별 id 없음. 기록이 없으면 404 `{"detail": {"code": "TRACE_NOT_FOUND"}}`. 남은 미결은 **프록시 주체**(§14)
+- (9/14 코드 대조) **AI API 쪽은 구현됐다**(§16.2). 응답은 최신 dossier 라벨·fact_type·scope, 출처 개수, 노드 타임라인, 비용 — 원문·개별 id 없음. 기록이 없으면 404 `{"code": "TRACE_NOT_FOUND"}`. 남은 미결은 **프록시 주체**(§14)
 
 ### 4.6 generation-failed · 오류 코드 표 `(제안 — proposal2 에 코드 표 없음)`
 - 요청 `{job_id, generation_id, error_code}`. 현재 세대만 처리, 다른 세대는 무시(409 `STALE_GENERATION`). **같은 세대·같은 코드 재전송은 200**(9/14 코드 대조, 가짜 백엔드). 워커가 보내는 코드는 아래 8종뿐이다(AI 저장소 `domain/retries.py`)
@@ -224,8 +225,10 @@ intake 동작 (9/14 코드 대조, 07 §3.1·§3.2·§3.4):
 - 워커 → 백엔드 헤더 5종: `Authorization`, `X-Trace-Id`(job 의 `trace_id`), `X-Request-Id`(**시도마다** 새 uuid4), `X-Job-Id`, `X-Generation-Id`. 본문이 있으면 `Content-Type: application/json`
 - 워커 타임아웃: connect 0.5초 공통, read 는 snapshot 2 · resolve-evidence 2 · begin-generation 1 · finalize 3 · generation-failed 1초
 - 워커 재전송: transport 오류·timeout·5xx 에 **같은 본문 바이트**를 최대 2회(200ms·600ms 뒤). 그래도 실패면 job 에 `BACKEND_UNAVAILABLE`, 5초 뒤 재시도. **4xx 는 재전송하지 않는다** — 백엔드는 같은 요청 재도착을 멱등하게 받는다(finalize 는 commit record, §5)
-- 거부 응답 본문: 워커는 4xx 본문의 `code`(또는 `error_code`, 또는 `detail.code`)를 읽고, 없으면 `HTTP_<status>` 로 본다. AI 저장소 가짜 백엔드는 `{"code": "<코드>"}` 를 쓴다. 이 문서에 이름이 없던 코드 — 401 `UNAUTHORIZED` · 404 `NOT_FOUND` · 422 `INVALID_REQUEST`(begin·failed·resolve 본문 검증) — 는 가짜 백엔드가 정한 것이라 확정 회신 대기(§14)
-- AI API 가 내는 거부는 FastAPI 모양 `{"detail": {"code": "…"}}` 이다(401 `UNAUTHORIZED`, intake 422, trace 404 `TRACE_NOT_FOUND`, trace 인데 `DATABASE_URL` 없음 503 `DB_UNAVAILABLE`)
+- **거부 응답 본문은 양쪽 모두 `{"code": "<코드>"}` 다**(9/14 결정, §15.5). 백엔드 → 워커 거부와 AI API → 백엔드 거부가 같은 모양이다
+- 워커는 백엔드 4xx 본문의 `code` 를 읽고, 없으면 `HTTP_<status>` 로 본다. 파서는 옛 모양 호환으로 `error_code`·`detail.code` 도 여전히 읽지만 계약 모양은 `{"code"}` 하나다. AI 저장소 가짜 백엔드도 `{"code"}` 를 쓴다. 이 문서에 이름이 없던 코드 — 401 `UNAUTHORIZED` · 404 `NOT_FOUND` · 422 `INVALID_REQUEST`(begin·failed·resolve 본문 검증) — 는 가짜 백엔드가 정한 것이라 확정 회신 대기(§14)
+- AI API 가 내는 거부(9/14 코드 대조): 401 `UNAUTHORIZED`(`WWW-Authenticate: Bearer` 헤더 유지), intake 422 `ITEM_LENGTH`·`REASON_LENGTH`·`AMOUNT`, 본문 스키마 위반 422 `INVALID_REQUEST`(검증 오류 원문·입력값 없음), trace 404 `TRACE_NOT_FOUND`, trace 인데 `DATABASE_URL` 없음 503 `DB_UNAVAILABLE`. `/health/ready` 503 은 거부가 아니라 상태 보고라 본문이 다르다(§16.2). 없는 경로 404 는 FastAPI 기본 `{"detail": "Not Found"}`
+- (원문, 9/14 폐기) AI API 가 내는 거부는 FastAPI 모양 `{"detail": {"code": "…"}}` 이다
 
 ## 5. finalize (proposal2 §10)
 
@@ -449,6 +452,7 @@ WHERE status = 'RUNNING' AND lease_until < now();
 | **D-25** | **준비 자료 폴백 계단.** ① 조서+드립 → ② 조서만(`DOSSIER_READY`) → ③ PREPARE 실패로 게이트 해제 → ④ 즉석 조서(INLINE, 드립 생략) — **서기·검수·finalize 시간(`reserve_after(SENTENCING)` 경로: 서기 상한 + 검수 상한 + 0.5초)을 먼저 남기고 남는 시간이 있을 때만** → ⑤ 최소 조서(MINIMAL, 모델 호출 0) → ⑥ watchdog 템플릿 + TEXT_RETRY. 기본 상한(서기 6초·검수 4초)에서는 10초 마감 안에 ④ 가 들어가지 않아 ⑤ 로 간다 — 상한을 낮추면 자동으로 ④ 가 켜진다 | 없음 | 05 §3.3 `inline_context` 조건을 이 규칙으로(9/14 리뷰 결함(조서가 서기 시간을 먹음) 해소) |
 | **D-26** | **게시물 삭제·공유 철회·탈퇴 시 진행 중 작업을 끈다.** 결과를 버리는 것(epoch 검사)에 더해, 모델 비용이 더 나가지 않게 한다 | §8 무효화 트랜잭션에서 영향 job `CANCELLED`(`(제안)`, §14) | 모델 호출 직전 epoch 확인 → 달라졌으면 호출 0·`EVIDENCE_INVALIDATED`. heartbeat 취소 경로 통합 테스트 |
 | **D-27** | **입력이 바뀌면 바뀐 부분만 다시 만든다.** 준비 자료 유효 판정을 한 덩어리 `input_hash` 대신 부분 키로: 조서 = 게시물 필드·심문 결과·방 규칙 버전·관련 scope epoch, 드립 후보 = 조서 + 그 강도(강도별). 방 강도만 바뀌면 드립만, 규칙 버전이 바뀌면 조서부터. **epoch 가 바뀐 것(삭제·철회)은 부분 재사용하지 않는다.** 모델 호출 단위 캐시(`node_results`)는 그대로 | 없음(방 강도·규칙 변경 때 PREPARE 재INSERT 는 기존 규약) | 05 §3.2 `input_hash`·§3.3 `load_valid_prep` 을 부분 키로. DDL 은 기존 컬럼(`dossiers.snapshot_hash`·`trial_prep.banter_json`)으로 먼저, 부족하면 결정 요청 |
+| **9/14 거부 본문** | AI API 거부 응답 본문을 백엔드와 같은 `{"code"}` 로 통일. 스키마 위반은 422 `INVALID_REQUEST` | 없음(이미 `{"code"}`) | AI API 예외 핸들러 |
 
 ## 16. 배포 · 연동 (9/14, 옛 백엔드 전달 파일 §1~§3 흡수)
 

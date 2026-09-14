@@ -404,4 +404,4 @@ async def test_trace_는_최신_dossier_라벨과_출처_개수와_노드_타임
 async def test_trace_는_기록이_없으면_404(client: httpx.AsyncClient):
     response = await client.get("/internal/v1/trials/no-such-post/trace", headers=auth())
     assert response.status_code == 404
-    assert response.json() == {"detail": {"code": "TRACE_NOT_FOUND"}}
+    assert response.json() == {"code": "TRACE_NOT_FOUND"}

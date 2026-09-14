@@ -126,6 +126,7 @@ def test_잘못된_본문은_422(body: dict[str, Any]):
     response = client.post(URL, json=body, headers=auth())
 
     assert response.status_code == 422
+    assert response.json() == {"code": "INVALID_REQUEST"}
 
 
 def test_item_이_공백뿐이면_422_코드만_돌려준다():
@@ -133,7 +134,7 @@ def test_item_이_공백뿐이면_422_코드만_돌려준다():
     response = client.post(URL, json=intake_body(item="    "), headers=auth())
 
     assert response.status_code == 422
-    assert response.json()["detail"] == {"code": "ITEM_LENGTH"}
+    assert response.json() == {"code": "ITEM_LENGTH"}
 
 
 def test_강한_인젝션은_모델_없이_BLOCKED():

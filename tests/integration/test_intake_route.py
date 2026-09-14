@@ -132,6 +132,7 @@ async def test_토큰이_없으면_401(client: httpx.AsyncClient, fake: FakeLLM)
     response = await client.post(URL, json=body("단비 같은 쾌락"))
 
     assert response.status_code == 401
+    assert response.json() == {"code": "UNAUTHORIZED"}
     assert fake.calls == []
 
 
