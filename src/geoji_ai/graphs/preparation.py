@@ -1,7 +1,15 @@
 """그래프 B — 사전 준비(05 §3.2, proposal2 §5.2).
 
-`load_case → recall_candidates → resolve_sources → build_db_evidence → analyze_reason →
-persist_dossier → generate_banter → validate_banter → persist_banter`
+`load_case → load_reusable_prep → recall_candidates → resolve_sources → build_db_evidence →
+analyze_reason → persist_dossier → generate_banter → validate_banter → persist_banter`
+
+9/14 D-27 부분 재사용: `load_reusable_prep` 이 조서 키가 맞는 유효 준비 자료(`load_valid_prep`)를
+찾으면 recall·resolve·build·조서 호출을 건너뛰고 `persist_dossier` 로 간다. 이때 `save_prep` 은
+기존 dossier 를 가리키는 `trial_prep` 새 행만 넣고(완료분 불변), 드립 키가 맞는 강도의 후보는
+복사하고 목표 강도 중 없는 것만 새로 부른다. `input_hash` 완전 일치 COMPLETE 행이면 기존대로 종료.
+
+9/14 D-26: 게이트웨이가 모델 호출 직전 epoch 불일치로 `EvidenceInvalidated` 를 올리면 삼키지 않고
+핸들러(`PrepareHandler`)까지 올린다(`fail("EVIDENCE_INVALIDATED")`, 저장 0).
 
 모델 호출은 조서(`context`) 1회와 드립 후보(`banter`) 강도마다 1회뿐이다. `llm` 이 게이트웨이
 (`ScopedLLM`)면 원장·재사용을 거친다. 노드 이름 `context`(call_index 0)·`banter`(call_index = 대상
@@ -38,6 +46,7 @@ from geoji_ai.contracts.writer import BanterStrategy
 from geoji_ai.core.config import Settings
 from geoji_ai.core.logging import get_logger
 from geoji_ai.domain import dossier_rules
+from geoji_ai.domain.input_hash import dossier_key
 from geoji_ai.domain.intensity import ALL_INTENSITIES, Intensity
 from geoji_ai.domain.lexicon import DEATH_WORDS, PROFANITY, LexiconRule, applies
 from geoji_ai.domain.visibility import Scope, Visibility
@@ -57,6 +66,7 @@ from geoji_ai.ports.preparation import (
     EVIDENCE_TEXT_MAX,
     Dossier,
     EvidenceFact,
+    EvidenceInvalidated,
     PreparationPort,
 )
 from geoji_ai.prompts import load_prompt, prompt_bundle_version
@@ -134,8 +144,12 @@ class _Run:
 
     dossier: Dossier | None = None
     prep_id: str | None = None
-    #: 드립 호출이 성공한 강도. 하나도 없으면 `DOSSIER_READY` 유지.
+    #: 드립 호출이 성공한 강도. 하나도 없으면(복사분도 없으면) `DOSSIER_READY` 유지.
     banter_ok: set[Intensity] = field(default_factory=set)
+    #: D-27: 저장된 dossier 를 다시 쓴다(`save_prep(reuse_dossier=True)`).
+    reuse_dossier: bool = False
+    #: D-27: 드립 키가 맞아 복사할 목표 강도의 후보. 이 강도는 드립을 다시 부르지 않는다.
+    copied: dict[Intensity, list[Candidate]] = field(default_factory=dict)
 
 
 # --- 순수 함수 --------------------------------------------------------------------
@@ -232,6 +246,14 @@ def _target_intensities(snapshot: CaseSnapshot) -> list[Intensity]:
     if not present and snapshot.jury is not None:
         present = {snapshot.jury.default_intensity}
     return [intensity for intensity in ALL_INTENSITIES if intensity in present]
+
+
+def _copied_banter(
+    banter: Mapping[Intensity, list[Candidate]], snapshot: CaseSnapshot
+) -> dict[Intensity, list[Candidate]]:
+    """재사용 준비 자료의 드립 중 이번 목표 강도에 든 것만."""
+    targets = set(_target_intensities(snapshot))
+    return {intensity: list(items) for intensity, items in banter.items() if intensity in targets}
 
 
 def _parse_candidates(output: Mapping[str, Any] | None) -> list[Candidate]:
@@ -440,7 +462,29 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
         return {"snapshot": snapshot, "status": STATUS_LOADED}
 
     def after_load(state: PrepareState) -> str:
-        return END if state["status"] == STATUS_STALE_EVENT else "recall_candidates"
+        return END if state["status"] == STATUS_STALE_EVENT else "load_reusable_prep"
+
+    async def load_reusable_prep(state: PrepareState) -> dict[str, Any]:
+        """D-27: 조서 키가 맞는 유효 준비 자료가 있으면 조서를 다시 만들지 않는다."""
+        snapshot = state["snapshot"]
+        try:
+            valid = await deps.preparation.load_valid_prep(snapshot, deps.prompt_version)
+        except Exception as exc:  # 조회 실패는 처음부터 만든다.
+            log.warning("reusable_prep_lookup_failed", error=type(exc).__name__)
+            return {}
+        if valid is None:
+            return {}
+        ctx.dossier = valid.dossier
+        ctx.reuse_dossier = True
+        ctx.copied = _copied_banter(valid.banter, snapshot)
+        return {
+            "dossier_id": valid.dossier.dossier_id,
+            "evidence": list(valid.dossier.facts),
+            "label_map": dict(valid.dossier.label_map),
+        }
+
+    def after_reuse(state: PrepareState) -> str:
+        return "persist_dossier" if ctx.reuse_dossier else "recall_candidates"
 
     async def recall_candidates(state: PrepareState) -> dict[str, Any]:
         snapshot = state["snapshot"]
@@ -497,7 +541,11 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
 
     async def build_db_evidence(state: PrepareState) -> dict[str, Any]:
         snapshot = state["snapshot"]
-        dossier = dossier_from_resolved(snapshot, state["resolved"], settings)
+        # D-27: 조서 키를 `ai.dossiers.snapshot_hash` 에 둔다(기존 컬럼).
+        dossier = replace(
+            dossier_from_resolved(snapshot, state["resolved"], settings),
+            snapshot_hash=dossier_key(snapshot),
+        )
         ctx.dossier = dossier
         return {"evidence": list(dossier.facts), "label_map": dict(dossier.label_map)}
 
@@ -515,6 +563,8 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
                 dossier,
                 scope=scope(state, "context", 0),
             )
+        except EvidenceInvalidated:
+            raise  # D-26: 무효는 삼키지 않는다(핸들러가 fail 로 기록).
         except Exception as exc:  # 코드 Evidence 만으로 계속(05 §3.2).
             log.warning("context_failed", error=type(exc).__name__)
             return {"errors": [*state.get("errors", []), "CONTEXT_FAILED"]}
@@ -529,7 +579,9 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
         dossier = ctx.dossier
         assert dossier is not None
         snapshot = state["snapshot"]
-        saved = await deps.preparation.save_prep(dossier, snapshot, deps.prompt_version)
+        saved = await deps.preparation.save_prep(
+            dossier, snapshot, deps.prompt_version, reuse_dossier=ctx.reuse_dossier
+        )
         ctx.prep_id = saved.prep_id
         if saved.reused:
             if saved.status != STATUS_DOSSIER_READY:
@@ -539,6 +591,7 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
             if valid is None:
                 return {"status": "INVALIDATED"}
             ctx.dossier = valid.dossier
+            ctx.copied = _copied_banter(valid.banter, snapshot)
             return {
                 "status": STATUS_DOSSIER_READY,
                 "dossier_id": valid.dossier.dossier_id,
@@ -592,6 +645,8 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
                             ),
                             timeout=timeout_s,
                         )
+            except EvidenceInvalidated:
+                raise  # D-26
             except Exception as exc:  # 그 강도 후보 없음.
                 log.warning("banter_failed", intensity=intensity.value, error=type(exc).__name__)
                 return intensity, None
@@ -602,9 +657,20 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
                 await llm.remember(scoped)
             return intensity, candidates
 
-        targets = _target_intensities(snapshot)
-        results = await asyncio.gather(*(one(i, n) for n, i in enumerate(targets)))
-        banter: dict[Intensity, list[Candidate]] = {}
+        # call_index 는 목표 강도 전체 안의 순서다(복사해 건너뛴 강도가 있어도 밀리지 않는다).
+        positions = {intensity: n for n, intensity in enumerate(_target_intensities(snapshot))}
+        missing = [intensity for intensity in positions if intensity not in ctx.copied]
+        gathered = await asyncio.gather(
+            *(one(intensity, positions[intensity]) for intensity in missing),
+            return_exceptions=True,
+        )
+        banter: dict[Intensity, list[Candidate]] = dict(ctx.copied)
+        results: list[tuple[Intensity, list[Candidate] | None]] = []
+        for outcome in gathered:
+            # 무효(D-26) 등은 모든 호출이 끝난 뒤 올린다(뒤에 남은 호출이 돌지 않게).
+            if isinstance(outcome, BaseException):
+                raise outcome
+            results.append(outcome)
         for intensity, candidates in results:
             if candidates is not None:
                 banter[intensity] = candidates
@@ -626,7 +692,7 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
         }
 
     async def persist_banter(state: PrepareState) -> dict[str, Any]:
-        if not ctx.banter_ok or ctx.prep_id is None:
+        if (not ctx.banter_ok and not ctx.copied) or ctx.prep_id is None:
             return {}
         try:
             done = await deps.preparation.save_banter(ctx.prep_id, state["banter"])
@@ -672,6 +738,7 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
     graph = StateGraph(PrepareState)
     for node_name, node_fn in (
         ("load_case", load_case),
+        ("load_reusable_prep", load_reusable_prep),
         ("recall_candidates", recall_candidates),
         ("resolve_sources", resolve_sources),
         ("build_db_evidence", build_db_evidence),
@@ -683,7 +750,10 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
     ):
         graph.add_node(node_name, logged(node_name, node_fn))
     graph.add_edge(START, "load_case")
-    graph.add_conditional_edges("load_case", after_load, ["recall_candidates", END])
+    graph.add_conditional_edges("load_case", after_load, ["load_reusable_prep", END])
+    graph.add_conditional_edges(
+        "load_reusable_prep", after_reuse, ["recall_candidates", "persist_dossier"]
+    )
     graph.add_edge("recall_candidates", "resolve_sources")
     graph.add_edge("resolve_sources", "build_db_evidence")
     graph.add_edge("build_db_evidence", "analyze_reason")

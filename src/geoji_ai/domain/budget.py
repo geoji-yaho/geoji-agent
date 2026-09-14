@@ -41,6 +41,7 @@ __all__ = [
     "budget_key_for_post",
     "budget_key_for_submission",
     "est_max_micro_usd",
+    "inline_context_reserve",
     "node_cap",
     "node_result_expires_at",
     "request_hash",
@@ -91,6 +92,17 @@ def reserve_after(name: str, settings: Any) -> float:
     if name == EVALUATOR:
         return FINALIZE_RESERVE_SECONDS
     return node_cap(EVALUATOR, settings) + FINALIZE_RESERVE_SECONDS
+
+
+def inline_context_reserve(settings: Any) -> float:
+    """즉석 조서(`inline_context`) 전에 남겨 둘 시간 = 서기 상한 + 검수 상한 + finalize 0.5s.
+
+    9/14 D-25(10 §15.5, 05 §3.1): 서기·검수·finalize 시간을 먼저 남기고 남는 시간만 조서에 쓴다.
+    조서 timeout = `min(서기 상한, 남은 − 이 값)`. 0 이하면 조서를 시작하지 않는다
+    (`minimal_dossier`).
+    기본 상한(서기 6·검수 4)이면 10.5초라 10초 마감에서는 즉석 조서가 사실상 꺼진다.
+    """
+    return node_cap(WRITER, settings) + node_cap(EVALUATOR, settings) + FINALIZE_RESERVE_SECONDS
 
 
 @dataclass(frozen=True)

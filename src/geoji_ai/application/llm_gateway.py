@@ -33,9 +33,14 @@
 - inner 가 `LLMError` 가 아닌 예외를 내면 `TRANSPORT`(원장 UNKNOWN)로 보되 벤더 장애로 세지 않는다
 - `node_results` 에는 **검증된 출력만** 넣는다. 게이트웨이는 검증을 모르므로 호출자(그래프)가 파싱·
   검증에 성공한 뒤 `remember(scoped)` 를 부른다. 조회·저장 오류는 로그만 남기고 호출을 막지 않는다
-- 재사용 조회 전과 저장 직전에 `CallScope.privacy_versions` 를 현재 `ai.privacy_epochs` 와 비교한다
-  (주입 `stale_scopes`, 08 §4.1·06 §3.2). 다르거나 확인이 실패하면 조회 miss·저장 안 함이고 호출은
-  그대로 한다. 무효화 SQL(04 §3.5)이 채우는 `node_results.invalidated_at` 과 이중 방어다
+- 모델 호출 직전(재사용 조회·reserve 전)과 재시도 직전마다 `CallScope.privacy_versions` 를 현재
+  `ai.privacy_epochs` 와 비교한다(주입 `stale_scopes`, 9/14 D-26 10 §8). 다르면 조회·예약·호출 없이
+  `EvidenceInvalidated`(원장 행 없음). 확인 자체가 실패하면 원장 예약 실패와 같은
+  `LLMError("TRANSPORT")`(무효로 오판해 재시도 불가 코드로 끝내지 않는다). 재시도 직전에
+  달라지면 그 원장 행을 직전 오류대로
+  한 번 닫고 `EvidenceInvalidated`, 재시도 직전 확인이 실패하면 재시도하지 않고 직전 오류를 올린다
+- 저장 직전에도 epoch 를 비교해 다르거나 확인이 실패하면 저장하지 않는다(08 §4.1·06 §3.2). 무효화
+  SQL(04 §3.5)이 채우는 `node_results.invalidated_at` 과 이중 방어다
 
 이 모듈은 SQLAlchemy·어댑터를 import 하지 않는다.
 """
@@ -62,6 +67,7 @@ from geoji_ai.domain.retries import backoff_seconds, ledger_status
 from geoji_ai.domain.vendor_health import VendorHealth
 from geoji_ai.ports.ledger import BudgetExceeded, CallSpec, LedgerPort
 from geoji_ai.ports.llm import Cost, LLMError, LLMResult, LLMRole, Usage
+from geoji_ai.ports.preparation import EvidenceInvalidated
 
 if TYPE_CHECKING:
     from geoji_ai.contracts.case import CaseSnapshot
@@ -291,9 +297,12 @@ class LLMGateway:
         versions = NodeResultKey(
             rhash, model_id, scope.prompt_version, scope.policy_version, scope.privacy_versions
         ).versions()
-        cached = None
-        if await self._epoch_current(scope.privacy_versions, scope.node):
-            cached = await self._lookup(rhash, versions, scope)
+        # D-26: 조회·예약·호출 전에 현재 epoch 를 확인한다. 달라졌으면 아무것도 하지 않는다.
+        stale = await self._stale(scope.privacy_versions, scope.node)
+        if stale:
+            log.info("llm_call_blocked_stale_epoch", node=scope.node, scopes=list(stale))
+            raise EvidenceInvalidated(stale)
+        cached = await self._lookup(rhash, versions, scope)
         if cached is not None:
             log.info("llm_node_result_reused", node=scope.node, call_index=scope.call_index)
             return ScopedResult(
@@ -373,14 +382,23 @@ class LLMGateway:
                     retry_after_s=error.retry_after_s,
                     reserve_s=scope.reserve_s,
                 )
+                stale_before_retry: list[str] = []
                 if wait is not None:
                     retry_timeout = min(timeout_s, remaining - scope.reserve_s - wait)
                     if retry_timeout > 0:
                         log.info("llm_retry", node=scope.node, kind=error.kind, wait_s=wait)
                         await self._sleep(wait)
-                        attempt += 1
-                        timeout = retry_timeout
-                        continue
+                        # D-26: 재시도 직전에도 epoch 확인. 확인이 실패하면 재시도하지 않는다.
+                        try:
+                            stale_before_retry = await self._stale(
+                                scope.privacy_versions, scope.node
+                            )
+                        except LLMError:
+                            retry_timeout = 0.0
+                        if retry_timeout > 0 and not stale_before_retry:
+                            attempt += 1
+                            timeout = retry_timeout
+                            continue
                 closed = True
                 if ledger_status(error.kind) == "UNKNOWN":
                     await self._close("mark_unknown", call_id, error)
@@ -388,6 +406,13 @@ class LLMGateway:
                     await self._close("fail", call_id, error)
                 # 벤더가 응답을 돌려준 실패(잘림·거절)는 과금된다. 비용을 알면 집계에 넣는다.
                 await self._track_cost(error.cost)
+                if stale_before_retry:
+                    log.info(
+                        "llm_retry_blocked_stale_epoch",
+                        node=scope.node,
+                        scopes=list(stale_before_retry),
+                    )
+                    raise EvidenceInvalidated(stale_before_retry)
                 raise error
         except BaseException as exc:
             if not closed:
@@ -424,17 +449,27 @@ class LLMGateway:
         except Exception as exc:
             log.warning("node_result_put_failed", error=type(exc).__name__)
 
-    async def _epoch_current(self, privacy_versions: Any, node: str | None) -> bool:
-        """`privacy_versions` 가 현재 epoch 과 같은가. 확인할 수 없으면(예외) False."""
+    async def _stale(self, privacy_versions: Any, node: str | None) -> list[str]:
+        """현재 epoch 와 다른 scope_key. 대조기가 없거나 대조할 쌍이 없으면 빈 목록.
+
+        확인 자체가 실패하면(DB 예외·모양 오류) `LLMError("TRANSPORT")` 를 올린다.
+        """
         if self._stale_scopes is None:
-            return True
+            return []
         try:
             pairs = _epoch_pairs(privacy_versions)
             if not pairs:
-                return True
-            stale = await self._stale_scopes(pairs)
+                return []
+            return list(await self._stale_scopes(pairs))
         except Exception as exc:
-            log.warning("node_result_epoch_check_failed", node=node, error=type(exc).__name__)
+            log.warning("llm_epoch_check_failed", node=node, error=type(exc).__name__)
+            raise LLMError("TRANSPORT", message=f"epoch 확인 실패: {type(exc).__name__}") from exc
+
+    async def _epoch_current(self, privacy_versions: Any, node: str | None) -> bool:
+        """저장 직전 대조. `privacy_versions` 가 현재 epoch 과 같은가. 확인할 수 없으면 False."""
+        try:
+            stale = await self._stale(privacy_versions, node)
+        except LLMError:
             return False
         if stale:
             log.info("llm_node_result_stale_epoch", node=node, scopes=list(stale))

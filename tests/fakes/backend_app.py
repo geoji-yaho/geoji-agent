@@ -27,6 +27,17 @@ verdict 별 상태: `sentence_status(PENDING/FINAL)`·`sentence_source(AI/RULE)`
 `ai.jobs` 에 INSERT 한다(02 §3.4 `sentence.finalized` 규약). 없으면 `retain_jobs` 에 기록한다.
 
 거부 응답 본문은 `{"code": "<오류 코드>"}` 다(10 에 본문 모양이 없어 이 가짜가 정한 것).
+
+9/14 결정 재현 도구(백엔드 스케줄러·무효화 트랜잭션 자리, `jobs_engine` 필요):
+
+- SENTENCE 게이트(D-24, 10 §3·§6): `confirm_verdict` 가 평결 확정을 받는다. 같은 post 의 PREPARE 가
+  `QUEUED`·`RUNNING` 이면 보류, 아니면 즉시 INSERT. `run_sentence_gate(now)` 가 스케줄러 한 주기로
+  PREPARE 종료(`SUCCEEDED`·`FAILED`·`CANCELLED`) 또는 `confirmed_at + sentence_gate_wait(30s)`
+  도달이면 INSERT 한다. job·verdict 마감 = INSERT 시각(DB `now()`) + 10s. 보류 중 verdict 는
+  마감이 없어 watchdog 대상이 아니다. 시간은 `now`·`clock` 으로 주입한다
+- 진행 중 작업 끄기(D-26, 10 §8): `invalidate_post(post_id, scope_keys=...)` 가 한 트랜잭션에서
+  scope epoch +1 → 그 post 의 `QUEUED`·`RUNNING` PREPARE·SENTENCE·TEXT_RETRY 를 `CANCELLED`.
+  TEXT_RETRY payload 에는 post_id 가 없어 이 가짜가 아는 verdict(같은 post)로 찾는다
 """
 
 from __future__ import annotations
@@ -38,6 +49,7 @@ import json
 import os
 import re
 import threading
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -47,8 +59,10 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, ValidationError
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.types import Text
 
 from geoji_ai.contracts.case import CaseSnapshot
 from geoji_ai.contracts.finalize import SHA256_HEX, FinalizeRequest, check_policy_version
@@ -65,9 +79,12 @@ from tests.conftest import load_fixture
 __all__ = [
     "FAKE_SERVICE_TOKEN",
     "IMMEDIATE_FALLBACK_CODES",
+    "INVALIDATED_JOB_KINDS",
     "NO_DEADLINE",
     "ROUND_RETRY_CODES",
+    "SENTENCE_GATE_WAIT",
     "FakeBackend",
+    "HeldSentence",
     "VerdictState",
     "app",
     "create_fake_backend",
@@ -94,6 +111,12 @@ TEXT_RETRY_ROUND_DELAYS_S: tuple[int, ...] = (300, 600, 1200)
 
 _DEFAULT_POLICY_VERSION: str = str(Settings.model_fields["GUARDRAIL_POLICY_VERSION"].default)
 _RETAIN_ROUTE = JOB_ROUTES["sentence.finalized"]
+_SENTENCE_ROUTE = JOB_ROUTES["verdict.confirmed"]
+
+#: 10 §3 SENTENCE 게이트 최대 대기 `confirmed_at + 30s`(9/14 D-24).
+SENTENCE_GATE_WAIT = timedelta(seconds=30)
+#: 10 §8 무효화 트랜잭션이 끄는 job kind(9/14 D-26).
+INVALIDATED_JOB_KINDS: tuple[str, ...] = ("PREPARE", "SENTENCE", "TEXT_RETRY")
 _SNAPSHOT_FIXTURE = "case-snapshot-taxi"
 
 #: resolve-evidence 의 고정 aggregates. fixture 에 집계 값이 없어 테스트용으로 둔 값이다
@@ -139,6 +162,58 @@ _CANCEL_JOB_SQL = text(
     """
 )
 
+#: 게이트 조건: 같은 post 의 PREPARE 가 아직 끝나지 않았다(10 §3).
+_PREPARE_ACTIVE_SQL = text(
+    """
+    SELECT EXISTS (
+        SELECT 1 FROM ai.jobs
+        WHERE kind = 'PREPARE' AND payload->>'post_id' = :post_id
+          AND status IN ('QUEUED', 'RUNNING')
+    )
+    """
+)
+
+#: 10 §3 SENTENCE INSERT. 마감은 INSERT 시각 + 10s(D-24, `JOB_ROUTES` 의 `deadline_after_s`).
+_INSERT_SENTENCE_SQL = text(
+    """
+    INSERT INTO ai.jobs (
+        id, event_id, event_type, kind, dedupe_key,
+        aggregate_id, aggregate_version, schema_version, payload,
+        priority, max_attempts, deadline_at, trace_id
+    ) VALUES (
+        :id, :event_id, :event_type, :kind, :dedupe_key,
+        :aggregate_id, :aggregate_version, 1, CAST(:payload AS jsonb),
+        :priority, :max_attempts, now() + make_interval(secs => :deadline_after_s), :trace_id
+    )
+    ON CONFLICT (dedupe_key) DO NOTHING
+    RETURNING CAST(id AS text) AS id, deadline_at
+    """
+)
+
+_SELECT_JOB_BY_DEDUPE_SQL = text(
+    "SELECT CAST(id AS text) AS id, deadline_at FROM ai.jobs WHERE dedupe_key = :dedupe_key"
+)
+
+#: 10 §8 "해당 scope 의 privacy_epochs 를 먼저 잠그고 증가". 행이 없으면 0 → 1.
+_BUMP_EPOCH_SQL = text(
+    """
+    INSERT INTO ai.privacy_epochs (scope_key, epoch) VALUES (:scope_key, 1)
+    ON CONFLICT (scope_key) DO UPDATE SET epoch = ai.privacy_epochs.epoch + 1
+    """
+)
+
+#: 10 §8 D-26 같은 무효화 트랜잭션에서 영향받는 게시물의 진행 중 job 끄기.
+_CANCEL_POST_JOBS_SQL = text(
+    """
+    UPDATE ai.jobs SET status = 'CANCELLED', owner_id = NULL, generation_id = NULL,
+           lease_until = NULL, updated_at = now()
+    WHERE kind IN ('PREPARE', 'SENTENCE', 'TEXT_RETRY') AND status IN ('QUEUED', 'RUNNING')
+      AND (payload->>'post_id' = :post_id
+           OR (kind = 'TEXT_RETRY' AND payload->>'verdict_id' = ANY(:verdict_ids)))
+    RETURNING CAST(id AS text) AS id
+    """
+).bindparams(bindparam("verdict_ids", type_=ARRAY(Text)))
+
 _STALE = "STALE_GENERATION"
 _INVALID_DRAFT = "INVALID_DRAFT"
 
@@ -181,6 +256,16 @@ class VerdictState:
     failed_generations: dict[str, str] = field(default_factory=dict)
 
 
+@dataclass
+class HeldSentence:
+    """게이트가 보류한 평결 확정(10 §3 D-24). SENTENCE 는 아직 INSERT 되지 않았다."""
+
+    verdict_id: str
+    verdict_version: int
+    post_id: str
+    confirmed_at: datetime
+
+
 def _reject(status: int, code: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"code": code})
 
@@ -215,6 +300,13 @@ class FakeBackend:
         self.sentence_fixes: list[tuple[str, str]] = []
         #: finalize 가 받은 본문(JSON 객체). 인증을 통과한 요청이면 거부 여부와 무관하게 쌓는다.
         self.finalize_bodies: list[dict[str, Any]] = []
+        #: SENTENCE 게이트(D-24). 대기 상한·시계는 테스트가 바꿔 끼운다.
+        self.sentence_gate_wait: timedelta = SENTENCE_GATE_WAIT
+        self.clock: Callable[[], datetime] = _now
+        #: 보류 중 평결 확정 verdict_id → 확정 기록.
+        self.held_sentences: dict[str, HeldSentence] = {}
+        #: 게이트가 넣은 SENTENCE job verdict_id → job id.
+        self.sentence_jobs: dict[str, str] = {}
 
     # --- 테스트 헬퍼 -------------------------------------------------------------
 
@@ -239,6 +331,119 @@ class FakeBackend:
 
     def verdict_for_post(self, post_id: str) -> VerdictState | None:
         return next((v for v in self.verdicts.values() if v.post_id == post_id), None)
+
+    # --- SENTENCE 게이트(D-24, 10 §3·§6) ------------------------------------------
+
+    async def confirm_verdict(
+        self,
+        verdict_id: str,
+        *,
+        post_id: str,
+        verdict_version: int = 1,
+        fallback_sentence: str = "oneDay",
+        confirmed_at: datetime | None = None,
+    ) -> str | None:
+        """평결 확정. 게이트를 한 번 돌려 넣었으면 SENTENCE job id, 보류면 None.
+
+        verdict 가 없으면 마감 없이(`deadline_at=None`, PENDING) 심는다. 마감은 INSERT 때 정해진다.
+        """
+        self._require_engine("SENTENCE 게이트")
+        confirmed = confirmed_at or self.clock()
+        if verdict_id not in self.verdicts:
+            self.seed_verdict(
+                verdict_id,
+                verdict_version=verdict_version,
+                post_id=post_id,
+                fallback_sentence=fallback_sentence,
+                deadline_at=None,
+            )
+        self.held_sentences[verdict_id] = HeldSentence(
+            verdict_id=verdict_id,
+            verdict_version=verdict_version,
+            post_id=post_id,
+            confirmed_at=confirmed,
+        )
+        await self.run_sentence_gate(now=confirmed)
+        return None if verdict_id in self.held_sentences else self.sentence_jobs.get(verdict_id)
+
+    async def run_sentence_gate(self, now: datetime | None = None) -> list[str]:
+        """게이트 스케줄러 한 주기. 이번에 넣은 SENTENCE job id 목록.
+
+        PREPARE 가 없거나 끝났으면(`QUEUED`·`RUNNING` 이 아니면) 또는 `confirmed_at + 대기 상한` 에
+        닿았으면 INSERT 하고, verdict 마감을 job 마감(INSERT 시각 + 10s)과 같게 둔다.
+        """
+        current = now or self.clock()
+        inserted: list[str] = []
+        for held in list(self.held_sentences.values()):
+            waited_out = current >= held.confirmed_at + self.sentence_gate_wait
+            if not waited_out and await self._prepare_active(held.post_id):
+                continue
+            job_id, deadline_at = await self._insert_sentence(held)
+            self.verdicts[held.verdict_id].deadline_at = deadline_at
+            self.sentence_jobs[held.verdict_id] = job_id
+            del self.held_sentences[held.verdict_id]
+            inserted.append(job_id)
+        return inserted
+
+    async def _prepare_active(self, post_id: str) -> bool:
+        engine = self._require_engine("SENTENCE 게이트")
+        async with engine.connect() as conn:
+            result = await conn.execute(_PREPARE_ACTIVE_SQL, {"post_id": post_id})
+            return bool(result.scalar_one())
+
+    async def _insert_sentence(self, held: HeldSentence) -> tuple[str, datetime]:
+        engine = self._require_engine("SENTENCE 게이트")
+        payload = {
+            "verdict_id": held.verdict_id,
+            "verdict_version": held.verdict_version,
+            "post_id": held.post_id,
+        }
+        dedupe_key = build_dedupe_key(_SENTENCE_ROUTE, payload)
+        id_field, version_field = _SENTENCE_ROUTE.aggregate_fields
+        params = {
+            "id": str(uuid4()),
+            "event_id": str(uuid4()),
+            "event_type": _SENTENCE_ROUTE.event_type,
+            "kind": _SENTENCE_ROUTE.kind,
+            "dedupe_key": dedupe_key,
+            "aggregate_id": str(payload[id_field]),
+            "aggregate_version": int(payload[version_field]),
+            "payload": json.dumps(payload, ensure_ascii=False),
+            "priority": _SENTENCE_ROUTE.priority,
+            "max_attempts": _SENTENCE_ROUTE.max_attempts,
+            "deadline_after_s": _SENTENCE_ROUTE.deadline_after_s,
+            "trace_id": str(uuid4()),
+        }
+        async with engine.begin() as conn:
+            row = (await conn.execute(_INSERT_SENTENCE_SQL, params)).mappings().first()
+            if row is None:  # 같은 dedupe_key 가 이미 있다.
+                existing = await conn.execute(_SELECT_JOB_BY_DEDUPE_SQL, {"dedupe_key": dedupe_key})
+                row = existing.mappings().one()
+        return row["id"], row["deadline_at"]
+
+    # --- 진행 중 작업 끄기(D-26, 10 §8) -------------------------------------------
+
+    async def invalidate_post(self, post_id: str, *, scope_keys: Iterable[str]) -> list[str]:
+        """무효화 트랜잭션 한 번. 끈(CANCELLED) job id 목록.
+
+        scope epoch 를 먼저 올리고, 같은 트랜잭션에서 그 post 의 진행 중 PREPARE·SENTENCE·
+        TEXT_RETRY 를 끈다. 어느 scope 가 영향받는지는 백엔드가 정한다 — 호출자가 `scope_keys`
+        로 준다.
+        """
+        engine = self._require_engine("무효화 트랜잭션")
+        verdict_ids = [v.verdict_id for v in self.verdicts.values() if v.post_id == post_id]
+        async with engine.begin() as conn:
+            for scope_key in sorted(set(scope_keys)):
+                await conn.execute(_BUMP_EPOCH_SQL, {"scope_key": scope_key})
+            rows = await conn.execute(
+                _CANCEL_POST_JOBS_SQL, {"post_id": post_id, "verdict_ids": verdict_ids}
+            )
+            return [row.id for row in rows]
+
+    def _require_engine(self, what: str) -> AsyncEngine:
+        if self.jobs_engine is None:
+            raise RuntimeError(f"{what}는 jobs_engine 이 필요하다")
+        return self.jobs_engine
 
     # --- 규칙 ---------------------------------------------------------------------
 
