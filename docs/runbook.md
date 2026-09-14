@@ -10,7 +10,7 @@
 | 계약(내부 API·finalize·watchdog·round) | `docs/plans/10-backend-contract.md` |
 | 관측 지표·알림 조건 | 08 §3.3 |
 | 장애 재현·리허설 | 08 §3.1·§3.5 |
-| 백엔드에 넘긴 것 | `docs/backend-handoff.md` |
+| 백엔드에 넘긴 것 | `docs/plans/10-backend-contract.md` §0.1·§16 |
 
 비밀값(`DATABASE_URL`·`SERVICE_AUTH_TOKEN`·`OPENAI_API_KEY`·`XAI_API_KEY`·`ALERT_DISCORD_WEBHOOK_URL`)은
 이 문서·로그·채팅에 원문을 적지 않는다. 키 이름만 쓴다.
@@ -90,7 +90,7 @@ uv run geoji-ai ledger-sweep --older-than 24h
 ## 8. 비밀값 회전
 
 - 대상: `SERVICE_AUTH_TOKEN`(백엔드와 공유), 벤더 키, `ALERT_DISCORD_WEBHOOK_URL`
-- `.env` 는 git 에 넣지 않는다. 운영 값의 전달 경로는 `docs/backend-handoff.md` §1
+- `.env` 는 git 에 넣지 않는다. 운영 값의 전달 경로는 `docs/plans/10-backend-contract.md` §16.1
 - 아래 두 절차는 **초안**이다. 계획서(08 §3.6)에는 "`SERVICE_AUTH_TOKEN` 회전" 이름만 있고 절차·겹침 기간은 정해지지 않았다
 - [ ] `SERVICE_AUTH_TOKEN` 회전: 백엔드와 교체 시각을 맞춘다 → 양쪽 설정을 같은 새 값으로 바꾼다 →
   API·워커 재기동 → 내부 호출이 401 없이 도는지 로그로 확인

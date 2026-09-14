@@ -9,7 +9,6 @@ assets/
 #
 docs/*
 !docs/plans/
-!docs/backend-handoff.md
 !docs/runbook.md
 # 하네스 중간 산출물
 _workspace/

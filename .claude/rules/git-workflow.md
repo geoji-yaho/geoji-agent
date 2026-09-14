@@ -21,7 +21,7 @@ description: 브랜치 전략과 커밋 메시지 형식, git add 하지 않는 
 ## git add 하지 않는 것
 
 - `.env`. 키 이름만 `.env.example`에 둔다. 훅이 `git add .env`를 막는다
-- `docs/` 중 추적하는 것은 `docs/plans/`와 `docs/backend-handoff.md`뿐이다(`.gitignore`)
+- `docs/` 중 추적하는 것은 `docs/plans/`와 `docs/runbook.md`뿐이다(`.gitignore`). 백엔드 전달 사항은 따로 파일을 두지 않고 10 에 적는다(`backend-contract` 룰)
 - `git push --force`는 어디서든 쓰지 않는다. 훅이 막는다
 
 ## orca 워커(무인)
