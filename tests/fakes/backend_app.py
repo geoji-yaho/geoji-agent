@@ -89,6 +89,8 @@ ROUND_RETRY_CODES: frozenset[str] = frozenset(
 )
 #: 10 §7 `retry_round <= 3`.
 MAX_TEXT_RETRY_ROUND = 3
+#: 10 §7 round 1·2·3 은 템플릿 후 5·10·20분 뒤. 가짜는 예약 기록에 값만 남긴다(기다리지 않는다).
+TEXT_RETRY_ROUND_DELAYS_S: tuple[int, ...] = (300, 600, 1200)
 
 _DEFAULT_POLICY_VERSION: str = str(Settings.model_fields["GUARDRAIL_POLICY_VERSION"].default)
 _RETAIN_ROUTE = JOB_ROUTES["sentence.finalized"]
@@ -125,6 +127,15 @@ _INSERT_RETAIN_SQL = text(
         :priority, :max_attempts, NULL, :trace_id
     )
     ON CONFLICT (dedupe_key) DO NOTHING
+    """
+)
+
+#: watchdog 4단계 "이전 job CANCELLED"(10 §6). 끝나지 않은 job 만.
+_CANCEL_JOB_SQL = text(
+    """
+    UPDATE ai.jobs SET status = 'CANCELLED', owner_id = NULL, generation_id = NULL,
+           lease_until = NULL, updated_at = now()
+    WHERE id = CAST(:id AS uuid) AND status IN ('QUEUED', 'RUNNING')
     """
 )
 
@@ -199,6 +210,11 @@ class FakeBackend:
         self.hold_after_begin: threading.Event | None = None
         #: finalize 가 앞에서부터 하나씩 꺼내 그대로 거부할 `(status, code)`. 비면 기존 동작이다.
         self.finalize_rejections: list[tuple[int, str]] = []
+        #: 형량이 PENDING → FINAL 로 바뀐 기록 `(verdict_id, sentence_source)`. 기록만 한다
+        #: (08 §4.1 "형량 중복 확정 0" 검사용).
+        self.sentence_fixes: list[tuple[str, str]] = []
+        #: finalize 가 받은 본문(JSON 객체). 인증을 통과한 요청이면 거부 여부와 무관하게 쌓는다.
+        self.finalize_bodies: list[dict[str, Any]] = []
 
     # --- 테스트 헬퍼 -------------------------------------------------------------
 
@@ -325,27 +341,65 @@ class FakeBackend:
         """10 §4.6 코드 표. 처음 확정이면 폴백 FINAL/RULE + 템플릿 + RETAIN."""
         first_fix = verdict.sentence_status == "PENDING"
         if first_fix:
-            verdict.sentence_status = "FINAL"
-            verdict.sentence_source = "RULE"
-            verdict.sentence = verdict.fallback_sentence
-            verdict.text_status = "TEMPLATE_READY"
+            self._fix_rule(verdict)
         elif verdict.text_status == "NONE":
             verdict.text_status = "TEMPLATE_READY"
         if code in ROUND_RETRY_CODES:
-            done = sum(1 for r in self.text_retry_rounds if r["verdict_id"] == verdict.verdict_id)
-            if done < MAX_TEXT_RETRY_ROUND:
-                self.text_retry_rounds.append(
-                    {
-                        "verdict_id": verdict.verdict_id,
-                        "verdict_version": verdict.verdict_version,
-                        "round": done + 1,
-                    }
-                )
+            self._schedule_round(verdict)
         verdict.failed_generations[generation_id] = code
         verdict.active_job_id = None
         verdict.active_generation_id = None
         if first_fix:
             await self.insert_retain(verdict, trace_id)
+
+    def _fix_rule(self, verdict: VerdictState) -> None:
+        """폴백 형량 FINAL/RULE + 템플릿(10 §4.6·§6 3단계)."""
+        verdict.sentence_status = "FINAL"
+        verdict.sentence_source = "RULE"
+        verdict.sentence = verdict.fallback_sentence
+        verdict.text_status = "TEMPLATE_READY"
+        self.sentence_fixes.append((verdict.verdict_id, "RULE"))
+
+    def _schedule_round(self, verdict: VerdictState) -> None:
+        """다음 TEXT_RETRY round 예약 기록(10 §7). 3회를 넘기지 않는다."""
+        done = sum(1 for r in self.text_retry_rounds if r["verdict_id"] == verdict.verdict_id)
+        if done < MAX_TEXT_RETRY_ROUND:
+            self.text_retry_rounds.append(
+                {
+                    "verdict_id": verdict.verdict_id,
+                    "verdict_version": verdict.verdict_version,
+                    "round": done + 1,
+                    "delay_s": TEXT_RETRY_ROUND_DELAYS_S[done],
+                }
+            )
+
+    async def run_watchdog(self, now: datetime | None = None) -> list[str]:
+        """deadline watchdog 한 주기(10 §6). 확정한 verdict_id 목록.
+
+        실제 백엔드는 250ms 주기 스케줄러다. 가짜는 테스트가 부를 때 한 번 돈다.
+        마감이 지난 `PENDING` 만 대상이다(2단계 — 이미 FINAL 이면 반복하지 않는다).
+        폴백 FINAL/RULE + 템플릿 → active 세대 해제 · 이전 job `CANCELLED` → RETAIN · round 1.
+        """
+        current = now or _now()
+        fixed: list[str] = []
+        for verdict in self.verdicts.values():
+            if (
+                verdict.sentence_status != "PENDING"
+                or verdict.deadline_at is None
+                or current < verdict.deadline_at
+            ):
+                continue
+            self._fix_rule(verdict)
+            job_id = verdict.active_job_id
+            verdict.active_job_id = None
+            verdict.active_generation_id = None
+            if job_id is not None and self.jobs_engine is not None:
+                async with self.jobs_engine.begin() as conn:
+                    await conn.execute(_CANCEL_JOB_SQL, {"id": job_id})
+            await self.insert_retain(verdict, str(uuid4()))
+            self._schedule_round(verdict)
+            fixed.append(verdict.verdict_id)
+        return fixed
 
 
 def _trace_id(request: Request) -> str:
@@ -517,6 +571,8 @@ def create_fake_backend(
             loose = json.loads(raw)
         except ValueError:
             return _reject(422, _INVALID_DRAFT)
+        if isinstance(loose, dict):
+            fake.finalize_bodies.append(loose)
         generation_id = loose.get("generation_id") if isinstance(loose, dict) else None
         if not isinstance(generation_id, str):
             return _reject(422, _INVALID_DRAFT)
@@ -562,6 +618,7 @@ def create_fake_backend(
             verdict.sentence_source = "AI"
             verdict.sentence = str(req.sentencing.sentence)
             verdict.sentencing_reason = req.sentencing.sentencing_reason
+            fake.sentence_fixes.append((verdict_id, "AI"))
         elif req.sentencing is not None and (
             str(req.sentencing.sentence) != verdict.sentence
             or req.sentencing.sentencing_reason != verdict.sentencing_reason
