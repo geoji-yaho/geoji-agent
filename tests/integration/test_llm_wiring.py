@@ -230,6 +230,28 @@ async def test_09_유죄_2강도_SENTENCE_원장은_양형1_서기2_검수1_rese
     assert roles(wired.writer) == Counter({"writer": 2})
 
 
+async def test_09b_남은_10s_유죄_SENTENCE_에서_양형_AI_가_원장에_남는다(env: Env):
+    """R1: 10 §3 기본 마감(confirmed_at + 10s)에서도 양형관을 부른다(예약 0, 05 §3.1)."""
+    await env.prepare(FakeLLM(outputs={"context": CONTEXT_OK}))
+    settings = make_settings()
+    wired = wire(env.engine, settings)
+    capture = Capture()
+
+    job_id = await env.sentence(
+        wired.gateway,
+        settings=settings,
+        remaining_s=10.0,
+        handler=SentenceHandler(capture),
+    )
+
+    assert (await env.fetch_job(job_id))["status"] == "SUCCEEDED"
+    assert capture.last["sentencing_source"] == "AI"
+    rows = await _calls(env.engine)
+    assert ("sentencing", 0, "COMPLETE") in _slots(rows)
+    assert roles(wired.judgment)["sentencing"] == 1
+    assert (await _budget(env.engine))["reserved_micro_usd"] == 0
+
+
 # --- ⑩ 예산 초과 ----------------------------------------------------------------------
 
 

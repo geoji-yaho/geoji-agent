@@ -65,11 +65,15 @@ def test_evaluator_not_started_at_finalize_reserve() -> None:
     assert _deadline(0.5, FakeClock()).node_timeout("evaluator", SETTINGS) is None
 
 
-@pytest.mark.parametrize(("remaining", "expected"), [(20, 3.0), (12, 1.5)])
-def test_sentencing_reserves_writer_evaluator_finalize(remaining: float, expected: float) -> None:
-    """sentencing 예약 = writer 상한 + evaluator 4s + finalize 0.5s(코디네이터 해석)."""
-    assert reserve_after("sentencing", SETTINGS) == 10.5
+@pytest.mark.parametrize(("remaining", "expected"), [(20, 3.0), (10, 3.0), (3, 3.0), (2, 2.0)])
+def test_sentencing_has_no_reserve(remaining: float, expected: float) -> None:
+    """sentencing 예약 0(05 §3.1 원문은 writer·evaluator 만 정의) → min(3, 남은)."""
+    assert reserve_after("sentencing", SETTINGS) == 0.0
     assert _deadline(remaining, FakeClock()).node_timeout("sentencing", SETTINGS) == expected
+
+
+def test_sentencing_not_started_when_deadline_passed() -> None:
+    assert _deadline(0, FakeClock()).node_timeout("sentencing", SETTINGS) is None
 
 
 def test_unknown_node_rejected() -> None:

@@ -146,7 +146,7 @@ async def test_24h_이전_UNKNOWN_만_spent_로_확정하고_재실행은_0건�
     done_before = await _call(engine, done_a)
 
     open_a = await ledger.reserve(KEY_A, _spec(700, 3))
-    await _age(engine, open_a, 30)
+    await _age(engine, open_a, 1)  # 최근 RESERVED 는 진행 중일 수 있어 유지
 
     old_b = await ledger.reserve(KEY_B, _spec(4_000, 4))
     await ledger.mark_unknown(old_b, LLMError("TIMEOUT"))
@@ -194,6 +194,37 @@ async def test_정리된_UNKNOWN_에_늦은_settle_이_와도_이중_정산하�
 
     assert await _budget(engine, KEY_A) == (5_000, 0)
     assert (await _call(engine, call_id))["actual_micro_usd"] == 5_000
+
+
+async def test_오래된_RESERVED_는_UNKNOWN_으로_바꿔_정리하고_최근_RESERVED_는_유지한다(
+    engine: AsyncEngine,
+):
+    ledger = PostgresCallLedger(engine)
+    old = await ledger.reserve(KEY_A, _spec(6_000, 0))
+    await _age(engine, old, 25)
+    recent = await ledger.reserve(KEY_A, _spec(900, 1))
+    await _age(engine, recent, 23)
+    assert await _budget(engine, KEY_A) == (0, 6_900)
+
+    report = await ledger.sweep_unknown(OLDER_THAN)
+
+    assert report == SweepReport(calls=1, micro_usd=6_000, budget_keys=1, reserved_calls=1)
+    row = await _call(engine, old)
+    assert (row["status"], row["actual_micro_usd"]) == ("UNKNOWN", 6_000)
+    assert row["finished_at"] is not None
+    kept = await _call(engine, recent)
+    assert (kept["status"], kept["actual_micro_usd"]) == ("RESERVED", None)
+    # reserved 누수 0 · spent 반영
+    assert await _budget(engine, KEY_A) == (6_000, 900)
+    assert (await _budget(engine, KEY_A))[1] == await _open_est(engine, KEY_A)
+
+    again = await ledger.sweep_unknown(OLDER_THAN)
+    assert again == SweepReport(calls=0, micro_usd=0, budget_keys=0, reserved_calls=0)
+    assert await _budget(engine, KEY_A) == (6_000, 900)
+
+    # 정리된 행에 늦은 settle 이 와도 이중 정산하지 않는다
+    await ledger.settle(old, _result(1))
+    assert await _budget(engine, KEY_A) == (6_000, 900)
 
 
 async def test_대상이_없으면_빈_리포트(engine: AsyncEngine):

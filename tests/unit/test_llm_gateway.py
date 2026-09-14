@@ -373,6 +373,86 @@ async def test_04c_inner_의_LLMError_아닌_예외는_TRANSPORT_UNKNOWN_벤더_
     assert r.health.failures == []
 
 
+# --- R2 취소·예외 경로에서 원장 닫기 ---------------------------------------------------
+
+
+class FailingCloseLedger(FakeLedger):
+    """닫기(`mark_unknown`)가 실패하는 원장. 시도는 기록한다."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.close_attempts = 0
+
+    async def mark_unknown(self, call_id: str, error: LLMError) -> None:
+        self.close_attempts += 1
+        raise RuntimeError("ledger down")
+
+
+async def _start_and_cancel(r: Rig) -> asyncio.Task[Any]:
+    task = asyncio.create_task(call(r))
+    while not r.inner.calls:  # inner 가 대기에 들어갈 때까지
+        await asyncio.sleep(0)
+    task.cancel()
+    return task
+
+
+async def test_R2a_inner_대기_중_취소면_mark_unknown_1회_CancelledError_전파():
+    r = rig(hang=True)
+
+    task = await _start_and_cancel(r)
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert r.ledger.unknown == [("call-1", "TRANSPORT")]
+    assert (r.ledger.settled, r.ledger.failed) == ([], [])
+    assert r.health.failures == []
+
+
+async def test_R2b_inner_RuntimeError_면_원장을_한_번_닫는다():
+    r = rig(RuntimeError("boom"))
+
+    with pytest.raises(LLMError):
+        await call(r)
+
+    closes = len(r.ledger.settled) + len(r.ledger.failed) + len(r.ledger.unknown)
+    assert closes == 1
+    assert r.ledger.unknown == [("call-1", "TRANSPORT")]
+
+
+async def test_R2c_루프_밖_예외도_원장을_UNKNOWN_으로_닫고_원래_예외를_올린다():
+    def broken_remaining() -> float:
+        raise RuntimeError("clock broken")
+
+    r = rig(LLMError("SERVER"))
+
+    with pytest.raises(RuntimeError, match="clock broken"):
+        await call(r, scope(remaining_s=broken_remaining))
+
+    assert r.ledger.unknown == [("call-1", "TRANSPORT")]
+    assert (r.ledger.settled, r.ledger.failed) == ([], [])
+
+
+async def test_R2d_닫기가_실패해도_원래_CancelledError_를_올린다():
+    ledger = FailingCloseLedger()
+    r = rig(ledger=ledger, hang=True)
+
+    task = await _start_and_cancel(r)
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert ledger.close_attempts == 1
+
+
+async def test_R2e_정상_닫은_뒤_실패는_두_번_닫지_않는다():
+    """fail 로 닫은 뒤 올리는 LLMError 는 except 에서 다시 닫지 않는다."""
+    r = rig(LLMError("AUTH"))
+
+    with pytest.raises(LLMError):
+        await call(r)
+
+    assert len(r.ledger.failed) + len(r.ledger.unknown) == 1
+
+
 # --- ⑤ 예산 -------------------------------------------------------------------------
 
 

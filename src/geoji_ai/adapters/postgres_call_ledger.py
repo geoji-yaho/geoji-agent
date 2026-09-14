@@ -117,6 +117,18 @@ _MARK_UNKNOWN_SQL = text(
     """
 )
 
+#: 프로세스 강제 종료로 남은 오래된 RESERVED 를 UNKNOWN 으로 바꾼다(`mark_unknown` 과 같은 표시).
+#: 같은 트랜잭션에서 이어지는 UNKNOWN 정리가 이 행까지 처리한다.
+_SWEEP_STALE_RESERVED_SQL = text(
+    """
+    UPDATE ai.llm_calls
+    SET status = 'UNKNOWN', finished_at = now()
+    WHERE status = 'RESERVED'
+      AND started_at < now() - make_interval(secs => :older_than_s)
+    RETURNING id
+    """
+)
+
 #: 정리 대상 UNKNOWN 행을 잠그고 `actual = est_max` 로 표시한다. 표시된 행은 다시 걸리지 않는다.
 _SWEEP_UNKNOWN_SQL = text(
     """
@@ -298,6 +310,10 @@ class PostgresCallLedger:
     async def sweep_unknown(self, older_than: timedelta) -> SweepReport:
         """UNKNOWN 정리(08 §3.2). 한 트랜잭션.
 
+        먼저 `status='RESERVED' ∧ started_at < now() − older_than` 를 `UNKNOWN`(finished_at=now())
+        으로 바꾼다. 게이트웨이가 닫지 못한 채 프로세스가 죽은 예약이다. 그 뒤 아래 규칙이 그 행까지
+        처리하고, 바꾼 수를 `reserved_calls` 로 따로 센다(`calls` 에 포함).
+
         대상은 `status='UNKNOWN' ∧ actual_micro_usd IS NULL ∧ started_at < now() − older_than`.
         예약액(`estimated_max_micro_usd`)을 보수적으로 사용액으로 본다.
 
@@ -314,7 +330,10 @@ class PostgresCallLedger:
         """
         if older_than <= timedelta(0):
             raise ValueError("older_than 은 양수여야 한다")
+        params = {"older_than_s": older_than.total_seconds()}
         async with self._engine.begin() as conn:
+            # 먼저 오래된 RESERVED(게이트웨이가 닫지 못하고 프로세스가 죽은 행)를 UNKNOWN 으로.
+            stale_reserved = len((await conn.execute(_SWEEP_STALE_RESERVED_SQL, params)).all())
             rows = (
                 (
                     await conn.execute(
@@ -341,12 +360,15 @@ class PostgresCallLedger:
                     keys += 1
                 else:
                     log.warning("ledger_sweep_budget_missing")
-        report = SweepReport(calls=len(rows), micro_usd=total, budget_keys=keys)
+        report = SweepReport(
+            calls=len(rows), micro_usd=total, budget_keys=keys, reserved_calls=stale_reserved
+        )
         log.info(
             "ledger_sweep_done",
             calls=report.calls,
             micro_usd=report.micro_usd,
             budget_keys=report.budget_keys,
+            reserved_calls=report.reserved_calls,
         )
         return report
 
