@@ -78,17 +78,19 @@ def node_cap(name: str, settings: Any) -> float:
 def reserve_after(name: str, settings: Any) -> float:
     """이 노드 뒤 필수 단계에 남겨 둘 시간.
 
+    05 §3.1 원문이 정의한 두 가지만 예약한다.
+
     - writer → evaluator 상한(4s) + finalize 0.5s
     - evaluator → finalize 0.5s
-    - sentencing → writer 상한 + evaluator 상한 + finalize 0.5s(05 §3.1 에 없어 코디네이터 해석)
+    - sentencing → 0. 양형 timeout = `min(양형 상한, 남은 시간)`. 뒤 서기·검수 시간은 각 노드의
+      `reserve_after` 가 확보하고, 남은 시간이 모자라면 뒤 노드가 줄어들거나 폴백한다
     """
     _check_name(name)
+    if name == SENTENCING:
+        return 0.0
     if name == EVALUATOR:
         return FINALIZE_RESERVE_SECONDS
-    after_writer = node_cap(EVALUATOR, settings) + FINALIZE_RESERVE_SECONDS
-    if name == WRITER:
-        return after_writer
-    return node_cap(WRITER, settings) + after_writer
+    return node_cap(EVALUATOR, settings) + FINALIZE_RESERVE_SECONDS
 
 
 @dataclass(frozen=True)

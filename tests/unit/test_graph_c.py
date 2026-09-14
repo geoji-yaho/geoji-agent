@@ -472,13 +472,32 @@ def test_04_sentencing_timeout_falls_back_to_rule() -> None:
     assert [c.error for c in result.state["calls"] if c.role == "sentencing"] == ["TIMEOUT"]
 
 
-def test_04b_sentencing_without_budget_is_not_called() -> None:
-    """④ 보강: 양형 예산이 없으면 호출하지 않고 RULE."""
-    snapshot = make_snapshot()
-    # sentencing 예약 = writer 6 + evaluator 4 + 0.5 → 남은 10s 면 budget ≤ 0
-    result = run(snapshot=snapshot, backend_kwargs={"remaining_s": 10.0})
-    assert result.roles()["sentencing"] == 0
-    assert result.state["sentencing_source"] == "RULE"
+def test_04b_default_deadline_10s_calls_sentencing_ai() -> None:
+    """R1: 남은 10s(10 §3 SENTENCE 기본 마감)·유죄·spent → 양형 AI 1회.
+
+    sentencing 예약 0 → timeout min(3, 10) = 3. writer min(6, 10 − 4.5) = 5.5, evaluator 4.
+    """
+    result = run(backend_kwargs={"remaining_s": 10.0})
+    assert result.roles() == Counter({"sentencing": 1, "writer": 2, "evaluator": 1})
+    assert result.state["sentencing_source"] == "AI"
+    [sentencing_call] = result.calls_of("sentencing")
+    assert sentencing_call.timeout_s == 3.0
+    assert [c.timeout_s for c in result.calls_of("writer")] == [5.5, 5.5]
+    assert result.jobs.completed == ["job-1"]
+
+
+def test_04c_remaining_3s_calls_sentencing_then_writer_fallback_rule() -> None:
+    """R1: 남은 3s → 양형은 부르고(min(3, 3)), 서기는 검수 예약(4.5s)이 없어 시작하지 않는다.
+
+    이후는 기존 규칙(⑬ 보강)대로 `DEADLINE_EXCEEDED`.
+    """
+    result = run(backend_kwargs={"remaining_s": 3.0})
+    assert result.roles()["sentencing"] == 1
+    assert result.state["sentencing_source"] == "AI"
+    assert result.roles()["writer"] == 0
+    assert result.roles()["evaluator"] == 0
+    assert result.backend.finalized == []
+    assert result.backend.failed == ["DEADLINE_EXCEEDED"]
 
 
 def test_05_long_reason_replaced_by_template_without_reevaluation() -> None:

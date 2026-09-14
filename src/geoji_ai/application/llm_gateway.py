@@ -26,6 +26,10 @@
   같은 규칙을 복제했다(application 은 어댑터를 import 하지 않는다). 정확 토크나이저 없음
 - 단가표에 없는 모델은 `est_max = 0` 으로 예약하지 않는다. 예약·호출 없이 `LLMError("BUDGET")` +
   로그 `llm_price_missing`(설정 오류)
+- reserve 뒤 settle/fail/mark_unknown 으로 닫지 못하고 빠져나가는 경로(`CancelledError` 등
+  `BaseException`, 루프 밖 예외)는 `mark_unknown`(kind `TRANSPORT`)으로 한 번 닫고 원래 예외를
+  다시 올린다. 요청 발송 여부를 구분할 수 없어 전부 UNKNOWN(06 §3.2). 닫기는 `asyncio.shield`
+  로 보호하고 닫기 실패는 로그만 남긴다. 강제 종료로 남은 RESERVED 는 `ledger-sweep` 이 정리한다
 - inner 가 `LLMError` 가 아닌 예외를 내면 `TRANSPORT`(원장 UNKNOWN)로 보되 벤더 장애로 세지 않는다
 - `node_results` 에는 **검증된 출력만** 넣는다. 게이트웨이는 검증을 모르므로 호출자(그래프)가 파싱·
   검증에 성공한 뒤 `remember(scoped)` 를 부른다. 조회·저장 오류는 로그만 남기고 호출을 막지 않는다
@@ -325,60 +329,83 @@ class LLMGateway:
             )
             raise LLMError("TRANSPORT", message=f"원장 예약 실패: {type(exc).__name__}") from exc
 
-        attempt = 1
-        timeout = timeout_s
-        while True:
-            from_vendor = True
-            try:
-                result = await asyncio.wait_for(
-                    self._inner.structured_call(
-                        role=role,
-                        messages=messages,
-                        schema=schema,
-                        timeout_s=timeout,
-                        max_output_tokens=max_output_tokens,
-                        model_override=scope.model_override,
-                    ),
-                    timeout,
-                )
-            except LLMError as exc:
-                error = exc
-            except TimeoutError:
-                error = LLMError("TIMEOUT", message=f"{timeout}s 안에 응답이 없다")
-            except Exception as exc:
-                error = LLMError("TRANSPORT", message=f"inner 예외: {type(exc).__name__}")
-                from_vendor = False
-            else:
-                await self._close("settle", call_id, result)
-                self._health.record_success(vendor)
-                await self._track_cost(result.cost)
-                return ScopedResult(result, False, call_id, rhash, versions)
+        # reserve 뒤 모든 종료 경로에서 원장을 정확히 한 번 닫는다. 정상 경로는 settle/fail/
+        # mark_unknown 직전에 `closed` 를 세우고, 그 밖(취소·루프 밖 예외)은 except 에서 UNKNOWN.
+        closed = False
+        try:
+            attempt = 1
+            timeout = timeout_s
+            while True:
+                from_vendor = True
+                try:
+                    result = await asyncio.wait_for(
+                        self._inner.structured_call(
+                            role=role,
+                            messages=messages,
+                            schema=schema,
+                            timeout_s=timeout,
+                            max_output_tokens=max_output_tokens,
+                            model_override=scope.model_override,
+                        ),
+                        timeout,
+                    )
+                except LLMError as exc:
+                    error = exc
+                except TimeoutError:
+                    error = LLMError("TIMEOUT", message=f"{timeout}s 안에 응답이 없다")
+                except Exception as exc:
+                    error = LLMError("TRANSPORT", message=f"inner 예외: {type(exc).__name__}")
+                    from_vendor = False
+                else:
+                    closed = True
+                    await self._close("settle", call_id, result)
+                    self._health.record_success(vendor)
+                    await self._track_cost(result.cost)
+                    return ScopedResult(result, False, call_id, rhash, versions)
 
-            if from_vendor:
-                self._health.record_failure(vendor, error.kind)
-            remaining = scope.remaining()
-            wait = backoff_seconds(
-                error.kind,
-                attempt,
-                remaining,
-                retry_after_s=error.retry_after_s,
-                reserve_s=scope.reserve_s,
-            )
-            if wait is not None:
-                retry_timeout = min(timeout_s, remaining - scope.reserve_s - wait)
-                if retry_timeout > 0:
-                    log.info("llm_retry", node=scope.node, kind=error.kind, wait_s=wait)
-                    await self._sleep(wait)
-                    attempt += 1
-                    timeout = retry_timeout
-                    continue
-            if ledger_status(error.kind) == "UNKNOWN":
-                await self._close("mark_unknown", call_id, error)
-            else:
-                await self._close("fail", call_id, error)
-            # 벤더가 응답을 돌려준 실패(잘림·거절)는 과금된다. 비용을 알면 집계에 넣는다.
-            await self._track_cost(error.cost)
-            raise error
+                if from_vendor:
+                    self._health.record_failure(vendor, error.kind)
+                remaining = scope.remaining()
+                wait = backoff_seconds(
+                    error.kind,
+                    attempt,
+                    remaining,
+                    retry_after_s=error.retry_after_s,
+                    reserve_s=scope.reserve_s,
+                )
+                if wait is not None:
+                    retry_timeout = min(timeout_s, remaining - scope.reserve_s - wait)
+                    if retry_timeout > 0:
+                        log.info("llm_retry", node=scope.node, kind=error.kind, wait_s=wait)
+                        await self._sleep(wait)
+                        attempt += 1
+                        timeout = retry_timeout
+                        continue
+                closed = True
+                if ledger_status(error.kind) == "UNKNOWN":
+                    await self._close("mark_unknown", call_id, error)
+                else:
+                    await self._close("fail", call_id, error)
+                # 벤더가 응답을 돌려준 실패(잘림·거절)는 과금된다. 비용을 알면 집계에 넣는다.
+                await self._track_cost(error.cost)
+                raise error
+        except BaseException as exc:
+            if not closed:
+                # 취소(lease 상실·SIGTERM)·루프 밖 예외. 요청이 벤더에 나갔을 수 있어 UNKNOWN
+                # (06 §3.2 "timeout·연결 끊김 = UNKNOWN, 예약 유지").
+                # 발송 전 취소는 구분하지 않는다.
+                log.warning(
+                    "llm_call_aborted",
+                    node=scope.node,
+                    call_index=scope.call_index,
+                    error=type(exc).__name__,
+                )
+                await self._close(
+                    "mark_unknown",
+                    call_id,
+                    LLMError("TRANSPORT", message=f"호출 중단: {type(exc).__name__}"),
+                )
+            raise
 
     async def remember(self, scoped: ScopedResult) -> None:
         """검증을 통과한 출력을 `node_results` 에 넣는다. 재사용 hit·출력 없음은 넣지 않는다."""
@@ -435,10 +462,18 @@ class LLMGateway:
         await track_cost(self._cost_tracker, self._notifier, cost.micro_usd, day=day)
 
     async def _close(self, action: str, call_id: str, value: Any) -> None:
-        try:
-            await getattr(self._ledger, action)(call_id, value)
-        except Exception as exc:
-            log.error("ledger_close_failed", action=action, error=type(exc).__name__)
+        """원장 닫기. `asyncio.shield` 로 감싸 호출 태스크가 취소돼도 닫기는 끝까지 간다.
+
+        닫기 실패는 로그만 남긴다(호출자의 원래 결과·예외를 바꾸지 않는다).
+        """
+
+        async def run() -> None:
+            try:
+                await getattr(self._ledger, action)(call_id, value)
+            except Exception as exc:
+                log.error("ledger_close_failed", action=action, error=type(exc).__name__)
+
+        await asyncio.shield(run())
 
 
 def _epoch_pairs(privacy_versions: Any) -> list[tuple[str, int]]:

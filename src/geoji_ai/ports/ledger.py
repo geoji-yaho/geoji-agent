@@ -21,6 +21,8 @@ class SweepReport:
     micro_usd: int
     #: 갱신한 `case_budgets` 키 수.
     budget_keys: int
+    #: `calls` 중 오래된 `RESERVED` 를 `UNKNOWN` 으로 바꿔 함께 정리한 수(프로세스 강제 종료 잔여).
+    reserved_calls: int = 0
 
 
 @dataclass(frozen=True)

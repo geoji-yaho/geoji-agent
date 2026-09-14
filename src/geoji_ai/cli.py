@@ -99,7 +99,7 @@ def _run_ledger_sweep(settings: Settings, *, older_than: timedelta) -> int:
     # 건수·금액·키 개수만. 예산 키 원문·접속 문자열은 출력하지 않는다.
     print(
         f"UNKNOWN 정리: 호출 {report.calls}건, {report.micro_usd} micro-USD 를 spent 로 확정, "
-        f"예산 키 {report.budget_keys}개"
+        f"예산 키 {report.budget_keys}개 (그중 오래된 RESERVED {report.reserved_calls}건)"
     )
     return 0
 

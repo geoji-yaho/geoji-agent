@@ -7,7 +7,31 @@ from datetime import timedelta
 
 import pytest
 
+from geoji_ai import cli
 from geoji_ai.cli import _parser, parse_duration
+from geoji_ai.ports.ledger import SweepReport
+
+
+def test_ledger_sweep_출력에_RESERVED_정리_건수가_있다(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    seen: list[timedelta] = []
+
+    async def fake_sweep(url: str, older_than: timedelta) -> SweepReport:
+        seen.append(older_than)
+        return SweepReport(calls=3, micro_usd=7_500, budget_keys=2, reserved_calls=1)
+
+    monkeypatch.setattr(cli, "_database_url", lambda settings: "postgresql://secret")
+    monkeypatch.setattr(cli, "_sweep", fake_sweep)
+
+    code = cli._run_ledger_sweep(object(), older_than=timedelta(hours=24))  # type: ignore[arg-type]
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert seen == [timedelta(hours=24)]
+    assert "호출 3건" in out and "7500 micro-USD" in out and "예산 키 2개" in out
+    assert "RESERVED 1건" in out
+    assert "secret" not in out
 
 
 @pytest.mark.parametrize(
