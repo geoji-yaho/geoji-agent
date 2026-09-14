@@ -67,7 +67,7 @@ Frontend ──▶ Main Backend ── 내부 HTTP ──▶ AI API (FastAPI)  :
 | 업무 트랜잭션 | kind / event_type | dedupe_key | priority | max_attempts | deadline_at | payload |
 |---|---|---|---:|---:|---|---|
 | 게시물 저장(`spent`·`considering` 만, `NO_SPEND` 제외) | `PREPARE` / `post.created` | `prepare:{post_id}:{post_version}:{audience_version}` | 30 | 2 | null | `{post_id, post_version, audience_version}` |
-| 배심원 평결 확정(전원 투표 즉시 or 마감 스캔) | `SENTENCE` / `verdict.confirmed` | `sentence:{verdict_id}:{verdict_version}` | 100 | 2 | `confirmed_at + 10s` | `{verdict_id, verdict_version, post_id}` |
+| 배심원 평결 확정(전원 투표 즉시 or 마감 스캔) — **9/14 D-24: PREPARE 종료 뒤 INSERT** | `SENTENCE` / `verdict.confirmed` | `sentence:{verdict_id}:{verdict_version}` | 100 | 2 | **INSERT 시각 + 10s** (원문 `confirmed_at + 10s`) | `{verdict_id, verdict_version, post_id}` |
 | 판결 최초 저장(finalize 또는 watchdog) | `RETAIN` / `sentence.finalized` | `retain:verdict:{verdict_id}:{verdict_version}` | 10 | 5 | null | `{event:"sentence.finalized", verdict_id, verdict_version}` |
 | 템플릿 저장·재시도 필요 | `TEXT_RETRY` / `verdict.text_retry` | `text-retry:{verdict_id}:{verdict_version}:{round}` | 50 | 1 | round 시작 + 20s | `{verdict_id, verdict_version, round, intensities[]}` |
 | 승인된 댓글(안전 검토 통과) | `RETAIN` / `comment.approved` | `retain:comment:{comment_id}:{comment_version}` | 10 | 5 | null | `{event:"comment.approved", comment_id, comment_version}` |
@@ -79,6 +79,7 @@ VALUES (gen_random_uuid(), gen_random_uuid(), 'verdict.confirmed', 'SENTENCE', '
         100, 2, :confirmed_at + interval '10 seconds', :trace_id)
 ON CONFLICT (dedupe_key) DO NOTHING;   -- 같은 업무 트랜잭션 안. commit 뒤 워커가 250ms 안에 집는다
 ```
+- **`(제안)` SENTENCE 게이트(9/14 D-24, §15.5):** 평결 확정 시점에 같은 `post_id` 의 `PREPARE` job 이 `QUEUED`·`RUNNING` 이면 SENTENCE 를 바로 넣지 않는다. 백엔드 스케줄러(§6 watchdog 250ms 스캔에 합쳐도 된다)가 **PREPARE 가 종료(`SUCCEEDED`·`FAILED`·`CANCELLED`)되거나 `confirmed_at + 30s` 에 도달하면** 그때 INSERT 하고, `verdicts.deadline_at` 과 job `deadline_at` 을 **INSERT 시각 + 10s** 로 둔다. 기다리는 동안 `sentence_status=PENDING`·`text_status=PENDING`, 공개 API 는 `view=null`(§9 대기 메시지). PREPARE job 이 아예 없으면(재처리 중 삭제 등) 바로 INSERT
 - `payload` 에는 **참조(ID·version)만.** 사유·댓글을 작업마다 복제하지 않는다
 - `dismissed`(정족수 미달 각하)는 **선고 작업을 만들지 않는다.** `disagree`(살까 말까 부결)는 만든다 — 양형관만 건너뛴다
 - 허용 목록이 비었거나 `fallback_sentence` 가 목록에 없으면 **선고 작업을 만들지 않고** 정책 설정 오류를 알린다(§5.3). 생산 환경에 임의 형량의 묵시적 기본값은 없다
@@ -169,6 +170,7 @@ COMMIT
 5. `RETAIN` 과 `TEXT_RETRY` round 1 을 같은 트랜잭션에 기록
 6. 이전 워커 응답은 generation/상태 불일치로 거부
 **엄밀한 10,000ms 보장은 아니다.** `confirmed_at → 첫 노출 저장` p95 를 측정하고 프론트 표시 지연을 별도로 합산한다.
+- 9/14 D-24: 마감 기준은 SENTENCE INSERT 시각이다(§3 게이트). PREPARE 대기(최대 30초) 동안은 watchdog 대상이 아니다(`deadline_at` 이 아직 없다). 체감 지연 = PREPARE 대기 + 10초 상한
 
 ## 7. 재시도 round · reaper (proposal2 §8.3·§11.2)
 
@@ -179,6 +181,7 @@ COMMIT
 ## 8. 삭제 · 권한 변경 (proposal2 §11.3)
 
 - 원본 삭제·댓글 삭제·작성자 탈퇴·방 공유 철회: **해당 scope 의 `ai.privacy_epochs` 를 먼저 잠그고 증가**, 같은 트랜잭션에서 원본 비활성화, 무효화 작업 기록. 판결 생성은 이전 epoch 로 저장할 수 없다(finalize 3 단계)
+- **`(제안)` 진행 중 작업 끄기(9/14 D-26, §15.5):** 같은 무효화 트랜잭션에서 영향받는 게시물의 `ai.jobs` 중 `QUEUED`·`RUNNING` 인 `PREPARE`·`SENTENCE`·`TEXT_RETRY` 를 `CANCELLED` 로 바꾼다(게시물 삭제·공유 철회는 그 `post_id`, 작성자 탈퇴는 그 사용자의 게시물 전부). 워커는 heartbeat 소유권 조건(`status='RUNNING'`, 02 §3.2)이 깨지는 즉시 핸들러를 취소하고 원장 예약을 닫는다. 추가 방어로 워커는 모델 호출 직전마다 epoch 를 확인해 달라졌으면 호출하지 않는다
 - **파생 정리는 비동기여도 읽기 차단은 즉시.** 판결 조회는 현재 epoch 와 저장 당시 epoch 를 비교, 불일치면 과거 문구 대신 공개 가능한 템플릿. 캐시·공유 카드 캐시도 버전 키가 달라지게
 - 무효화 스케줄러: `04-memory-evidence-deletion.md` §3.5 SQL(evidence_sources → evidence/dossiers/trial_prep/memory_facts/node_results) + `text_evidence_refs` 로 영향받는 `verdict_texts` 를 템플릿으로 전환. 재시도는 삭제된 prep 를 읽지 않는다. **이미 `FINAL` 인 형량은 설명 삭제와 별개로 유지.** 사건 삭제 시 판결 조회도 차단
 - 통합 테스트 대상: 다른 방 기록·댓글 삭제까지(scope 누락 시 epoch 검사가 무의미)
@@ -241,6 +244,8 @@ COMMIT
 | §4.5 | trace 조회 프록시 주체 | 9/16 |
 | §4.6 | `generation-failed` 오류 코드 표 채택 | 9/10 |
 | §5 10단계 | 일부 강도 TEMPLATE 시 `TEXT_RETRY payload.intensities[]` 채택 | 9/13 |
+| D-24 `(제안)` | SENTENCE 게이트 — PREPARE 종료 또는 확정 + 30초까지 INSERT 대기, 마감은 INSERT + 10초(§3·§6) | 9/16 |
+| D-26 `(제안)` | 무효화 트랜잭션에서 영향 게시물의 진행 중 job `CANCELLED`(§8) | 9/16 |
 
 ## 15. 9/8 결정 기록 — 서버 코드 대조 (`geoji-server` · `geoji-web` 확인)
 
@@ -282,3 +287,14 @@ COMMIT
 ### 15.4 남은 것
 - §14 의 나머지 행(CaseSnapshot 필드, §4.4 · §4.5 · §4.6, §5 10단계)은 그대로 회신 대기
 - D-23(양형관 실측), 검수관 모델은 작업 3·6 실측 뒤. LangSmith·CI 실비는 P1
+
+### 15.5 9/14 결정 기록 — 준비 자료(PREPARE)와 선고(SENTENCE)의 순서·폴백·삭제·부분 재사용
+
+> 9/14 사용자 결정. 배경: 준비 자료(`ai.trial_prep` — 조서 + 드립 후보)가 없으면 판결 품질이 떨어지는 네 경우(아직 안 끝남·실패·무효·입력 변경)를 정리했다.
+
+| ID | 결정 | 백엔드가 할 일 | AI 파트가 할 일 |
+|---|---|---|---|
+| **D-24** | **SENTENCE 는 PREPARE 가 끝난 뒤 시작한다.** 평결 확정 때 PREPARE 가 진행 중이면 최대 **30초** 기다린다. 판결문은 맨 나중에 나오므로 체감 비용이 작다. 마감 10초는 SENTENCE INSERT 시각부터 | §3 게이트·§6 마감 기준 변경(`(제안)`, §14) | 없음(워커는 SENTENCE 를 받은 시점 기준 그대로). 가짜 백엔드·통합 테스트에 게이트 반영 |
+| **D-25** | **준비 자료 폴백 계단.** ① 조서+드립 → ② 조서만(`DOSSIER_READY`) → ③ PREPARE 실패로 게이트 해제 → ④ 즉석 조서(INLINE, 드립 생략) — **서기·검수·finalize 시간(`reserve_after(SENTENCING)` 경로: 서기 상한 + 검수 상한 + 0.5초)을 먼저 남기고 남는 시간이 있을 때만** → ⑤ 최소 조서(MINIMAL, 모델 호출 0) → ⑥ watchdog 템플릿 + TEXT_RETRY. 기본 상한(서기 6초·검수 4초)에서는 10초 마감 안에 ④ 가 들어가지 않아 ⑤ 로 간다 — 상한을 낮추면 자동으로 ④ 가 켜진다 | 없음 | 05 §3.3 `inline_context` 조건을 이 규칙으로(9/14 리뷰 결함(조서가 서기 시간을 먹음) 해소) |
+| **D-26** | **게시물 삭제·공유 철회·탈퇴 시 진행 중 작업을 끈다.** 결과를 버리는 것(epoch 검사)에 더해, 모델 비용이 더 나가지 않게 한다 | §8 무효화 트랜잭션에서 영향 job `CANCELLED`(`(제안)`, §14) | 모델 호출 직전 epoch 확인 → 달라졌으면 호출 0·`EVIDENCE_INVALIDATED`. heartbeat 취소 경로 통합 테스트 |
+| **D-27** | **입력이 바뀌면 바뀐 부분만 다시 만든다.** 준비 자료 유효 판정을 한 덩어리 `input_hash` 대신 부분 키로: 조서 = 게시물 필드·심문 결과·방 규칙 버전·관련 scope epoch, 드립 후보 = 조서 + 그 강도(강도별). 방 강도만 바뀌면 드립만, 규칙 버전이 바뀌면 조서부터. **epoch 가 바뀐 것(삭제·철회)은 부분 재사용하지 않는다.** 모델 호출 단위 캐시(`node_results`)는 그대로 | 없음(방 강도·규칙 변경 때 PREPARE 재INSERT 는 기존 규약) | 05 §3.2 `input_hash`·§3.3 `load_valid_prep` 을 부분 키로. DDL 은 기존 컬럼(`dossiers.snapshot_hash`·`trial_prep.banter_json`)으로 먼저, 부족하면 결정 요청 |

@@ -140,7 +140,7 @@ WHERE id = :id AND owner_id = :worker_id AND generation_id = :generation_id
 | 업무 트랜잭션(백엔드) | kind / event_type | dedupe_key | priority | max_attempts | deadline_at |
 |---|---|---|---:|---:|---|
 | 게시물 저장 | `PREPARE` / `post.created` | `prepare:{post_id}:{post_version}:{audience_version}` | 30 | 2 | null |
-| 배심원 평결 확정 | `SENTENCE` / `verdict.confirmed` | `sentence:{verdict_id}:{verdict_version}` | 100 | 2 | `confirmed_at + 10s` |
+| 배심원 평결 확정 — 9/14 D-24: PREPARE 종료(또는 확정 + 30초) 뒤 INSERT(10 §3) | `SENTENCE` / `verdict.confirmed` | `sentence:{verdict_id}:{verdict_version}` | 100 | 2 | INSERT 시각 + 10s (원문 `confirmed_at + 10s`) |
 | 판결 최초 저장(finalize·watchdog) | `RETAIN` / `sentence.finalized` | `retain:verdict:{verdict_id}:{verdict_version}` | 10 | 5 | null |
 | 템플릿 저장·재시도 필요 | `TEXT_RETRY` / `verdict.text_retry` | `text-retry:{verdict_id}:{verdict_version}:{round}` | 50 | 1 | round 시작 + 20s |
 | 승인된 댓글 | `RETAIN` / `comment.approved` | `retain:comment:{comment_id}:{comment_version}` | 10 | 5 | null |

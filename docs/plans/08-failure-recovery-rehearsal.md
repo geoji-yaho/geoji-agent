@@ -73,7 +73,7 @@
 | 지표 | 라벨 | 해석 |
 |---|---|---|
 | `queue_wait_seconds` | kind | 모델이 빨라도 슬롯·claim 지연일 수 있음 |
-| `first_result_latency_seconds` p50/p95/p99 | path(guilty/other/regen) | 평결 확정 → 첫 저장. 프론트 노출과 구분 |
+| `first_result_latency_seconds` p50/p95/p99 | path(guilty/other/regen) | 평결 확정 → 첫 저장. 프론트 노출과 구분. 9/14 D-24 이후 PREPARE 대기(≤ 30초)가 포함된다 — 마감 10초 준수는 SENTENCE INSERT 기준으로 따로 본다 |
 | `llm_duration_seconds` | node, vendor | 어느 벤더·노드가 느린지 |
 | `template_first_rate`, `retry_recovery_rate` | — | 초기 품질 저하와 복구 |
 | `evaluation_repair_rate` | intensity | 검수 재생성률 — 프롬프트 회귀 신호 |
