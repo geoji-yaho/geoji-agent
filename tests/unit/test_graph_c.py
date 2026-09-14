@@ -257,7 +257,7 @@ def make_prep() -> SimpleNamespace:
     return SimpleNamespace(dossier=make_dossier(), banter={Intensity.spicy: [candidate]})
 
 
-def make_job(kind: str = "SENTENCE") -> Job:
+def make_job(kind: str = "SENTENCE", payload_extra: dict[str, Any] | None = None) -> Job:
     if kind == "SENTENCE":
         payload = {
             "verdict_id": "7a1d9c40-3b52-4e18-9f0a-2c6d8b4e1f31",
@@ -270,6 +270,7 @@ def make_job(kind: str = "SENTENCE") -> Job:
             "verdict_version": 1,
             "round": 1,
         }
+    payload.update(payload_extra or {})
     return Job(
         id="job-1",
         event_id="event-1",
@@ -324,6 +325,7 @@ def run(
     settings: Settings | None = None,
     preparation: FakePreparation | None = None,
     templates: dict[str, Any] | None = None,
+    payload_extra: dict[str, Any] | None = None,
 ) -> Run:
     llm = llm or FakeLLM()
     snapshot = snapshot or make_snapshot()
@@ -357,7 +359,7 @@ def run(
         worker_id=WORKER_ID,
     )
     handler = SentenceHandler(factory, db_now=db_now, clock=clock or FakeClock())
-    asyncio.run(handler(make_job(kind), ctx))
+    asyncio.run(handler(make_job(kind, payload_extra), ctx))
     return Run(state=captured.get("state", {}), backend=backend, jobs=jobs, llm=llm)
 
 
@@ -816,15 +818,115 @@ def test_18_no_repair_when_less_than_5s_remain() -> None:
     ]
 
 
+FIXED = {"sentence": "probation", "sentencing_reason": "고정된 이유", "reason_source": "AI"}
+
+
 def test_19_regenerate_does_not_repair() -> None:
-    """TEXT_RETRY(REGENERATE) 는 round 안 보정 없음."""
-    fixed = {"sentence": "probation", "sentencing_reason": "고정된 이유", "reason_source": "AI"}
+    """TEXT_RETRY(REGENERATE) 는 round 안 보정 없음.
+
+    검수 실패 → TEMPLATE 저장 없이 `EVAL_FAILED`(08 §3.2).
+    """
     llm = ScriptedLLM(sequences={"evaluator": [report(["spicy", "hell"], fail=["hell"]), None]})
-    result = run(llm, backend_kwargs={"fixed": fixed}, kind="TEXT_RETRY")
-    assert result.roles()["writer"] == 2
-    assert result.roles()["sentencing"] == 0
+    result = run(llm, backend_kwargs={"fixed": FIXED}, kind="TEXT_RETRY")
+    assert result.roles() == Counter({"writer": 2, "evaluator": 1})
     assert result.state["repair_count"] == 0
-    assert [t.source for t in result.finalize().draft.texts] == ["AI", "TEMPLATE"]
+    assert result.backend.finalized == []
+    assert result.backend.failed == ["EVAL_FAILED"]
+    assert result.jobs.completed == ["job-1"]
+
+
+def test_25_regenerate_only_payload_intensities() -> None:
+    """payload `intensities=["hell"]` → 서기 1·검수 1(hell 만)·양형 0, finalize texts=[hell]."""
+    result = run(
+        backend_kwargs={"fixed": FIXED},
+        kind="TEXT_RETRY",
+        payload_extra={"intensities": ["hell"]},
+    )
+    assert result.roles() == Counter({"writer": 1, "evaluator": 1})
+    assert [writer_intensity(c) for c in result.calls_of("writer")] == ["hell"]
+    assert [evaluator_intensities(c) for c in result.calls_of("evaluator")] == [["hell"]]
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [("hell", "AI")]
+    assert [t.intensity for t in req.evaluation.texts] == ["hell"]
+    assert (req.sentencing.sentence, req.sentencing.sentencing_reason) == (
+        "probation",
+        "고정된 이유",
+    )
+    assert_finalize_hash_is_last_evaluated(result)
+
+
+def test_26_regenerate_intensity_outside_target_fails_without_calls() -> None:
+    """target 밖 강도 → 모델 호출 없이 `SCHEMA_INVALID`(계획서에 없는 판단)."""
+    result = run(
+        backend_kwargs={"fixed": FIXED},
+        kind="TEXT_RETRY",
+        payload_extra={"intensities": ["mild"]},
+    )
+    assert result.llm.calls == []
+    assert result.backend.finalized == []
+    assert result.backend.failed == ["SCHEMA_INVALID"]
+
+
+def test_27_regenerate_without_prep_is_minimal_even_with_time() -> None:
+    """REGENERATE ∧ prep 없음 → 남은 시간이 넉넉해도 MINIMAL(조서 0).
+
+    ⑤ 실패도 TEMPLATE 저장 없음.
+    """
+    result = run(prep=None, backend_kwargs={"fixed": FIXED, "remaining_s": 60.0}, kind="TEXT_RETRY")
+    assert result.state["dossier_source"] == "MINIMAL"
+    assert "context" not in result.roles()
+    assert all(
+        [f["id"] for f in user_payload(c)["dossier"]] == ["F0"] for c in result.calls_of("writer")
+    )
+    # 서기 fixture 는 F0 밖 라벨을 인용해 ⑤ 에서 걸린다(test_graph_c_flow ② 와 같은 fixture 한계).
+    assert result.backend.finalized == []
+    assert result.backend.failed == ["EVAL_FAILED"]
+
+
+def test_28_regenerate_writer_failure_does_not_finalize_template() -> None:
+    """REGENERATE 에서 한 강도라도 서기 실패 → 검수 0·finalize 0·기존 코드 규칙."""
+    result = run(
+        ScriptedLLM(FakeScenario.INTENSITY_FAIL), backend_kwargs={"fixed": FIXED}, kind="TEXT_RETRY"
+    )
+    assert result.roles()["evaluator"] == 0
+    assert result.backend.finalized == []
+    assert result.backend.failed == ["VENDOR_UNAVAILABLE"]
+
+
+@pytest.mark.parametrize(("retry_timeout_s", "failed"), [(10, ["DEADLINE_EXCEEDED"]), (20, [])])
+def test_29_regenerate_budget_is_text_retry_timeout(
+    retry_timeout_s: int, failed: list[str]
+) -> None:
+    """begin 마감이 60s 여도 REGENERATE 예산은 `TEXT_RETRY_TIMEOUT_SECONDS` 다."""
+    clock = FakeClock()
+
+    def delay(role: str) -> None:
+        if role == "writer":
+            clock.now += 4.8  # 두 강도 합 9.6초
+
+    result = run(
+        ScriptedLLM(before=delay),
+        backend_kwargs={"fixed": FIXED, "remaining_s": 60.0},
+        kind="TEXT_RETRY",
+        clock=clock,
+        settings=Settings(_env_file=None, TEXT_RETRY_TIMEOUT_SECONDS=retry_timeout_s),
+    )
+    assert result.backend.failed == failed
+    if failed:
+        assert result.roles()["evaluator"] == 0
+        assert result.backend.finalized == []
+    else:
+        assert len(result.backend.finalized) == 1
+
+
+def test_30_regenerate_reason_check_failure_keeps_reason() -> None:
+    """REGENERATE 검수 `sentencing_reason_check` 실패 → 이유 치환·재검수 없이 EVAL_FAILED."""
+    llm = ScriptedLLM(sequences={"evaluator": [evaluation_reason_failed()]})
+    result = run(llm, backend_kwargs={"fixed": FIXED}, kind="TEXT_RETRY")
+    assert result.roles()["evaluator"] == 1
+    assert result.backend.finalized == []
+    assert result.backend.failed == ["EVAL_FAILED"]
+    assert result.state["sentencing"].sentencing_reason == "고정된 이유"
 
 
 def test_20_finalize_422_repairs_once_then_succeeds() -> None:

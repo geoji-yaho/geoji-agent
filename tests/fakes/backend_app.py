@@ -15,7 +15,9 @@ verdict 별 상태: `sentence_status(PENDING/FINAL)`·`sentence_source(AI/RULE)`
 - `begin-generation`(10 §4.3): PENDING 은 마감 전만, FINAL 은 `fixed_sentencing`(TEXT_RETRY).
   같은 현재 generation 재호출 허용, 다른 활성 generation 이 유효하면 409 `STALE_GENERATION`
 - `generation-failed`(10 §4.6): 현재 세대만. 다른 세대는 409. 코드 표 그대로 폴백·round 예약
-- `finalize`(10 §5): commit record → generation·버전 → hash 형식·정책 버전 → 저장
+- `finalize`(10 §5): commit record → generation·버전 → hash 형식·정책 버전 → 저장.
+  FINAL 재생성(TEXT_RETRY)은 형량·양형 이유가 기존과 다르면 422, `texts` 강도가 중복이거나
+  `target_intensities` 밖이면 422. 받은 강도만 바꾸고 나머지 강도는 기존 `text_sources` 를 유지한다
 - `snapshot`(10 §4.1): `case-snapshot-taxi.json` 을 job payload 로 덮어 반환
 - `resolve-evidence`(10 §4.2): 빈 sources + 고정 aggregates
 - 두 엔드포인트 모두 `create_fake_backend(snapshot_fixture=..., resolve_fixture=...)` 로 다른
@@ -162,6 +164,8 @@ class VerdictState:
     text_version: int = 0
     active_job_id: str | None = None
     active_generation_id: str | None = None
+    #: 강도 값 → 저장된 문구의 `source`(AI/TEMPLATE). 없는 강도는 템플릿이다.
+    text_sources: dict[str, str] = field(default_factory=dict)
     #: generation-failed 를 처리한 세대 → 코드. 같은 요청 재전송을 흡수한다.
     failed_generations: dict[str, str] = field(default_factory=dict)
 
@@ -558,11 +562,25 @@ def create_fake_backend(
             verdict.sentence_source = "AI"
             verdict.sentence = str(req.sentencing.sentence)
             verdict.sentencing_reason = req.sentencing.sentencing_reason
-        elif req.sentencing is not None and str(req.sentencing.sentence) != verdict.sentence:
+        elif req.sentencing is not None and (
+            str(req.sentencing.sentence) != verdict.sentence
+            or req.sentencing.sentencing_reason != verdict.sentencing_reason
+        ):
+            # TEXT_RETRY: 형량 필드가 기존과 다르면 거부(08 §3.2).
             return _reject(422, _INVALID_DRAFT)
         # 9·10. 문구 저장 · text_status · active 해제
+        given = [str(text_draft.intensity) for text_draft in req.draft.texts]
+        if first_fix:
+            all_ai = all(text_draft.source == "AI" for text_draft in req.draft.texts)
+            verdict.text_sources = {str(t.intensity): t.source for t in req.draft.texts}
+        else:
+            # 재생성: payload `intensities` 부분집합만 온다. 나머지 강도는 기존 행을 유지한다.
+            targets = [str(i) for i in load_snapshot_data()["jury"]["target_intensities"]]
+            if len(set(given)) != len(given) or not set(given) <= set(targets):
+                return _reject(422, _INVALID_DRAFT)
+            verdict.text_sources.update({str(t.intensity): t.source for t in req.draft.texts})
+            all_ai = all(verdict.text_sources.get(i) == "AI" for i in targets)
         verdict.text_version += 1
-        all_ai = all(text_draft.source == "AI" for text_draft in req.draft.texts)
         verdict.text_status = "AI_READY" if all_ai else "TEMPLATE_READY"
         verdict.active_job_id = None
         verdict.active_generation_id = None

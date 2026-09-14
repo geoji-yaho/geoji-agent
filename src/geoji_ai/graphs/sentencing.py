@@ -40,6 +40,19 @@ generation_failed`.
 - `node_results` 는 검증을 통과한 출력만: 양형은 `parse_sentencing` 뒤, 서기는 `TextDraft`·강도·각도
   검사 뒤, 검수는 보고서에 전역 형식 실패가 없을 때(`remember`)
 - `db_now` 는 핸들러가 준다(`application.sentence_case`: `job.updated_at` + 경과 monotonic)
+
+`REGENERATE`(TEXT_RETRY, 08 §3.2):
+
+- 형량·양형 이유는 begin 응답의 `fixed_sentencing` 그대로다. 양형 0호출, 검수 `reason_failed` 에도
+  이유를 템플릿으로 바꾸지 않는다(바꾸면 형량 필드가 달라진다) → `EVAL_FAILED`
+- `load_valid_prep` 만 읽는다. prep 이 없으면 남은 시간과 무관하게 MINIMAL(조서 호출 없음)
+- 대상 강도 = payload `intensities`(None 이면 `target_intensities`). 서기·join·⑤·⑥·finalize `texts`
+  모두 이 집합이다. `target_intensities` 밖 강도가 있으면 호출 없이 `SCHEMA_INVALID`(계획서에 없음)
+- 예산 = `min(begin deadline, begin 노드 시작 + TEXT_RETRY_TIMEOUT_SECONDS)`. round 안 보정 없음
+- 어느 강도든 서기 실패·예산 없음·⑤ 실패·검수 실패면 TEMPLATE 을 새로 finalize 하지 않고 저장 없이
+  `generation_failed` 다. 서기는 join 코드 규칙(`BUDGET_EXCEEDED`·`DEADLINE_EXCEEDED`·
+  `VENDOR_UNAVAILABLE`), ⑤·검수 거부·불완전은 `EVAL_FAILED`, 검수 호출 오류는 INITIAL 과 같은 표.
+  다음 round 는 백엔드가 예약한다
 """
 
 from __future__ import annotations
@@ -327,6 +340,30 @@ def _targets(jury: JurySnapshot) -> list[Intensity]:
     return list(jury.target_intensities)
 
 
+def _regenerate(state: Mapping[str, Any]) -> bool:
+    return state["mode"] == "REGENERATE"
+
+
+def _requested(state: Mapping[str, Any]) -> list[Intensity] | None:
+    """REGENERATE payload 의 `intensities`. INITIAL 이거나 없으면 None."""
+    if not _regenerate(state):
+        return None
+    payload = _payload(state)
+    if not isinstance(payload, TextRetryPayload) or payload.intensities is None:
+        return None
+    return list(payload.intensities)
+
+
+def _scope(state: Mapping[str, Any]) -> list[Intensity]:
+    """이 실행이 쓰는 강도. `target_intensities` 순서를 따르고 payload `intensities` 로 좁힌다."""
+    targets = _targets(_jury(state))
+    requested = _requested(state)
+    if requested is None:
+        return targets
+    wanted = set(requested)
+    return [i for i in targets if i in wanted]
+
+
 def _text_index(path: str) -> int | None:
     if not path.startswith("texts["):
         return None
@@ -463,7 +500,10 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         jury = _jury(state)
         snapshot = state["snapshot"]
         dossier: Dossier = state["dossier"]
-        targets = _targets(jury)
+        targets = _scope(state)
+        regenerate = _regenerate(state)
+        # 규칙 5(강도 집합)는 이 실행의 대상 강도와 대조한다(REGENERATE 는 부분집합).
+        rule_jury = jury.model_copy(update={"target_intensities": targets}) if regenerate else jury
         drafts = dict(drafts)
         sources = dict(sources)
         hints: MemeHints | None = state.get("meme_hints")
@@ -477,7 +517,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 "meme_tag": "GUILTY_LIGHT",
                 "meme_hints": hints.model_dump(mode="json") if hints is not None else None,
             }
-            rules = apply_text_rules(body, dossier.label_map, sentencing, jury)
+            rules = apply_text_rules(body, dossier.label_map, sentencing, rule_jury)
             bad: dict[Intensity, list[str]] = {}
             for issue in rules.issues:
                 index = _text_index(issue.path)
@@ -500,6 +540,10 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     "writer_draft": writer_draft,
                     "failure": None,
                 }
+            if regenerate:
+                # round 안 보정·TEMPLATE 치환 없음. 다음 round 는 백엔드 몫이다.
+                logger.info("REGENERATE 서버 검증 실패 %s → 저장 없이 실패", sorted(bad))
+                return {"failure": EVAL_FAILED}
             for intensity, codes in bad.items():
                 logger.info("강도 %s 서버 검증 실패 %s → TEMPLATE", intensity, codes)
                 if sources.get(intensity) == "TEMPLATE":
@@ -526,6 +570,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
 
     async def begin_generation(state: SentenceGraphState) -> dict[str, Any]:
         payload = _payload(state)
+        started = deps.clock()
         try:
             begin = await deps.backend.begin_generation(
                 payload.verdict_id,
@@ -539,7 +584,22 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 return {}
             raise
         deadline = Deadline.from_db(begin.deadline_at, await deps.db_now(), clock=deps.clock)
+        if _regenerate(state):
+            # 08 §3.2 예산 20초(`TEXT_RETRY_TIMEOUT_SECONDS`). begin 마감이 더 이르면 그것을 쓴다.
+            retry_expires = started + float(settings.TEXT_RETRY_TIMEOUT_SECONDS)
+            deadline = Deadline(
+                expires_at_monotonic=min(deadline.expires_at_monotonic, retry_expires),
+                clock=deps.clock,
+            )
         update: dict[str, Any] = {"begin": begin, "deadline": deadline}
+        requested = _requested(state)
+        if requested is not None:
+            outside = sorted(
+                {i.value for i in requested} - {i.value for i in _targets(_jury(state))}
+            )
+            if outside:
+                logger.warning("TEXT_RETRY intensities %s 가 target 밖 → SCHEMA_INVALID", outside)
+                update["failure"] = SCHEMA_INVALID
         fixed = begin.fixed_sentencing
         if fixed is not None:
             update["sentencing"] = SentencingDecision(
@@ -566,6 +626,9 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 "banter": dict(prep.banter),
                 "route": _ROUTE_PREP,
             }
+        if _regenerate(state):
+            # 삭제·무효 prep 을 대신할 inline 조서도 부르지 않는다(08 §3.2).
+            return {"route": _ROUTE_MINIMAL}
         remaining_ms = state["deadline"].remaining_s() * 1000
         inline = remaining_ms >= settings.INLINE_CONTEXT_MIN_REMAINING_MS
         return {"route": _ROUTE_INLINE if inline else _ROUTE_MINIMAL}
@@ -837,6 +900,8 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             sources.pop(intensity, None)
             if intensity == jury.default_intensity:
                 hints = None
+            if _regenerate(state):
+                continue  # TEMPLATE 을 새로 만들지 않는다. join 이 실패로 보낸다.
             template = template_for(intensity, jury, decision, post_id)
             if template is not None:
                 drafts[intensity] = template
@@ -850,13 +915,13 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         }
 
     async def writer(state: SentenceGraphState) -> dict[str, Any]:
-        targets = _targets(_jury(state))
-        return await fan_out(state, targets, state.get("repair_count", 0), {})
+        return await fan_out(state, _scope(state), state.get("repair_count", 0), {})
 
     async def join(state: SentenceGraphState) -> dict[str, Any]:
-        targets = _targets(_jury(state))
+        targets = _scope(state)
         sources = state.get("draft_sources") or {}
-        if not any(sources.get(i) == "AI" for i in targets):
+        not_ai = [i for i in targets if sources.get(i) != "AI"]
+        if len(not_ai) == len(targets) or (_regenerate(state) and not_ai):
             writer_errors = {c.error for c in state["calls"] if c.role == "writer"}
             if "BUDGET" in writer_errors:
                 code = BUDGET_EXCEEDED
@@ -971,7 +1036,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
     async def run_evaluator(state: SentenceGraphState, rounds: list[int]) -> dict[str, Any]:
         """검수 루프. `rounds[0]` 은 이 실행의 다음 검수 라운드 번호다(call_index 용)."""
         jury = _jury(state)
-        targets = _targets(jury)
+        targets = _scope(state)
         order = {i.value: n for n, i in enumerate(targets)}
         policy_version = settings.GUARDRAIL_POLICY_VERSION
         calls = list(state["calls"])
@@ -1036,6 +1101,10 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 }
             if attempt == 1:
                 logger.warning("재검수도 통과하지 못했다: %s", [i.code for i in issues])
+                return failed()
+            if _regenerate(state):
+                # round 안 보정 없음: repair·TEMPLATE·D-19 이유 치환 없이 저장하지 않는다.
+                logger.info("REGENERATE 검수 실패 %s → EVAL_FAILED", [i.code for i in issues])
                 return failed()
 
             entries = {_key(e.get("intensity")): e for e in entries_list}
@@ -1192,7 +1261,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 return {"failure": EVIDENCE_INVALIDATED}
             if status == 422:
                 sources = state.get("draft_sources") or {}
-                ai = [i for i in _targets(_jury(state)) if sources.get(i) == "AI"]
+                ai = [i for i in _scope(state) if sources.get(i) == "AI"]
                 can_repair = (
                     bool(ai)
                     and state["mode"] == "INITIAL"
@@ -1225,7 +1294,9 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
     # --- 간선 ---------------------------------------------------------------
 
     def after_begin(state: SentenceGraphState) -> str:
-        return "load_valid_prep" if state.get("begin") is not None else END
+        if state.get("begin") is None:
+            return END
+        return "generation_failed" if state.get("failure") else "load_valid_prep"
 
     def sentencing_or_writer(state: SentenceGraphState) -> str:
         jury = _jury(state)
@@ -1279,7 +1350,9 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
     graph.add_node("generation_failed", generation_failed)
 
     graph.add_edge(START, "begin_generation")
-    graph.add_conditional_edges("begin_generation", after_begin, ["load_valid_prep", END])
+    graph.add_conditional_edges(
+        "begin_generation", after_begin, ["load_valid_prep", "generation_failed", END]
+    )
     graph.add_conditional_edges(
         "load_valid_prep", after_prep, ["inline_context", "minimal_dossier", "sentencing", "writer"]
     )

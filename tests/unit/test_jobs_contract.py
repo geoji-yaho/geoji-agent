@@ -8,8 +8,13 @@ from __future__ import annotations
 
 import inspect
 
+import pytest
+from pydantic import ValidationError
+
 from geoji_ai.adapters.postgres_jobs import PostgresJobs
+from geoji_ai.contracts.jobs import TextRetryPayload
 from geoji_ai.core.config import Settings
+from geoji_ai.domain.intensity import Intensity
 from geoji_ai.ports.jobs import JobsPort
 from geoji_ai.workers.dispatch import (
     DEFAULT_ROUTE_BY_KIND,
@@ -95,3 +100,28 @@ def test_dedupe_key_가_규약_문자열과_같다():
         build_dedupe_key(JOB_ROUTES["comment.approved"], {"comment_id": "c1", "version": 1})
         == "retain:comment:c1:1"
     )
+
+
+# --- TEXT_RETRY payload `intensities[]`(10 §3 표, 10 §4.5 10번 제안) ----------------------
+
+_RETRY_BASE = {"verdict_id": "v1", "verdict_version": 1, "round": 1}
+
+
+def test_TEXT_RETRY_intensities_없으면_None_이다():
+    assert TextRetryPayload.model_validate(_RETRY_BASE).intensities is None
+
+
+def test_TEXT_RETRY_intensities_는_소문자_강도_목록이다():
+    payload = TextRetryPayload.model_validate({**_RETRY_BASE, "intensities": ["hell", "spicy"]})
+    assert payload.intensities == [Intensity.hell, Intensity.spicy]
+
+
+@pytest.mark.parametrize("bad", [[], ["HELL"], ["extreme"], "hell"])
+def test_TEXT_RETRY_intensities_빈_목록과_모르는_값은_거부한다(bad):
+    with pytest.raises(ValidationError):
+        TextRetryPayload.model_validate({**_RETRY_BASE, "intensities": bad})
+
+
+def test_TEXT_RETRY_payload_는_모르는_필드를_거부한다():
+    with pytest.raises(ValidationError):
+        TextRetryPayload.model_validate({**_RETRY_BASE, "extra": 1})
