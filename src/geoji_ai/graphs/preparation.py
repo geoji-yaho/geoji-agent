@@ -19,14 +19,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import timedelta
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 
+from geoji_ai.application import instrument
 from geoji_ai.application.build_evidence import build_evidence, target_pack
 from geoji_ai.application.llm_gateway import CallScope, ScopedLLM, case_scope
 from geoji_ai.contracts.case import CaseSnapshot, VerdictResult
@@ -633,16 +635,53 @@ def build_preparation_graph(deps: PrepareDeps, run: _Run | None = None) -> Any:
             return {}
         return {"status": STATUS_COMPLETE} if done else {}
 
+    def logged(
+        name: str, fn: Callable[[PrepareState], Awaitable[dict[str, Any]]]
+    ) -> Callable[[PrepareState], Awaitable[dict[str, Any]]]:
+        """노드 한 번마다 `prepare_node` 로그(08 §3.3). 원문 없이 코드·지연만."""
+
+        def emit(state: Mapping[str, Any], started: float, **fields: Any) -> None:
+            job = state.get("job")
+            instrument.node_log(
+                "prepare_node",
+                trace_id=getattr(job, "trace_id", None),
+                job_id=getattr(job, "id", None),
+                generation_id=deps.generation_id,
+                graph_name="preparation",
+                node=name,
+                latency_ms=int((time.monotonic() - started) * 1000),
+                prompt_bundle_version=deps.prompt_version,
+                **fields,
+            )
+
+        async def node(state: PrepareState) -> dict[str, Any]:
+            started = time.monotonic()
+            try:
+                update = await fn(state)
+            except BaseException as exc:
+                emit(state, started, ok=False, fallback_reason=type(exc).__name__)
+                raise
+            update = update or {}
+            before = len(state.get("errors") or [])
+            added = list(update.get("errors") or [])[before:]
+            emit(state, started, ok=True, fallback_reason=",".join(added) if added else None)
+            return update
+
+        return node
+
     graph = StateGraph(PrepareState)
-    graph.add_node("load_case", load_case)
-    graph.add_node("recall_candidates", recall_candidates)
-    graph.add_node("resolve_sources", resolve_sources)
-    graph.add_node("build_db_evidence", build_db_evidence)
-    graph.add_node("analyze_reason", analyze_reason)
-    graph.add_node("persist_dossier", persist_dossier)
-    graph.add_node("generate_banter", generate_banter)
-    graph.add_node("validate_banter", validate_banter)
-    graph.add_node("persist_banter", persist_banter)
+    for node_name, node_fn in (
+        ("load_case", load_case),
+        ("recall_candidates", recall_candidates),
+        ("resolve_sources", resolve_sources),
+        ("build_db_evidence", build_db_evidence),
+        ("analyze_reason", analyze_reason),
+        ("persist_dossier", persist_dossier),
+        ("generate_banter", generate_banter),
+        ("validate_banter", validate_banter),
+        ("persist_banter", persist_banter),
+    ):
+        graph.add_node(node_name, logged(node_name, node_fn))
     graph.add_edge(START, "load_case")
     graph.add_conditional_edges("load_case", after_load, ["recall_candidates", END])
     graph.add_edge("recall_candidates", "resolve_sources")

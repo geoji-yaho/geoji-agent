@@ -285,7 +285,7 @@ def test_check_expect() -> None:
 def test_check_meme_emotion() -> None:
     draft = good_draft()
     draft["meme_hints"]["emotion"] = "ANGRY"
-    assert names(run_case_checks(draft)) == {"meme_emotion"}
+    assert names(run_case_checks(draft)) == {"meme_emotion", "schema"}
     draft["meme_hints"] = None
     assert run_case_checks(draft) == []
     for emotion in checks.MEME_EMOTIONS:

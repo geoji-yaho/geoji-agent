@@ -326,6 +326,7 @@ def run(
     preparation: FakePreparation | None = None,
     templates: dict[str, Any] | None = None,
     payload_extra: dict[str, Any] | None = None,
+    notifier: Any = None,
 ) -> Run:
     llm = llm or FakeLLM()
     snapshot = snapshot or make_snapshot()
@@ -357,6 +358,7 @@ def run(
         settings=settings or Settings(_env_file=None),
         generation_id=GENERATION_ID,
         worker_id=WORKER_ID,
+        notifier=notifier,
     )
     handler = SentenceHandler(factory, db_now=db_now, clock=clock or FakeClock())
     asyncio.run(handler(make_job(kind, payload_extra), ctx))

@@ -20,8 +20,11 @@ import os
 import random
 import signal
 import socket
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Any
 
+import structlog
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from geoji_ai.adapters.backend_http import BackendHttp, bind_trace
@@ -30,6 +33,8 @@ from geoji_ai.adapters.postgres_call_ledger import PostgresCallLedger
 from geoji_ai.adapters.postgres_jobs import PostgresJobs, make_engine, reap
 from geoji_ai.adapters.postgres_memory import PostgresMemory
 from geoji_ai.adapters.postgres_preparation import PostgresPreparation
+from geoji_ai.adapters.postgres_telemetry import PostgresTelemetry
+from geoji_ai.application import instrument
 from geoji_ai.application.llm_gateway import LLMGateway, ScopedLLM
 from geoji_ai.contracts.jobs import Job
 from geoji_ai.core.config import Settings, secret_value
@@ -41,6 +46,13 @@ from geoji_ai.ports.jobs import JobsPort
 from geoji_ai.ports.llm import LLMPort
 from geoji_ai.ports.memory import MemoryPort
 from geoji_ai.ports.preparation import PreparationPort
+from geoji_ai.telemetry.alerts import (
+    AlertNotifier,
+    DailyCostTracker,
+    QueueAgeWatch,
+    retry_exhausted,
+    sink_from_settings,
+)
 from geoji_ai.workers.dispatch import SLOT_KINDS, HandlerContext, handler_for
 from geoji_ai.workers.heartbeat import start_heartbeat
 
@@ -75,6 +87,51 @@ def make_worker_id(slot: str) -> str:
     return f"{socket.gethostname()}:{os.getpid()}:{slot}"
 
 
+async def _alert_if_exhausted(
+    notifier: AlertNotifier | None, job: Job, error_code: str, updated: bool
+) -> None:
+    """`fail` 이 반영됐고 마지막 시도였으면 재시도 소진 알림(08 §3.3).
+
+    claim 이 `attempts` 를 이미 1 올렸으므로 `attempts >= max_attempts` 면 FAIL_SQL 이 행을 FAILED
+    (기한 지난 SENTENCE 는 CANCELLED)로 닫는다 — 어느 쪽이든 더 시도하지 않는다.
+    """
+    if notifier is None or not updated or job.attempts < job.max_attempts:
+        return
+    try:
+        alert = retry_exhausted(job_kind=job.kind, code=error_code, attempts=job.attempts)
+    except Exception as exc:
+        # 계측은 job 을 바꾸지 않는다. 알림을 만들지 못해도 fail 결과는 그대로다.
+        log.warning("instrument_failed", target="retry_exhausted", error_type=type(exc).__name__)
+        return
+    await instrument.notify(notifier, alert)
+
+
+class _AlertingJobs:
+    """`JobsPort` 를 감싸 `fail` 결과로 재시도 소진을 알린다. 나머지 메서드는 그대로 넘긴다."""
+
+    def __init__(self, inner: JobsPort, job: Job, notifier: AlertNotifier) -> None:
+        self._inner = inner
+        self._job = job
+        self._notifier = notifier
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+    async def fail(
+        self,
+        job_id: str,
+        worker_id: str,
+        generation_id: str,
+        error_code: str,
+        retry_after_s: float | None,
+    ) -> bool:
+        updated = await self._inner.fail(
+            job_id, worker_id, generation_id, error_code=error_code, retry_after_s=retry_after_s
+        )
+        await _alert_if_exhausted(self._notifier, self._job, error_code, updated)
+        return updated
+
+
 @dataclass
 class _InFlight:
     """진행 중인 job. 종료 때 lease 를 반납할 대상이다."""
@@ -97,6 +154,10 @@ class Worker:
         memory: MemoryPort | None = None,
         llm: LLMPort | ScopedLLM | None = None,
         preparation: PreparationPort | None = None,
+        notifier: AlertNotifier | None = None,
+        cost_tracker: DailyCostTracker | None = None,
+        queue_age_threshold_s: float | None = None,
+        queue_age: Callable[[], Awaitable[float | None]] | None = None,
     ) -> None:
         unknown = set(settings.WORKER_SLOTS) - set(SLOT_KINDS)
         if unknown:
@@ -121,6 +182,17 @@ class Worker:
         # 프로세스 전역 세마포어. 슬롯이 몇 개든 하나를 공유한다(02 §3.3 동시성).
         self._semaphore = asyncio.Semaphore(settings.MODEL_CONCURRENCY_LIMIT)
         self._inflight: dict[str, _InFlight] = {}
+        # 운영 알림·비용 집계(08 §3.3). `run_worker` 가 프로세스에 하나씩 넣는다.
+        self._notifier = notifier
+        self._cost_tracker = cost_tracker
+        # queue oldest age 목표값은 계획서에 수치가 없다(08 §4.1).
+        # 임계 인자가 없으면 감시하지 않는다.
+        self._queue_age_watch = (
+            QueueAgeWatch(queue_age_threshold_s) if queue_age_threshold_s is not None else None
+        )
+        if queue_age is None and self._queue_age_watch is not None and engine is not None:
+            queue_age = PostgresTelemetry(engine).oldest_queued_age_seconds
+        self._queue_age = queue_age
 
     @property
     def semaphore(self) -> asyncio.Semaphore:
@@ -172,8 +244,16 @@ class Worker:
         # 백엔드 호출의 `X-Trace-Id`. 포트 시그니처에 자리가 없어 어댑터 컨텍스트로 준다.
         bind_trace(job.trace_id)
         generation_id = job.generation_id or ""
+        # job 단위 로그 문맥(08 §3.3). `job_kind` 는 `log_node` 필드 목록 밖이라
+        # contextvars 로만 묶는다.
+        structlog.contextvars.bind_contextvars(
+            job_id=job.id, job_kind=job.kind, generation_id=generation_id
+        )
+        jobs: JobsPort = (
+            self._jobs if self._notifier is None else _AlertingJobs(self._jobs, job, self._notifier)  # type: ignore[assignment]
+        )
         ctx = HandlerContext(
-            jobs=self._jobs,
+            jobs=jobs,
             semaphore=self._semaphore,
             settings=self._settings,
             generation_id=generation_id,
@@ -182,6 +262,8 @@ class Worker:
             memory=self._memory,
             llm=self._llm,
             preparation=self._preparation,
+            notifier=self._notifier,
+            cost_tracker=self._cost_tracker,
         )
         handler = handler_for(job.kind)
         handler_task = asyncio.create_task(handler(job, ctx), name=f"handler:{job.kind}")
@@ -259,7 +341,7 @@ class Worker:
                 self._inflight.pop(job.id, None)
                 log.exception("handler_failed", slot=slot)
                 try:
-                    await self._jobs.fail(
+                    updated = await self._jobs.fail(
                         job.id,
                         worker_id,
                         job.generation_id or "",
@@ -269,6 +351,8 @@ class Worker:
                 except Exception:
                     # fail 까지 죽으면 로그만 남긴다. 행은 lease 만료 뒤 reaper 가 회수한다.
                     log.exception("handler_fail_record_failed", slot=slot)
+                else:
+                    await _alert_if_exhausted(self._notifier, job, HANDLER_ERROR_CODE, updated)
 
     async def _reaper_loop(self) -> None:
         engine = self._engine
@@ -282,9 +366,21 @@ class Worker:
                 reaped = await reap(engine)
             except Exception:
                 log.exception("reaper_failed")
-                continue
+                reaped = 0
             if reaped:
                 log.info("lease_reaped", reaped=reaped)
+            await self._watch_queue_age()
+
+    async def _watch_queue_age(self) -> None:
+        """reaper 주기에 queue oldest age 를 한 번 본다. 임계가 없으면(기본) 하지 않는다."""
+        if self._queue_age_watch is None or self._queue_age is None:
+            return
+        try:
+            alert = self._queue_age_watch.observe(await self._queue_age())
+        except Exception as exc:
+            log.warning("queue_age_watch_failed", error=type(exc).__name__)
+            return
+        await instrument.notify(self._notifier, alert)
 
     async def _sleep_or_shutdown(self, delay: float) -> None:
         """`delay` 만큼 쉰다. 그 사이 종료 신호가 오면 바로 깬다."""
@@ -324,13 +420,25 @@ async def run_worker(settings: Settings, *, reaper: bool = False) -> None:
     backend = BackendHttp(backend_url, secret_value(settings, "SERVICE_AUTH_TOKEN"))
     memory: MemoryPort = PostgresMemory(engine, settings)
     preparation: PreparationPort = PostgresPreparation(engine)
+    # 알림·비용 집계는 프로세스에 하나다(08 §3.3). 웹훅 URL 이 비면 싱크가 아무것도 보내지 않는다.
+    sink = sink_from_settings(settings)
+    notifier = AlertNotifier(sink)
+    cost_tracker = DailyCostTracker(settings.COST_ALERT_KRW_PER_DAY)
     router = build_llm(settings)
     llm: ScopedLLM | None = None
     if router is None:
         log.warning("llm_disabled_no_vendor_keys")
     else:
         # 원장·벤더 장애 상태는 프로세스에 하나다(06 §3.1·§3.2).
-        llm = LLMGateway(router, PostgresCallLedger(engine), VendorHealth(), price_for)
+        llm = LLMGateway(
+            router,
+            PostgresCallLedger(engine),
+            VendorHealth(),
+            price_for,
+            cost_tracker=cost_tracker,
+            notifier=notifier,
+        )
+    # queue oldest age 임계는 넘기지 않는다 — 값 미정(08 §4.1)이라 감시하지 않는다.
     worker = Worker(
         jobs,
         settings,
@@ -340,6 +448,8 @@ async def run_worker(settings: Settings, *, reaper: bool = False) -> None:
         memory=memory,
         llm=llm,
         preparation=preparation,
+        notifier=notifier,
+        cost_tracker=cost_tracker,
     )
     _install_sigterm(worker)
     log.info("worker_started", slots=settings.WORKER_SLOTS, reaper=reaper)
@@ -347,5 +457,6 @@ async def run_worker(settings: Settings, *, reaper: bool = False) -> None:
         await worker.run()
     finally:
         await backend.aclose()
+        await sink.aclose()
         await engine.dispose()
         log.info("worker_stopped")

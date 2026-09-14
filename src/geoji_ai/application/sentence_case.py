@@ -151,6 +151,8 @@ class SentenceHandler:
                 db_now=self._db_now or self._job_db_now(job, started),
                 preparation=getattr(ctx, "preparation", None),
                 clock=self._clock,
+                # 알림(08 §3.3). 없는 문맥(테스트·스텁)이면 알리지 않는다.
+                notifier=getattr(ctx, "notifier", None),
             )
             graph = self._graph_factory(deps)
             await graph.ainvoke(initial_state(job, mode, snapshot))
