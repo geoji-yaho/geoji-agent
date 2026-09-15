@@ -103,6 +103,9 @@
 | [작업 8 — 장애 복구 · 관측 · 리허설 · 동결](08-failure-recovery-rehearsal.md) | M4 | 9/18 | #28~#30 | AI 파트 · 백엔드(watchdog·round·시드·짤) · 프론트 |
 | [P1 로드맵](09-p1-roadmap.md) | P1 | 10/6~ | #31 | 아키텍트 · 팀 |
 | [백엔드 계약서](10-backend-contract.md) | Contract | 9/8~9/17 | #1, #9, #27 + 각 절 | **백엔드 담당 필독** |
+| [로컬 전체 흐름 검증](14-local-e2e-validation.md) | 9/15 검증·후속 계획 | — | 실제 연결의 기준선 | AI 파트 |
+| [로컬 구현·재실행](15-local-e2e-implementation.md) | 9/16 검증·증거·참고 패치 | — | 무료 E2E, PNG, 이미지 등록 | AI 파트 |
+| [프론트 반영 요청](16-frontend-handoff.md) | 신규 posts·저장 PNG·관리자 파일 등록 | — | 프론트 인수인계 | 프론트 담당 |
 
 ---
 

@@ -1,0 +1,66 @@
+{
+  "date": "2026-09-16",
+  "status": "local implementation verified; live LLM waiting for keys",
+  "ai_pytest": {
+    "passed": 1372,
+    "warnings": 1,
+    "seconds": 78.85
+  },
+  "backend_build": {
+    "classes": 54,
+    "tests": 512,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "frontend": {
+    "pnpm_check": "PASS",
+    "pnpm_harness_check": "PASS",
+    "node": "24.19.0",
+    "pnpm": "11.19.0"
+  },
+  "api_e2e": {
+    "result": "PASS",
+    "explicit_checks": 111,
+    "report": "api-report-final.json",
+    "jar_sha256": "44620d6e8fe73a0f2a0a03907184338dba7031a665d72395115e4b6930ae9e1c"
+  },
+  "browser_final": {
+    "post_id": "d704010d-430f-4331-8c00-84408bb587e8",
+    "template": "share-card-v3",
+    "server_and_dom_sha256": "f2e2c58f1b80b5d8cf80b623d1cd6270640f16c092695c3bb84ef3bc11897e3a",
+    "screenshot": "browser-card-v3.jpg",
+    "png": "server-card-v3.png",
+    "download": "Chrome button clicked; macOS denied new Downloads file read; browser policy blocked download-manager page. Prior v2 local file hash and final v3 API bytes are verified separately."
+  },
+  "browser_full_flow": "browser-report.json (v2 actual local download SHA matched plus frontend privacy followup)",
+  "paid_vendor_calls": 0,
+  "live_approval": {
+    "posts": 1,
+    "max_calls": 10,
+    "cap_usd": 0.05,
+    "keys_available": false
+  },
+  "generative_image": "not implemented or called; local GRAYSCALE only",
+  "repos": {
+    "backend": {
+      "path": "/private/tmp/geoji-implementation-20260916/server",
+      "base_commit": "ac5b88b338977a2d7b554b9430565a6da4f8229f",
+      "changed_files": 34,
+      "patch": "backend.patch",
+      "patch_sha256": "5aeb134c07d6d1cc1ab111edf76a1b7c5b2d8ef4ea5a5951279a3ca5cf785c40",
+      "patch_bytes": 192360,
+      "clean_base_apply_check": "PASS"
+    },
+    "frontend": {
+      "path": "/private/tmp/geoji-implementation-20260916/web",
+      "base_commit": "f7fd4f443999fff83459b21262222f50564d776d",
+      "changed_files": 19,
+      "patch": "frontend.patch",
+      "patch_sha256": "a532d980390e9d0177bf156c22a1b88587c9eb5fdbbd3349768610a5e6975e43",
+      "patch_bytes": 72671,
+      "clean_base_apply_check": "PASS"
+    }
+  },
+  "original_ai_checkout_clean": true
+}

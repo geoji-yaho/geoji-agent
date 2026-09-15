@@ -1,0 +1,3746 @@
+diff --git a/.gitignore b/.gitignore
+index 1f0700612dee403151809550f5a5613247ae5cf0..9677dde4628078425db68970dc3c0f18fd65feac 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -43,3 +43,6 @@ out/
+ _workspace/
+ _workspace_prev/
+ .claude/settings.local.json
++
++### local private media ###
++var/media/
+diff --git a/API.md b/API.md
+index 037eff06db35e2d1a252eaf0469e02f8552714c2..f6c20fb4b46fb70a71c32d4e55ee5ecf6981caeb 100644
+--- a/API.md
++++ b/API.md
+@@ -789,11 +789,12 @@ AI 판사가 형량·판결문을 만든다(최대 약 40초, 늦으면 템플
+ 
+ ### `GET /api/posts/{postId}/verdict?room_id={roomId}`
+ 
+-판결 조회(폴링용). 스키마는 AI 저장소 `contracts/verdict-view-v1.schema.json` 의 키를 camelCase 로 바꾼 것이다.
++판결 조회(폴링용). AI 저장소 `contracts/verdict-view-v1.schema.json`은 실제 응답과 같은 camelCase·nullable 계약이다.
+ 
+ - `room_id`(선택): 이 방의 강도(`mild`·`spicy`·`hell`) 문구를 본다. 철회되지 않은 공유 방이어야 하고, 작성자가 아니면 요청자가 그 방 멤버여야 한다.
+   없으면 대표 강도(표가 가장 많이 나온 방의 강도)
+ - 생성 중에도 `200` 이고 `view` 가 `null` 이다. 빈 화면 대신 대기 메시지를 보여 준다
++- 현재 인용한 다른 게시물·판결·댓글의 원천이 삭제되면 스케줄러가 처리하기 전에도 `view.source=TEMPLATE`로 대체하고 양형 이유를 숨긴다. 현재 `intensity/textVersion` 인용만 검사한다. 상위 `textStatus=AI_READY`와 `textVersion`은 비동기 저장 전까지 유지될 수 있으므로 같은 버전의 `view` 변경도 반영해야 한다. 열린 완료 화면은 서버의 기존 `pollAfterMs=0`과 별도로 5초마다 재검증한다.
+ 
+ **Response `200`**
+ ```json
+@@ -907,6 +908,8 @@ S-11 판결 공유 카드. 방 밖으로 나갈 수 있는 문구와 이미지 m
+ 
+ 게시물 삭제. 작성자만 할 수 있다. 삭제하면 판결 조회·공유 카드가 곧바로 `404` 가 되고, 진행 중인 AI 작업은 취소된다.
+ 
++다른 게시물의 판결이 삭제한 사건을 인용했다면 그 판결과 공유 카드에서는 다음 조회부터 템플릿을 반환한다. 백그라운드 정리는 해당 게시물의 POST·VERDICT·COMMENT 출처 근거와 같은 `payload.post_id`를 가진 파생 기억을 무효화한다. 현재 인용 문구도 템플릿으로 저장하되 이미 확정된 형량은 유지한다.
++
+ **Response `204`** — 바디 없음. 이미 삭제된 게시물을 작성자가 다시 지워도 `204`
+ 
+ **오류**
+@@ -1026,3 +1029,155 @@ S-11 판결 공유 카드. 방 밖으로 나갈 수 있는 문구와 이미지 m
+ | 남의 댓글(게시물 작성자여도) | 403 | `{ "message": "본인 댓글만 삭제할 수 있습니다." }` |
+ | `postId`·`commentId` 가 UUID 아님 | 400 | Spring 기본 에러 형식 |
+ | JWT 없음 | 401 | - |
++
++## 14. 신규 게시물 상세
++
++### `GET /api/posts/{postId}`
++
++신규 `posts` 재판 화면에 입력 정보와 요청자 본인의 투표 상태를 반환한다. 기존 `expenses` 식별자와 혼용하지 않는다. JWT가 필요하며, 작성자 또는 공유가 철회되지 않은 방 멤버만 조회할 수 있다.
++
++```json
++{
++  "id": "게시물 UUID",
++  "authorId": "작성자 UUID",
++  "postType": "spent",
++  "amountKrw": 12000,
++  "category": "교통/택시",
++  "item": "택시",
++  "reason": "늦잠",
++  "roomIds": ["조회 가능한 공유 방 UUID"],
++  "voteDeadlineAt": "2026-09-16T12:00:00Z",
++  "myVote": null,
++  "canVote": true
++}
++```
++
++- `reason`은 nullable이다. `myVote`는 본인의 `guilty|notGuilty|agree|disagree` 또는 null이다. 타인의 표·투표 사유는 반환하지 않는다.
++- `roomIds`는 활성 공유 방 중 요청자가 멤버인 방만 포함한다. 작성자는 자신이 공유한 활성 방 전체를 본다.
++- `canVote`는 작성자 아님·활성 공유 방 멤버·DB 마감 이전·평결 미확정·본인 미투표를 모두 만족할 때 true다. 표시 뒤 상태가 바뀔 수 있으므로 실제 투표 API가 다시 검증한다.
++- 없음·삭제·권한 없음은 동일한 `404 {"message":"게시물을 찾을 수 없습니다."}`. JWT 없음은 401, UUID 형식 오류는 400.
++
++사건 상세에는 `juryStatus`(평결 또는 null)와 `textStatus`(`PENDING|GENERATING|TEMPLATE_READY|AI_READY`)도 필수 필드로 포함한다.
++
++### `GET /api/rooms/{roomId}/posts?limit=50`
++
++해당 방의 신규 게시물을 위 사건 상세 DTO **배열**로 반환한다. 방의 현재 멤버만 조회 가능하며 삭제된 방·비회원·없는 방은 404다. 삭제된 게시물과 공유가 철회된 게시물은 제외한다. `created_at DESC, id DESC`로 정렬하며 `limit`은 기본50, 1~100이다(범위 밖400). 각 항목에 요청자 자신의 `myVote`, `canVote`, `juryStatus`, `textStatus`를 포함한다. 기존 `expenses` 목록과 합치지 않는다. 목록 조회는 쿼리2회로 제한하며 항목별 추가 쿼리를 실행하지 않는다.
++
++## 15. 로컬 저장 PNG 공유 카드
++
++판결 확정 후 기존 `GET /api/posts/{postId}/share-card` 공개 문구 DTO만 렌더링한다. 판결 저장 트랜잭션과 별도 작업이며, 렌더링 실패가 판결을 취소하거나 AI를 다시 호출하지 않는다. 아래 모든 경로는 JWT가 필요하다.
++
++| 메서드 | 경로 | 동작 |
++| --- | --- | --- |
++| POST | `/api/posts/{postId}/share-card/render` | 렌더 요청. 빈 본문, 202. 같은 입력이면 기존 작업 반환 |
++| GET | `/api/posts/{postId}/share-card/render` | 현재 입력의 작업 조회. 요청 전에는 404 |
++| POST | `/api/posts/{postId}/share-card/render/retry` | FAILED 카드만 다시 PENDING. 같은 입력의 기존 작업 ID 유지 |
++| GET | `/api/posts/{postId}/share-card/png` | 저장된 PNG bytes. READY 이전 409 |
++| GET | `/api/posts/{postId}/share-card/download` | 위 PNG와 동일 bytes + attachment 헤더 |
++| PUT | `/api/posts/{postId}/share-card/sharing` | 작성자만 `{ "enabled": false }`로 카드 공유 철회, true로 복구 |
++
++작업 응답:
++
++```json
++{
++  "id": "작업 UUID",
++  "postId": "게시물 UUID",
++  "status": "READY",
++  "inputHash": "64자 sha256",
++  "pngSha256": "64자 sha256",
++  "pngUrl": "/api/posts/게시물 UUID/share-card/png",
++  "downloadUrl": "/api/posts/게시물 UUID/share-card/download",
++  "errorCode": null
++}
++```
++
++- 상태: `PENDING → RENDERING → READY | FAILED`. 작업에 lease token과 만료 시각을 저장한다. 서버 재시작 후 만료된 RENDERING을 다시 처리한다.
++- 문구 DTO, 선택 짤의 실제 bytes 해시, 템플릿 버전, 한국어 폰트 해시로 중복을 막는다. 공개 문구가 바뀌면 새 작업을 요청한다.
++- 선택 짤이 없으면 결과 글자를 렌더링한다. 선택된 짤이 로딩 실패하면 `MEME_UNAVAILABLE`로 카드만 실패하며 임의의 다른 태그 이미지로 대체하지 않는다.
++- 오류 코드: `FONT_UNAVAILABLE`, `MEME_UNAVAILABLE`, `INPUT_CHANGED`, `ACCESS_REVOKED`, `RENDER_FAILED`. 렌더 재요청은 모델을 호출하지 않는다.
++- PNG는 1080×1440이며 명시한 한국어 폰트와 공개 문구만 사용한다. 템플릿 `share-card-v3`는 실제 글자 폭·높이를 측정해 본문을 33px부터 최소 22px까지 축소하고, 계약상 최대 300자 본문을 말줄임 없이 표시한다. 연속 공백·줄바꿈은 공백 하나로 정리하며 이모지·결합 문자 묶음을 나누지 않는다. 형량은 별도 영역에 최대 두 줄, 하단 문구는 고정 위치에 둔다. 입력이 표시 가능한 범위를 넘으면 조용히 자르지 않고 카드 작업을 실패시킨다.
++- 조회·다운로드마다 삭제, 방 공유 철회, 현재 문구/이미지 해시를 다시 검사한다. 작성자의 카드 공유 철회는 카드 작업 조회·생성·PNG를 모두 404로 차단한다. 기존 판결/공개 문구 조회 권한에는 영향을 주지 않는다.
++- 파일 URL을 외부 정적 호스팅에 노출하지 않는다. 프론트는 JWT로 blob을 받아 미리보기/다운로드한다. `Cache-Control: no-store`, `X-Content-SHA256`, `ETag`, 다운로드의 `Content-Disposition`을 제공한다. CORS에서 이 응답 헤더를 노출한다.
++
++로컬 실행 설정:
++
++```bash
++export GEOJI_MEDIA_ROOT=/private/tmp/geoji-local-media
++export GEOJI_MEDIA_FONT_PATH=/System/Library/Fonts/AppleSDGothicNeo.ttc
++# 기존 외부 URL 짤을 렌더할 경우만 허용 origin을 명시한다. redirect는 허용하지 않는다.
++export GEOJI_MEDIA_SOURCE_ORIGIN=http://127.0.0.1:18090
++```
++
++Linux는 배포 환경에 설치한 한국어 TTF/TTC 파일 경로를 명시한다. 폰트 미설정/읽기 실패는 서버 전체 기동 대신 카드만 실패시킨다. 공유 Supabase/S3 migration 및 저장소 배포는 이번 로컬 구현에 포함하지 않는다.
++
++## 16. 이미지 비공개 업로드·검수·무료 변환
++
++원본과 변환본은 내용 해시로 따로 보관한다. 파일 이름은 저장 경로에 사용하지 않는다. 크기 1바이트~8MiB, PNG/JPEG 실제 형식과 multipart MIME 일치, 디코딩 성공, 각 변 4096px 및 총 1600만 픽셀 이하를 검사한다. SVG/애니메이션 GIF/잘못된 MIME은 400이다. 업로드 크기 제한을 넘으면 413이다.
++
++| 메서드 | 경로 | 요청/결과 |
++| --- | --- | --- |
++| POST | `/api/images` | multipart `file`, 201. 동일 사용자+동일 bytes는 같은 이미지 ID |
++| GET | `/api/images/{id}` | 소유자만 메타데이터 |
++| GET | `/api/images/{id}/content` | 소유자만 원본 bytes |
++| POST | `/api/images/{id}/transform` | `{ "operation": "GRAYSCALE" }`, 202 |
++| GET | `/api/images/{id}/transform` | 변환 작업 상태 |
++| GET | `/api/images/{id}/transform/content` | READY 변환 PNG bytes, 이전 409 |
++| POST | `/api/images/{id}/review` | `{ "approved": true, "version": "ORIGINAL" }` 또는 `GRAYSCALE` |
++
++ImageView:
++
++```json
++{
++  "id": "이미지 UUID", "sha256": "64자 해시", "mimeType": "image/png", "width": 640, "height": 480,
++  "status": "PRIVATE", "contentUrl": "/api/images/이미지 UUID/content",
++  "reviewStatus": "PENDING", "selectedVersion": null
++}
++```
++
++검수 상태는 `PENDING | APPROVED | REJECTED`, 선택 버전은 `ORIGINAL | GRAYSCALE | null`이다. 검수 승인 후에도 PRIVATE이며 카탈로그 검색/선택에 포함하지 않는다. 다른 사용자의 ID는 404다. 변환이 READY이기 전에 변환본 검수 승인을 할 수 없다.
++
++TransformView:
++
++```json
++{
++  "id": "작업 UUID", "imageId": "원본 이미지 UUID", "status": "READY", "operation": "GRAYSCALE",
++  "sha256": "변환본 64자 해시", "contentUrl": "/api/images/이미지 UUID/transform/content", "errorCode": null
++}
++```
++
++`PENDING | RENDERING | READY | FAILED` 상태와 lease를 저장한다. 같은 이미지/operation/변환 버전의 중복 요청은 같은 작업을 반환하고 FAILED는 재시도한다. 파일 저장 뒤 DB 갱신에 실패하면 다음 시도에서 해시/변환 recipe에 따른 기존 파일을 재사용한다. `GRAYSCALE`은 **무료 로컬 회색조 처리**이며 생성형 AI 이미지 변환 기능이 아니다. 외부 이미지 provider나 유료 호출은 구현·실행하지 않는다.
++
++## 17. 관리자 이미지 카탈로그
++
++관리자는 서버 환경변수 `GEOJI_MEDIA_ADMIN_IDS`의 쉼표로 구분한 profile UUID allowlist로만 판정한다. 비어 있으면 모든 관리자 API를 403으로 거부한다. JWT의 임의 `role=admin` 등 클레임을 신뢰하지 않는다.
++
++| 메서드 | 경로 | 요청/동작 |
++| --- | --- | --- |
++| POST | `/api/admin/memes` | multipart `file`, `tag` 필수. `strategies`, `emotions`, `keywords`는 CSV, 빈 값 허용 |
++| GET | `/api/admin/memes` | 등록 목록 |
++| GET | `/api/admin/memes/{id}/image` | 비활성을 포함한 검수용 선택 이미지 bytes, 관리자만 |
++| POST | `/api/admin/memes/{id}/review` | `{ "approved": true }`. 승인과 active는 별도 |
++| PUT | `/api/admin/memes/{id}/active` | `{ "active": true }`. 미승인은 409 |
++| POST/GET | `/api/admin/memes/{id}/transform` | POST `{ "operation": "GRAYSCALE" }` / GET 변환 상태 |
++| GET | `/api/admin/memes/{id}/transform/content` | 관리자 검수용 변환본 PNG |
++| PUT | `/api/admin/memes/{id}/image-version` | `{ "version": "GRAYSCALE" }` 또는 `ORIGINAL`. 버전 변경 시 승인·active 해제 |
++| GET | `/api/memes/{id}/image` | 승인+활성 짤만 JWT 사용자에게 반환. 나머지 404 |
++
++```json
++{
++  "id": "카탈로그 UUID", "imageId": "원본 이미지 UUID", "tag": "GUILTY_HEAVY",
++  "approved": false, "active": false, "imageUrl": "/api/memes/카탈로그 UUID/image", "selectedVersion": "ORIGINAL"
++}
++```
++
++관리자 등록 직후 `approved=false`, `active=false`이며 승인해도 자동 활성화하지 않는다. 등록된 이미지의 선택 버전을 변경하면 재검수를 요구한다. 비공개 일반 사용자 업로드는 관리자 목록/조회에 포함하지 않는다. 기존 엄격한 active/tag 필터와 전략·감정·키워드·최근 사용·CRC32 선택 점수는 변경하지 않는다.
++
++DDL 초안은 `src/test/resources/db/004b_media.sql`이며 독립 로컬 DB/Testcontainers만 적용한다.
++
++## 18. 최초 제출 재전송
++
++`POST /api/post-submissions`는 선택 헤더 `Idempotency-Key`를 받는다. 키는 1~128자 영문·숫자·`.`·`_`·`:`·`-`를 허용한다. 같은 JWT 사용자+키+정규화된 입력은 같은 submission/post와 201 응답을 돌려준다. 다른 입력에 같은 키를 쓰면 409이며, 키가 없으면 기존처럼 매번 새 제출이다.
++
++동시 첫 요청 처리 중에는 409를 반환한다. 같은 키로 재시도하면 완료 결과를 받으며, 서버가 NEW 상태에서 중단됐으면 15초 lease 만료 후 같은 submission을 복구한다. 키가 있다고 intake HTTP를 DB 트랜잭션 안에서 호출하지 않는다. `GET /api/post-submissions/{id}`로 소유자만 현재 상태를 조회할 수 있으며, NEW의 `intakeResult`와 `postId`는 null이다. 기존 `/{id}/complete`의 revision 및 중복 완료 규칙은 유지한다.
++
++DDL 초안: `src/test/resources/db/004b_submission_idempotency.sql`. CORS 허용 요청 헤더에 `Idempotency-Key`를 추가했다.
+diff --git a/docs/ai-team-report.md b/docs/ai-team-report.md
+index 5ce82ba3c63dd84b78f2506f4362e5dec8633bc0..71d666a8f0d9b81f02d00795ce80484fb3df3ef2 100644
+--- a/docs/ai-team-report.md
++++ b/docs/ai-team-report.md
+@@ -27,7 +27,7 @@ AI 파트(`geoji-agent`)에 전할 내용을 한곳에 모은다. 백엔드가 1
+ | - | ----- | ----- | ---- |
+ | A1 | 워커·AI API 의 `SERVICE_AUTH_TOKEN` 과 백엔드 EB 환경변수 `SERVICE_AUTH_TOKEN` 에 **같은 값**을 넣는다(양방향 같은 토큰). 값 전달 경로는 사람 | §4.7·§16.1 | W1 infra |
+ | A2 | 백엔드가 AI API 를 부를 주소 `AI_API_BASE_URL` 을 백엔드에 알려 준다 | §16.1 | W1 infra |
+-| A3 | 워커 설정 `BACKEND_INTERNAL_URL` = 백엔드 EB 주소 + `/internal/v1` | §16.1 | 플랜 |
++| A3 | 워커 설정 `BACKEND_INTERNAL_URL` = 백엔드 호스트 루트(예: `http://127.0.0.1:18080`). Python 클라이언트가 `/internal/v1/...`를 붙이므로 경로를 중복하지 않음 | §16.1 | 플랜 |
+ | A4 | 템플릿을 바꾸면 `templates-v2` 로 올리고 백엔드에 알린다(백엔드는 `templates-v1.json` 을 geoji-agent `995c7fb` 바이트 그대로 고정 복사) | §10·§16 | W2 pure |
+ | A5 | `workers/dispatch.py` 모듈 docstring 정리 — "`intensities[]`·RETAIN `verdict_version` 은 백엔드 미채택이라 넣지 않는다"가 낡았다. 백엔드는 둘 다 넣는다 | §3 | W2 jobs |
+ | A6 | 워커가 **PREPARE·SENTENCE·TEXT_RETRY snapshot 404 와 resolve-evidence 404** 도 skip 으로 받는지 확인(백엔드는 원본 게시물이 삭제되면 kind 와 무관하게 404) | §4.1·§4.2 | W3 internal-read |
+@@ -41,8 +41,8 @@ AI 파트(`geoji-agent`)에 전할 내용을 한곳에 모은다. 백엔드가 1
+ | # | 질문 | 백엔드 현재 동작 | 10 절 | 출처 |
+ | - | ---- | ---------------- | ----- | ---- |
+ | Q1 | SENTENCE·TEXT_RETRY `deadline_at` 을 `now()` 대신 `clock_timestamp()` 로 할까? Postgres `now()` 는 **트랜잭션 시작 시각**이라 업무 트랜잭션이 길면 10초 마감이 그만큼 짧아진다 | 10 §3 SQL 그대로 `now()`. 백엔드는 트랜잭션을 짧게 유지(트랜잭션 안 HTTP 금지) | §3 D-24 | W2 jobs |
+-| Q2 | 게시물 삭제 무효화를 `('POST', post_id)` 한 행으로 기록하면 `invalidate_scope.sql` 이 같은 게시물의 **VERDICT(source_id = verdict_id)·COMMENT memory_facts** 를 지우지 못한다. AI `delete_post` 는 payload post_id 로 전부 지운다. 백엔드가 VERDICT·COMMENT 기록도 넣어야 하나? | POST 1행만 기록 | §8·§16.3 | W3 privacy |
+-| Q3 | 삭제된 게시물 P 를 다른 게시물 Q 의 조서가 PRIOR 근거로 인용하면, Q 의 `privacy_versions` 에 `post:P` 가 없어 조회 시 epoch 비교로 즉시 차단되지 않고 무효화 스케줄러(약 5초) 뒤 템플릿으로 바뀐다. 허용 범위인가? | 스케줄러 5초 주기로 전환 | §8 | W3 privacy |
++| Q2 | 게시물 삭제 시 VERDICT·COMMENT 등 파생 기억·근거 누락 | 9/16 로컬 수정: SQL은 POST `payload.post_id` 기억도 삭제, POST 작업 내부에서 해당 verdict/comment source의 같은 SQL·현재 인용 템플릿 전환 수행. 기록은 POST 1행 유지 | §8·§16.3 | `DeletedPriorPrivacyTest` |
++| Q3 | Q의 snapshot에 `post:P`가 없는 PRIOR 인용 삭제 즉시차단 누락 | 9/16 로컬 수정: 현재 verdict/intensity/textVersion refs의 POST·VERDICT·COMMENT 원천 삭제를 읽기마다 확인하여 스케줄러 전에도 템플릿. 완료 화면은 5초 재검증 | §8·§9 | `DeletedPriorPrivacyTest` |
+ | Q4 | `RecentVerdict.sentence` 를 nullable 로 바꿀 수 있나? 지금 워커 모델이 non-null str 이라 비유죄·동의·기각 평결을 `recent_verdicts` 에 넣으면 응답 전체가 거부된다 | 유죄(sentence 있음)만 넣는다 | §4.2 | W3 internal-read |
+ | Q5 | `RULE/{rule_id}/{version}` 참조에 room_id 가 없다. `rule_id` 가 방별 rules 배열 인덱스라 공유 방이 여럿이면 방끼리 구분하지 못한다. 참조 모양을 바꿀까? | RULE 후보는 sources 에서 버린다 | §4.2 | W3 internal-read |
+ | Q6 | 반복 집계 "확정 소비"를 AI `domain/aggregation.py` 와 같게 **판결 확정과 무관한 spent** 로 해석했다. 맞나? | 작성자·현재 사건 제외·같은 카테고리·spent·삭제 제외·[created_at−30일, created_at) | §4.2 | W3 internal-read |
+@@ -129,7 +129,7 @@ AI 파트(`geoji-agent`)에 전할 내용을 한곳에 모은다. 백엔드가 1
+ | 폴백 statement 모양 | 템플릿 줄마다 `{text, kind:"opinion", evidence_labels:[]}` 1개(워커 `graphs/templates.py` 와 달리 문장 끝에서 쪼개지 않음). `{n}`/`{m}` = votes 행 수 / guilty 수 | §4.6·§10 | W3 begin-failed·privacy |
+ | 비유죄 폴백 | `sentence_status = FINAL`, 형량·이유 null. TEXT_RETRY begin 의 `fixed_sentencing` 은 null | §4.6 | W3 begin-failed |
+ | 무효화 템플릿 전환 | 인용한 강도 행만 `verdicts.text_version + 1` 로 갱신, `text_status = TEMPLATE_READY`, `sentencing_reason`·`reason_source`·형량 유지, 전환 행 `dossier_id`·`privacy_epoch_snapshot` NULL, TEXT_RETRY 새 예약 없음. `text_evidence_refs` 는 DELETE 권한이 없어 옛 version 행이 남는다(현재 text_version 의 refs 만 본다) | §8·§10 | W3 privacy |
+-| 조회 판정 | `privacy_epoch_snapshot` NULL(템플릿 저장 행)은 원문 허용, 게시물 삭제는 차단 우선, snapshot 의 scope epoch 가 하나라도 다르면 템플릿 | §8 | W3 privacy |
++| 조회 판정 | 게시물 삭제는 차단 우선, snapshot scope epoch 불일치 또는 현재 문구가 인용한 POST·VERDICT·COMMENT 원천 삭제는 템플릿. snapshot NULL도 현재 인용 삭제 검사는 수행. 옛 버전·다른 강도 refs 제외 | §8 | W3 privacy·9/16 Q3 |
+ | 무효화 기록 | 게시물 삭제·공유 철회 모두 `('POST', post_id)`·scope `post:{id}`(AI `test_deletion.py` 조합) — 철회도 그 게시물 파생 전부를 무효화. 재삭제는 epoch·기록 추가 없이 성공. 탈퇴(`user:{id}`)는 미구현 | §8 | W3 privacy |
+ | 무효화 스케줄러 | fixedDelay 5초, 배치 50, `SKIP LOCKED`, 5회 실패 FAILED + WARN | §8 | 사용자 9/14 |
+ | 댓글 삭제 scope | 10 §2 scope key 가 `user`·`room`·`post` 셋뿐이라 **댓글 삭제는 그 댓글이 달린 게시물의 `post:{post_id}`** epoch 를 올리고, 무효화 source 는 `('COMMENT', comment_id)`. 방 전체(`room:`)는 올리지 않는다(방의 다른 게시물까지 무효화되므로). W5 에서 구현 | §2·§8 | 코디네이터(10 §2 에서 도출) |
+diff --git a/src/main/java/com/ttegeoji/backend/ai/AiTraceClient.java b/src/main/java/com/ttegeoji/backend/ai/AiTraceClient.java
+index 542ab6ebe5ad357a61a26f908b7e05c00078fef5..13b7048093764a6709168b287c6cac2b810fc1dd 100644
+--- a/src/main/java/com/ttegeoji/backend/ai/AiTraceClient.java
++++ b/src/main/java/com/ttegeoji/backend/ai/AiTraceClient.java
+@@ -45,7 +45,7 @@ public class AiTraceClient {
+     }
+ 
+     private static JdkClientHttpRequestFactory requestFactory() {
+-        HttpClient httpClient = HttpClient.newBuilder()
++        HttpClient httpClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+                 .connectTimeout(CONNECT_TIMEOUT)
+                 .build();
+         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+diff --git a/src/main/java/com/ttegeoji/backend/ai/IntakeClient.java b/src/main/java/com/ttegeoji/backend/ai/IntakeClient.java
+index d0a87b364c00f0cea63ccc675d60506717e48297..663cd948f2258e4674fd312b594668e6547c114c 100644
+--- a/src/main/java/com/ttegeoji/backend/ai/IntakeClient.java
++++ b/src/main/java/com/ttegeoji/backend/ai/IntakeClient.java
+@@ -56,7 +56,7 @@ public class IntakeClient {
+     }
+ 
+     private static RestClient withReadTimeout(RestClient base) {
+-        HttpClient httpClient = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
++        HttpClient httpClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(CONNECT_TIMEOUT).build();
+         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+         factory.setReadTimeout(READ_TIMEOUT);
+         // mutate 는 baseUrl·Authorization 기본 헤더를 유지한다
+diff --git a/src/main/java/com/ttegeoji/backend/api/MediaController.java b/src/main/java/com/ttegeoji/backend/api/MediaController.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..9b9ec06ed15fbfe1eba4ca097971642c7141a2c1
+--- /dev/null
++++ b/src/main/java/com/ttegeoji/backend/api/MediaController.java
+@@ -0,0 +1,215 @@
++package com.ttegeoji.backend.api;
++
++import com.ttegeoji.backend.media.CardService;
++import com.ttegeoji.backend.media.ImageService;
++import com.ttegeoji.backend.security.CurrentUser;
++
++import lombok.RequiredArgsConstructor;
++
++import org.springframework.http.CacheControl;
++import org.springframework.http.HttpHeaders;
++import org.springframework.http.MediaType;
++import org.springframework.http.ResponseEntity;
++import org.springframework.security.core.annotation.AuthenticationPrincipal;
++import org.springframework.security.oauth2.jwt.Jwt;
++import org.springframework.web.bind.annotation.*;
++import org.springframework.web.multipart.MultipartFile;
++
++import java.util.List;
++import java.util.Map;
++import java.util.UUID;
++
++@RestController
++@RequiredArgsConstructor
++public class MediaController {
++    private final CardService cards;
++    private final ImageService images;
++
++    public record TransformRequest(String operation) {}
++
++    public record ReviewRequest(Boolean approved) {}
++
++    public record ImageReviewRequest(Boolean approved, String version) {}
++
++    public record ActiveRequest(Boolean active) {}
++
++    public record VersionRequest(String version) {}
++
++    public record SharingRequest(Boolean enabled) {}
++
++    @PostMapping("/api/posts/{postId}/share-card/render")
++    public ResponseEntity<CardService.CardView> render(
++            @AuthenticationPrincipal Jwt jwt, @PathVariable UUID postId) {
++        return ResponseEntity.accepted().body(cards.request(postId, CurrentUser.idOf(jwt), false));
++    }
++
++    @GetMapping("/api/posts/{postId}/share-card/render")
++    public CardService.CardView card(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID postId) {
++        return cards.status(postId, CurrentUser.idOf(jwt));
++    }
++
++    @PostMapping("/api/posts/{postId}/share-card/render/retry")
++    public ResponseEntity<CardService.CardView> retry(
++            @AuthenticationPrincipal Jwt jwt, @PathVariable UUID postId) {
++        return ResponseEntity.accepted().body(cards.request(postId, CurrentUser.idOf(jwt), true));
++    }
++
++    @PutMapping("/api/posts/{postId}/share-card/sharing")
++    public Map<String, Boolean> sharing(
++            @AuthenticationPrincipal Jwt jwt,
++            @PathVariable UUID postId,
++            @RequestBody SharingRequest request) {
++        if (request.enabled() == null) throw new IllegalArgumentException("enabled가 필요합니다.");
++        cards.sharing(postId, CurrentUser.idOf(jwt), request.enabled());
++        return Map.of("enabled", request.enabled());
++    }
++
++    @GetMapping("/api/posts/{postId}/share-card/png")
++    public ResponseEntity<byte[]> png(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID postId) {
++        return bytes(cards.content(postId, CurrentUser.idOf(jwt)), null);
++    }
++
++    @GetMapping("/api/posts/{postId}/share-card/download")
++    public ResponseEntity<byte[]> download(
++            @AuthenticationPrincipal Jwt jwt, @PathVariable UUID postId) {
++        return bytes(cards.content(postId, CurrentUser.idOf(jwt)), "verdict-" + postId + ".png");
++    }
++
++    @PostMapping(value = "/api/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
++    public ResponseEntity<ImageService.ImageView> upload(
++            @AuthenticationPrincipal Jwt jwt, @RequestParam MultipartFile file) {
++        return ResponseEntity.status(201).body(images.upload(CurrentUser.idOf(jwt), file));
++    }
++
++    @GetMapping("/api/images/{id}")
++    public ImageService.ImageView image(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
++        return images.get(CurrentUser.idOf(jwt), id);
++    }
++
++    @GetMapping("/api/images/{id}/content")
++    public ResponseEntity<byte[]> imageContent(
++            @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
++        return bytes(images.content(CurrentUser.idOf(jwt), id), null);
++    }
++
++    @PostMapping("/api/images/{id}/review")
++    public ImageService.ImageView reviewImage(
++            @AuthenticationPrincipal Jwt jwt,
++            @PathVariable UUID id,
++            @RequestBody ImageReviewRequest request) {
++        if (request.approved() == null) throw new IllegalArgumentException("approved가 필요합니다.");
++        return images.reviewImage(CurrentUser.idOf(jwt), id, request.approved(), request.version());
++    }
++
++    @PostMapping("/api/images/{id}/transform")
++    public ResponseEntity<ImageService.TransformView> transform(
++            @AuthenticationPrincipal Jwt jwt,
++            @PathVariable UUID id,
++            @RequestBody TransformRequest request) {
++        return ResponseEntity.accepted()
++                .body(images.transform(CurrentUser.idOf(jwt), id, request.operation()));
++    }
++
++    @GetMapping("/api/images/{id}/transform")
++    public ImageService.TransformView transformStatus(
++            @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
++        return images.transformation(CurrentUser.idOf(jwt), id);
++    }
++
++    @GetMapping("/api/images/{id}/transform/content")
++    public ResponseEntity<byte[]> transformed(
++            @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
++        return bytes(images.transformedContent(CurrentUser.idOf(jwt), id), null);
++    }
++
++    @PostMapping(value = "/api/admin/memes", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
++    public ResponseEntity<ImageService.CatalogView> register(
++            @AuthenticationPrincipal Jwt jwt,
++            @RequestParam MultipartFile file,
++            @RequestParam String tag,
++            @RequestParam(required = false) String strategies,
++            @RequestParam(required = false) String emotions,
++            @RequestParam(required = false) String keywords) {
++        return ResponseEntity.status(201)
++                .body(
++                        images.register(
++                                CurrentUser.idOf(jwt), file, tag, strategies, emotions, keywords));
++    }
++
++    @GetMapping("/api/admin/memes")
++    public List<ImageService.CatalogView> catalog(@AuthenticationPrincipal Jwt jwt) {
++        return images.list(CurrentUser.idOf(jwt));
++    }
++
++    @PostMapping("/api/admin/memes/{id}/review")
++    public ImageService.CatalogView review(
++            @AuthenticationPrincipal Jwt jwt,
++            @PathVariable UUID id,
++            @RequestBody ReviewRequest request) {
++        if (request.approved() == null) throw new IllegalArgumentException("approved가 필요합니다.");
++        return images.review(CurrentUser.idOf(jwt), id, request.approved());
++    }
++
++    @PutMapping("/api/admin/memes/{id}/active")
++    public ImageService.CatalogView active(
++            @AuthenticationPrincipal Jwt jwt,
++            @PathVariable UUID id,
++            @RequestBody ActiveRequest request) {
++        if (request.active() == null) throw new IllegalArgumentException("active가 필요합니다.");
++        return images.active(CurrentUser.idOf(jwt), id, request.active());
++    }
++
++    @GetMapping("/api/admin/memes/{id}/image")
++    public ResponseEntity<byte[]> adminImage(
++            @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
++        return bytes(images.adminContent(CurrentUser.idOf(jwt), id), null);
++    }
++
++    @PostMapping("/api/admin/memes/{id}/transform")
++    public ResponseEntity<ImageService.TransformView> adminTransform(
++            @AuthenticationPrincipal Jwt jwt,
++            @PathVariable UUID id,
++            @RequestBody TransformRequest request) {
++        return ResponseEntity.accepted()
++                .body(images.adminTransform(CurrentUser.idOf(jwt), id, request.operation()));
++    }
++
++    @GetMapping("/api/admin/memes/{id}/transform")
++    public ImageService.TransformView adminTransformation(
++            @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
++        return images.adminTransformation(CurrentUser.idOf(jwt), id);
++    }
++
++    @GetMapping("/api/admin/memes/{id}/transform/content")
++    public ResponseEntity<byte[]> adminTransformed(
++            @AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
++        return bytes(images.adminTransformedContent(CurrentUser.idOf(jwt), id), null);
++    }
++
++    @PutMapping("/api/admin/memes/{id}/image-version")
++    public ImageService.CatalogView selectVersion(
++            @AuthenticationPrincipal Jwt jwt,
++            @PathVariable UUID id,
++            @RequestBody VersionRequest request) {
++        return images.selectVersion(CurrentUser.idOf(jwt), id, request.version());
++    }
++
++    @GetMapping("/api/memes/{id}/image")
++    public ResponseEntity<byte[]> meme(@PathVariable UUID id) {
++        return bytes(images.memeContent(id), null);
++    }
++
++    private static ResponseEntity<byte[]> bytes(ImageService.ImageBytes image, String filename) {
++        var builder =
++                ResponseEntity.ok()
++                        .contentType(MediaType.parseMediaType(image.mimeType()))
++                        .cacheControl(CacheControl.noStore())
++                        .header("X-Content-Type-Options", "nosniff")
++                        .header("X-Content-SHA256", image.hash())
++                        .eTag(image.hash());
++        if (filename != null)
++            builder.header(
++                    HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
++        return builder.body(image.bytes());
++    }
++}
+diff --git a/src/main/java/com/ttegeoji/backend/api/PostDetailController.java b/src/main/java/com/ttegeoji/backend/api/PostDetailController.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..8ffa0ca0c01647353a701ac46544ef00554887dc
+--- /dev/null
++++ b/src/main/java/com/ttegeoji/backend/api/PostDetailController.java
+@@ -0,0 +1,41 @@
++package com.ttegeoji.backend.api;
++
++import com.ttegeoji.backend.security.CurrentUser;
++import com.ttegeoji.backend.verdictview.PostDetailAssembler;
++import com.ttegeoji.backend.verdictview.PublicApiRejection;
++import lombok.RequiredArgsConstructor;
++import org.springframework.http.ResponseEntity;
++import org.springframework.security.core.annotation.AuthenticationPrincipal;
++import org.springframework.security.oauth2.jwt.Jwt;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.RestController;
++import org.springframework.web.bind.annotation.RequestParam;
++
++import java.util.Map;
++import java.util.UUID;
++
++@RestController
++@RequiredArgsConstructor
++public class PostDetailController {
++    private final PostDetailAssembler assembler;
++
++    @GetMapping("/api/posts/{postId}")
++    public ResponseEntity<?> getPost(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID postId) {
++        try {
++            return ResponseEntity.ok(assembler.assemble(postId, CurrentUser.idOf(jwt)));
++        } catch (PublicApiRejection e) {
++            return ResponseEntity.status(e.getStatus()).body(Map.of("message", e.getMessage()));
++        }
++    }
++
++    @GetMapping("/api/rooms/{roomId}/posts")
++    public ResponseEntity<?> getRoomPosts(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID roomId,
++                                         @RequestParam(defaultValue = "50") int limit) {
++        try {
++            return ResponseEntity.ok(assembler.list(roomId, CurrentUser.idOf(jwt), limit));
++        } catch (PublicApiRejection e) {
++            return ResponseEntity.status(e.getStatus()).body(Map.of("message", e.getMessage()));
++        }
++    }
++}
+diff --git a/src/main/java/com/ttegeoji/backend/api/PostSubmissionController.java b/src/main/java/com/ttegeoji/backend/api/PostSubmissionController.java
+index ee8c9938a740444ce6e8ff0f56f2f1cb3f710f44..6fb953587bf9092905ed873003fbe86bc8beb339 100644
+--- a/src/main/java/com/ttegeoji/backend/api/PostSubmissionController.java
++++ b/src/main/java/com/ttegeoji/backend/api/PostSubmissionController.java
+@@ -5,7 +5,9 @@ import com.ttegeoji.backend.submission.SubmissionService;
+ import com.ttegeoji.backend.submission.dto.CompleteRequest;
+ import com.ttegeoji.backend.submission.dto.SubmissionResponse;
+ import com.ttegeoji.backend.submission.dto.SubmitRequest;
++
+ import lombok.RequiredArgsConstructor;
++
+ import org.springframework.http.HttpStatus;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.core.annotation.AuthenticationPrincipal;
+@@ -23,16 +25,26 @@ public class PostSubmissionController {
+     private final SubmissionService submissionService;
+ 
+     @PostMapping
+-    public ResponseEntity<SubmissionResponse> submit(@AuthenticationPrincipal Jwt jwt,
+-                                                     @RequestBody SubmitRequest request) {
++    public ResponseEntity<SubmissionResponse> submit(
++            @AuthenticationPrincipal Jwt jwt,
++            @RequestBody SubmitRequest request,
++            @RequestHeader(value = "Idempotency-Key", required = false) String requestKey) {
+         return ResponseEntity.status(HttpStatus.CREATED)
+-                .body(submissionService.submit(CurrentUser.idOf(jwt), request));
++                .body(submissionService.submit(CurrentUser.idOf(jwt), request, requestKey));
++    }
++
++    @GetMapping("/{submissionId}")
++    public SubmissionResponse get(
++            @AuthenticationPrincipal Jwt jwt, @PathVariable UUID submissionId) {
++        return submissionService.get(CurrentUser.idOf(jwt), submissionId);
+     }
+ 
+     @PostMapping("/{submissionId}/complete")
+-    public ResponseEntity<SubmissionResponse> complete(@AuthenticationPrincipal Jwt jwt,
+-                                                       @PathVariable UUID submissionId,
+-                                                       @RequestBody CompleteRequest request) {
+-        return ResponseEntity.ok(submissionService.complete(CurrentUser.idOf(jwt), submissionId, request));
++    public ResponseEntity<SubmissionResponse> complete(
++            @AuthenticationPrincipal Jwt jwt,
++            @PathVariable UUID submissionId,
++            @RequestBody CompleteRequest request) {
++        return ResponseEntity.ok(
++                submissionService.complete(CurrentUser.idOf(jwt), submissionId, request));
+     }
+ }
+diff --git a/src/main/java/com/ttegeoji/backend/config/AiApiClientConfig.java b/src/main/java/com/ttegeoji/backend/config/AiApiClientConfig.java
+index 758b63d8287bd168a644eaaa0701bbbf6df39d2d..5417c60e3594b006b9333b264df5f4154cbc5976 100644
+--- a/src/main/java/com/ttegeoji/backend/config/AiApiClientConfig.java
++++ b/src/main/java/com/ttegeoji/backend/config/AiApiClientConfig.java
+@@ -20,7 +20,7 @@ public class AiApiClientConfig {
+ 
+     @Bean
+     public RestClient aiApiRestClient(GeojiProperties properties) {
+-        HttpClient httpClient = HttpClient.newBuilder()
++        HttpClient httpClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+                 .connectTimeout(CONNECT_TIMEOUT)
+                 .build();
+         RestClient.Builder builder = RestClient.builder()
+diff --git a/src/main/java/com/ttegeoji/backend/config/SecurityConfig.java b/src/main/java/com/ttegeoji/backend/config/SecurityConfig.java
+index c6f2ba3b0c64800cfadf18e0a6771bfdac1ce027..754a68b34764f1c7e9dadc59f36f06feaf6a20f3 100644
+--- a/src/main/java/com/ttegeoji/backend/config/SecurityConfig.java
++++ b/src/main/java/com/ttegeoji/backend/config/SecurityConfig.java
+@@ -55,7 +55,8 @@ public class SecurityConfig {
+                 "http://localhost:3800"
+         ));
+         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+-        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
++        config.setExposedHeaders(List.of("ETag", "Content-Disposition", "X-Content-SHA256"));
++        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
+ 
+         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+         source.registerCorsConfiguration("/**", config);
+diff --git a/src/main/java/com/ttegeoji/backend/media/CardRenderer.java b/src/main/java/com/ttegeoji/backend/media/CardRenderer.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..99f0e2ab44ac0dbf28adfdaee9521272a91bac5d
+--- /dev/null
++++ b/src/main/java/com/ttegeoji/backend/media/CardRenderer.java
+@@ -0,0 +1,194 @@
++package com.ttegeoji.backend.media;
++
++import com.ttegeoji.backend.verdictview.dto.ShareCardResponse;
++
++import org.springframework.stereotype.Component;
++
++import java.awt.Color;
++import java.awt.Font;
++import java.awt.FontMetrics;
++import java.awt.Graphics2D;
++import java.awt.RenderingHints;
++import java.awt.image.BufferedImage;
++import java.io.ByteArrayInputStream;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.regex.Pattern;
++
++import javax.imageio.ImageIO;
++
++/** 공유 카드 DTO만 받는다. 원문/양형 이유/투표 내역을 렌더러에 전달할 수 없다. */
++@Component
++public class CardRenderer {
++    public static final String TEMPLATE_VERSION = "share-card-v3";
++    private static final int TEXT_WIDTH = 950;
++    private static final int BODY_BASELINE = 980;
++    private static final int BODY_BOTTOM = 1270;
++    private static final Pattern GRAPHEME = Pattern.compile("\\X");
++    private final Font font;
++    private final String fontHash;
++
++    public CardRenderer(MediaProperties properties) {
++        Font loaded = null;
++        String hash = "missing-font";
++        try {
++            if (properties.fontPath() != null) {
++                byte[] bytes = Files.readAllBytes(properties.fontPath());
++                hash = MediaStorage.hash(bytes);
++                loaded = Font.createFonts(new ByteArrayInputStream(bytes))[0];
++                if (loaded.canDisplayUpTo("떼거지 판결 공유 유죄 무죄") != -1) loaded = null;
++            }
++        } catch (Exception ignored) {
++            /* 서버 API는 기동하고 카드 작업만 FONT_UNAVAILABLE로 실패시킨다. */
++        }
++        font = loaded;
++        fontHash = MediaStorage.hash(hash.getBytes(StandardCharsets.UTF_8));
++    }
++
++    public String fontHash() {
++        return fontHash;
++    }
++
++    public byte[] render(ShareCardResponse card, byte[] meme) throws Exception {
++        if (font == null) throw new IllegalStateException("FONT_UNAVAILABLE");
++        var canvas = new BufferedImage(1080, 1440, BufferedImage.TYPE_INT_RGB);
++        var g = canvas.createGraphics();
++        try {
++            g.setRenderingHint(
++                    RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
++            g.setRenderingHint(
++                    RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
++            g.setColor(new Color(249, 247, 242));
++            g.fillRect(0, 0, 1080, 1440);
++            g.setColor(new Color(35, 35, 30));
++            g.setFont(font.deriveFont(Font.BOLD, 32f));
++            g.drawString("떼거지 · 소비 재판  /  " + juryLabel(card.juryStatus()), 64, 86);
++            g.setColor(new Color(221, 83, 46));
++            g.fillRect(64, 112, 952, 5);
++            g.setColor(new Color(35, 35, 30));
++            g.setFont(font.deriveFont(Font.BOLD, 54f));
++            int y = 190;
++            for (String line : fixedLines(card.headline(), g.getFontMetrics(), 3)) {
++                g.drawString(line, 64, y);
++                y += 68;
++            }
++            if (meme != null) {
++                var image = ImageIO.read(new ByteArrayInputStream(meme));
++                if (image == null) throw new IllegalArgumentException("MEME_DECODE_FAILED");
++                double scale = Math.min(952.0 / image.getWidth(), 550.0 / image.getHeight());
++                int w = (int) (image.getWidth() * scale), h = (int) (image.getHeight() * scale);
++                g.drawImage(image, (1080 - w) / 2, 360 + (550 - h) / 2, w, h, null);
++            } else {
++                g.setColor(new Color(237, 232, 220));
++                g.fillRoundRect(64, 360, 952, 550, 24, 24);
++                g.setColor(new Color(95, 90, 80));
++                g.setFont(font.deriveFont(Font.BOLD, 58f));
++                g.drawString(
++                        switch (card.juryStatus()) {
++                            case "guilty" -> "유죄";
++                            case "notGuilty" -> "무죄";
++                            case "agree" -> "동의";
++                            default -> "기각";
++                        },
++                        420,
++                        650);
++            }
++            g.setColor(new Color(35, 35, 30));
++            TextBlock body = fitBody(String.join(" ", card.statement()), g);
++            g.setFont(body.font());
++            y = BODY_BASELINE;
++            for (String line : body.lines()) {
++                g.drawString(line, 64, y);
++                y += body.lineHeight();
++            }
++            // 형량은 본문 길이와 무관한 영역에 두어 최대 두 줄과 footer 사이 여백을 유지한다.
++            g.setFont(font.deriveFont(Font.BOLD, 30f));
++            y = 1310;
++            if (card.sentenceLabel() != null) {
++                for (String line : fixedLines(card.sentenceLabel(), g.getFontMetrics(), 2)) {
++                    g.drawString(line, 64, y);
++                    y += 36;
++                }
++            }
++            g.setColor(new Color(130, 122, 107));
++            g.setFont(font.deriveFont(22f));
++            g.drawString("함께 판단하고, 다음 소비는 더 신중하게.", 64, 1380);
++        } finally {
++            g.dispose();
++        }
++        return MediaStorage.png(canvas);
++    }
++
++    private static String juryLabel(String result) {
++        return switch (result) {
++            case "guilty" -> "유죄";
++            case "notGuilty" -> "무죄";
++            case "agree" -> "동의";
++            case "disagree" -> "기각";
++            default -> "각하";
++        };
++    }
++
++    private record TextBlock(Font font, List<String> lines, int lineHeight) {}
++
++    private TextBlock fitBody(String text, Graphics2D graphics) {
++        String normalized = normalizeWhitespace(text);
++        for (int size = 33; size >= 22; size--) {
++            Font candidate = font.deriveFont((float) size);
++            FontMetrics metrics = graphics.getFontMetrics(candidate);
++            List<String> lines = wrap(normalized, metrics, TEXT_WIDTH);
++            int lineHeight = (int) Math.ceil(metrics.getHeight() * 1.1);
++            int bottom =
++                    BODY_BASELINE
++                            + Math.max(0, lines.size() - 1) * lineHeight
++                            + metrics.getDescent();
++            if (bottom <= BODY_BOTTOM) {
++                return new TextBlock(candidate, lines, lineHeight);
++            }
++        }
++        // 계약 범위를 벗어나더라도 공개 문구를 조용히 잘라 READY로 저장하지 않는다.
++        throw new IllegalStateException("CARD_TEXT_OVERFLOW");
++    }
++
++    private static List<String> fixedLines(String text, FontMetrics metrics, int maximum) {
++        List<String> lines = wrap(normalizeWhitespace(text), metrics, TEXT_WIDTH);
++        if (lines.size() > maximum) throw new IllegalStateException("CARD_TEXT_OVERFLOW");
++        return lines;
++    }
++
++    static String normalizeWhitespace(String text) {
++        var normalized = new StringBuilder();
++        boolean pendingSpace = false;
++        for (int cp : text.codePoints().toArray()) {
++            if (Character.isWhitespace(cp) || Character.isSpaceChar(cp)) {
++                pendingSpace = !normalized.isEmpty();
++            } else {
++                if (pendingSpace) normalized.append(' ');
++                normalized.appendCodePoint(cp);
++                pendingSpace = false;
++            }
++        }
++        return normalized.toString();
++    }
++
++    /** 글자 묶음 단위로 줄바꿈하여 서로게이트 쌍·결합 문자·emoji ZWJ를 중간에서 자르지 않는다. */
++    static List<String> wrap(String text, FontMetrics metrics, int width) {
++        var lines = new ArrayList<String>();
++        var line = new StringBuilder();
++        var graphemes = GRAPHEME.matcher(text);
++        while (graphemes.find()) {
++            String next = graphemes.group();
++            if (!line.isEmpty() && metrics.stringWidth(line + next) > width) {
++                lines.add(line.toString());
++                line.setLength(0);
++            }
++            if (metrics.stringWidth(next) > width)
++                throw new IllegalStateException("CARD_TEXT_OVERFLOW");
++            line.append(next);
++        }
++        if (!line.isEmpty()) lines.add(line.toString());
++        return List.copyOf(lines);
++    }
++}
+diff --git a/src/main/java/com/ttegeoji/backend/media/CardService.java b/src/main/java/com/ttegeoji/backend/media/CardService.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..569e86e877cf3bdc1821367b3e7152f17dcc68e3
+--- /dev/null
++++ b/src/main/java/com/ttegeoji/backend/media/CardService.java
+@@ -0,0 +1,283 @@
++package com.ttegeoji.backend.media;
++
++import com.ttegeoji.backend.verdictview.PublicApiRejection;
++import com.ttegeoji.backend.verdictview.ShareCardAssembler;
++import com.ttegeoji.backend.verdictview.dto.ShareCardResponse;
++
++import org.springframework.http.HttpStatus;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.stereotype.Service;
++import org.springframework.web.server.ResponseStatusException;
++
++import tools.jackson.databind.json.JsonMapper;
++
++import java.net.HttpURLConnection;
++import java.net.URI;
++import java.nio.charset.StandardCharsets;
++import java.util.UUID;
++
++@Service
++public class CardService {
++    private static final JsonMapper JSON = JsonMapper.builder().build();
++    private final JdbcTemplate jdbc;
++    private final ShareCardAssembler assembler;
++    private final MediaStorage storage;
++    private final ImageService images;
++    private final CardRenderer renderer;
++    private final MediaProperties properties;
++
++    public CardService(
++            JdbcTemplate jdbc,
++            ShareCardAssembler assembler,
++            MediaStorage storage,
++            ImageService images,
++            CardRenderer renderer,
++            MediaProperties properties) {
++        this.jdbc = jdbc;
++        this.assembler = assembler;
++        this.storage = storage;
++        this.images = images;
++        this.renderer = renderer;
++        this.properties = properties;
++    }
++
++    public record CardView(
++            UUID id,
++            UUID postId,
++            String status,
++            String inputHash,
++            String pngSha256,
++            String pngUrl,
++            String downloadUrl,
++            String errorCode) {}
++
++    private record Input(
++            ShareCardResponse card,
++            String json,
++            String hash,
++            String memeHash,
++            boolean memeUnavailable) {}
++
++    public CardView request(UUID post, UUID user, boolean retry) {
++        Input input = input(post, user);
++        jdbc.update(
++                """
++                INSERT INTO share_card_jobs(post_id,requested_by,input_hash,input_json,meme_sha256,font_sha256)
++                VALUES (?,?,?,?::jsonb,?,?) ON CONFLICT(post_id,input_hash) DO NOTHING
++                """,
++                post,
++                user,
++                input.hash(),
++                input.json(),
++                input.memeHash(),
++                renderer.fontHash());
++        if (retry)
++            jdbc.update(
++                    """
++                    UPDATE share_card_jobs SET status='PENDING',error_code=NULL,requested_by=?,updated_at=now()
++                    WHERE post_id=? AND input_hash=? AND status='FAILED'
++                    """,
++                    user,
++                    post,
++                    input.hash());
++        return find(post, input.hash());
++    }
++
++    public CardView status(UUID post, UUID user) {
++        return find(post, input(post, user).hash());
++    }
++
++    public ImageService.ImageBytes content(UUID post, UUID user) {
++        CardView row = status(post, user);
++        if (!row.status().equals("READY"))
++            throw new ResponseStatusException(HttpStatus.CONFLICT, "카드가 아직 준비되지 않았습니다.");
++        return new ImageService.ImageBytes(
++                storage.get(row.pngSha256()), "image/png", row.pngSha256());
++    }
++
++    public void sharing(UUID post, UUID user, boolean enabled) {
++        if (!Boolean.TRUE.equals(
++                jdbc.queryForObject(
++                        "SELECT EXISTS(SELECT 1 FROM posts WHERE id=? AND author_id=? AND"
++                            + " deleted_at IS NULL)",
++                        Boolean.class,
++                        post,
++                        user))) throw missing();
++        jdbc.update(
++                """
++                INSERT INTO share_card_sharing(post_id,enabled) VALUES (?,?)
++                ON CONFLICT(post_id) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=now()
++                """,
++                post,
++                enabled);
++    }
++
++    private CardView find(UUID post, String hash) {
++        return jdbc
++                .query(
++                        "SELECT * FROM share_card_jobs WHERE post_id=? AND input_hash=?",
++                        (r, n) -> {
++                            boolean ready = "READY".equals(r.getString("status"));
++                            String base = "/api/posts/" + post + "/share-card";
++                            return new CardView(
++                                    r.getObject("id", UUID.class),
++                                    post,
++                                    r.getString("status"),
++                                    r.getString("input_hash"),
++                                    r.getString("png_sha256"),
++                                    ready ? base + "/png" : null,
++                                    ready ? base + "/download" : null,
++                                    r.getString("error_code"));
++                        },
++                        post,
++                        hash)
++                .stream()
++                .findFirst()
++                .orElseThrow(CardService::missing);
++    }
++
++    private Input input(UUID post, UUID user) {
++        ShareCardResponse card;
++        try {
++            card = assembler.assemble(post, user);
++        } catch (PublicApiRejection e) {
++            throw new ResponseStatusException(e.getStatus(), e.getMessage());
++        }
++        if (Boolean.TRUE.equals(
++                jdbc.queryForObject(
++                        "SELECT EXISTS(SELECT 1 FROM share_card_sharing WHERE post_id=? AND NOT"
++                            + " enabled)",
++                        Boolean.class,
++                        post))) throw missing();
++        String memeHash = null;
++        boolean memeUnavailable = false;
++        if (card.meme() != null && card.meme().imageUrl() != null) {
++            String url = card.meme().imageUrl();
++            byte[] bytes;
++            try {
++                if (url.matches("/api/memes/[a-f0-9-]+/image"))
++                    bytes = images.memeContent(UUID.fromString(card.meme().imageId())).bytes();
++                else bytes = fetchAllowedImage(url);
++                storage.validate(bytes);
++                memeHash = storage.put(bytes);
++            } catch (RuntimeException e) {
++                // 선택된 짤을 조용히 생략하지 않는다. 카드 작업만 실패 상태로 남겨 재시도하게 한다.
++                memeUnavailable = true;
++            }
++        }
++        String json = JSON.writeValueAsString(card);
++        String hash =
++                MediaStorage.hash(
++                        (CardRenderer.TEMPLATE_VERSION
++                                        + ":"
++                                        + renderer.fontHash()
++                                        + ":"
++                                        + memeHash
++                                        + ":"
++                                        + memeUnavailable
++                                        + ":"
++                                        + json)
++                                .getBytes(StandardCharsets.UTF_8));
++        return new Input(card, json, hash, memeHash, memeUnavailable);
++    }
++
++    /** 원격 이미지 URL은 배포자가 명시한 origin 하나에 한정하고 redirect/큰 파일/무한 대기를 금지한다. */
++    private byte[] fetchAllowedImage(String url) {
++        HttpURLConnection connection = null;
++        try {
++            URI uri = URI.create(url);
++            URI allowed = URI.create(properties.sourceOrigin());
++            if (uri.getUserInfo() != null
++                    || uri.getFragment() != null
++                    || !java.util.Set.of("http", "https").contains(uri.getScheme())
++                    || !uri.getScheme().equals(allowed.getScheme())
++                    || !java.util.Objects.equals(uri.getRawAuthority(), allowed.getRawAuthority()))
++                throw new IllegalArgumentException("허용되지 않은 짤 저장소입니다.");
++            connection = (HttpURLConnection) uri.toURL().openConnection();
++            connection.setConnectTimeout(500);
++            connection.setReadTimeout(2000);
++            connection.setInstanceFollowRedirects(false);
++            if (connection.getResponseCode() != 200)
++                throw new IllegalStateException("짤 이미지를 읽을 수 없습니다.");
++            if (connection.getContentLengthLong() > MediaStorage.MAX_BYTES)
++                throw new IllegalArgumentException("짤 이미지가 너무 큽니다.");
++            try (var stream = connection.getInputStream()) {
++                byte[] bytes = stream.readNBytes(MediaStorage.MAX_BYTES + 1);
++                storage.validate(bytes);
++                return bytes;
++            }
++        } catch (java.io.IOException e) {
++            throw new IllegalStateException("짤 이미지 로딩 실패", e);
++        } finally {
++            if (connection != null) connection.disconnect();
++        }
++    }
++
++    public boolean runCard() {
++        UUID token = UUID.randomUUID();
++        var jobs =
++                jdbc.queryForList(
++                        """
++                        WITH next AS (SELECT id FROM share_card_jobs WHERE status='PENDING'
++                        OR (status='RENDERING' AND lease_until<now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1)
++                        UPDATE share_card_jobs j SET status='RENDERING',lease_token=?,lease_until=now()+interval '30 seconds',
++                        attempts=attempts+1,updated_at=now() FROM next WHERE j.id=next.id RETURNING j.*
++                        """,
++                        token);
++        if (jobs.isEmpty()) return false;
++        var job = jobs.getFirst();
++        UUID id = (UUID) job.get("id");
++        UUID post = (UUID) job.get("post_id");
++        UUID user = (UUID) job.get("requested_by");
++        try {
++            Input current = input(post, user);
++            if (current.memeUnavailable()) throw new IllegalStateException("MEME_UNAVAILABLE");
++            if (!current.hash().equals(job.get("input_hash")))
++                throw new IllegalStateException("INPUT_CHANGED");
++            String recipe = current.hash();
++            byte[] bytes = storage.derived(recipe);
++            if (bytes == null) {
++                bytes =
++                        renderer.render(
++                                current.card(),
++                                current.memeHash() == null
++                                        ? null
++                                        : storage.get(current.memeHash()));
++                storage.saveDerived(recipe, bytes);
++            }
++            String hash = storage.put(bytes);
++            if (!input(post, user).hash().equals(current.hash()))
++                throw new IllegalStateException("INPUT_CHANGED");
++            jdbc.update(
++                    "UPDATE share_card_jobs SET"
++                        + " status='READY',png_sha256=?,error_code=NULL,lease_until=NULL,updated_at=now()"
++                        + " WHERE id=? AND lease_token=?",
++                    hash,
++                    id,
++                    token);
++        } catch (Exception e) {
++            String code =
++                    e instanceof ResponseStatusException
++                            ? "ACCESS_REVOKED"
++                            : "FONT_UNAVAILABLE".equals(e.getMessage())
++                                    ? "FONT_UNAVAILABLE"
++                                    : "INPUT_CHANGED".equals(e.getMessage())
++                                            ? "INPUT_CHANGED"
++                                            : "MEME_UNAVAILABLE".equals(e.getMessage())
++                                                    ? "MEME_UNAVAILABLE"
++                                                    : "RENDER_FAILED";
++            jdbc.update(
++                    "UPDATE share_card_jobs SET"
++                        + " status='FAILED',error_code=?,lease_until=NULL,updated_at=now() WHERE"
++                        + " id=? AND lease_token=?",
++                    code,
++                    id,
++                    token);
++        }
++        return true;
++    }
++
++    private static ResponseStatusException missing() {
++        return new ResponseStatusException(HttpStatus.NOT_FOUND, "공유 카드가 없습니다.");
++    }
++}
+diff --git a/src/main/java/com/ttegeoji/backend/media/ImageService.java b/src/main/java/com/ttegeoji/backend/media/ImageService.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..fb970d9da8710946a6e367a00ca878ea210a8c28
+--- /dev/null
++++ b/src/main/java/com/ttegeoji/backend/media/ImageService.java
+@@ -0,0 +1,497 @@
++package com.ttegeoji.backend.media;
++
++import com.ttegeoji.backend.domain.enums.MemeTag;
++
++import org.springframework.http.HttpStatus;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.PlatformTransactionManager;
++import org.springframework.transaction.support.TransactionTemplate;
++import org.springframework.web.multipart.MultipartFile;
++import org.springframework.web.server.ResponseStatusException;
++
++import java.awt.image.BufferedImage;
++import java.io.ByteArrayInputStream;
++import java.nio.charset.StandardCharsets;
++import java.util.Arrays;
++import java.util.List;
++import java.util.Set;
++import java.util.UUID;
++
++import javax.imageio.ImageIO;
++
++@Service
++public class ImageService {
++    public static final String TRANSFORM_VERSION = "grayscale-v1";
++    private final JdbcTemplate jdbc;
++    private final MediaStorage storage;
++    private final MediaProperties properties;
++    private final TransactionTemplate tx;
++
++    public ImageService(
++            JdbcTemplate jdbc,
++            MediaStorage storage,
++            MediaProperties properties,
++            PlatformTransactionManager manager) {
++        this.jdbc = jdbc;
++        this.storage = storage;
++        this.properties = properties;
++        this.tx = new TransactionTemplate(manager);
++    }
++
++    public record ImageView(
++            UUID id,
++            String sha256,
++            String mimeType,
++            int width,
++            int height,
++            String status,
++            String contentUrl,
++            String reviewStatus,
++            String selectedVersion) {}
++
++    public record TransformView(
++            UUID id,
++            UUID imageId,
++            String status,
++            String operation,
++            String sha256,
++            String contentUrl,
++            String errorCode) {}
++
++    public record CatalogView(
++            UUID id,
++            UUID imageId,
++            String tag,
++            boolean approved,
++            boolean active,
++            String imageUrl,
++            String selectedVersion) {}
++
++    public record ImageBytes(byte[] bytes, String mimeType, String hash) {}
++
++    public ImageView upload(UUID user, MultipartFile file) {
++        var image = storage.validate(file);
++        storage.put(image.bytes()); // DB 실패 후 같은 해시 파일을 재사용한다.
++        UUID id =
++                jdbc.queryForObject(
++                        """
++                        INSERT INTO media_images(owner_id,sha256,mime_type,width,height) VALUES (?,?,?,?,?)
++                        ON CONFLICT(owner_id,sha256) DO UPDATE SET sha256=EXCLUDED.sha256 RETURNING id
++                        """,
++                        UUID.class,
++                        user,
++                        image.sha256(),
++                        image.mimeType(),
++                        image.width(),
++                        image.height());
++        return get(user, id);
++    }
++
++    public ImageView get(UUID user, UUID id) {
++        return jdbc
++                .query(
++                        "SELECT * FROM media_images WHERE id=? AND owner_id=?",
++                        (r, n) ->
++                                new ImageView(
++                                        r.getObject("id", UUID.class),
++                                        r.getString("sha256"),
++                                        r.getString("mime_type"),
++                                        r.getInt("width"),
++                                        r.getInt("height"),
++                                        "PRIVATE",
++                                        "/api/images/" + id + "/content",
++                                        r.getString("review_status"),
++                                        r.getString("selected_version")),
++                        id,
++                        user)
++                .stream()
++                .findFirst()
++                .orElseThrow(ImageService::notFound);
++    }
++
++    public ImageView reviewImage(UUID user, UUID id, boolean approved, String version) {
++        get(user, id);
++        if (!Set.of("ORIGINAL", "GRAYSCALE").contains(version == null ? "" : version))
++            throw new IllegalArgumentException("검수할 버전이 필요합니다.");
++        if (approved
++                && version.equals("GRAYSCALE")
++                && !transformation(user, id).status().equals("READY"))
++            throw new ResponseStatusException(HttpStatus.CONFLICT, "변환 완료 후 검수할 수 있습니다.");
++        jdbc.update(
++                "UPDATE media_images SET review_status=?,selected_version=? WHERE id=? AND"
++                    + " owner_id=?",
++                approved ? "APPROVED" : "REJECTED",
++                approved ? version : null,
++                id,
++                user);
++        return get(user, id);
++    }
++
++    public ImageBytes content(UUID user, UUID id) {
++        var row = get(user, id);
++        return new ImageBytes(storage.get(row.sha256()), row.mimeType(), row.sha256());
++    }
++
++    public TransformView transform(UUID user, UUID id, String operation) {
++        get(user, id);
++        if (!"GRAYSCALE".equals(operation))
++            throw new IllegalArgumentException("지원 변환은 무료 로컬 GRAYSCALE입니다.");
++        jdbc.update(
++                """
++                INSERT INTO media_transforms(image_id,operation,version) VALUES (?, ?, ?)
++                ON CONFLICT(image_id,operation,version) DO UPDATE SET
++                  status=CASE WHEN media_transforms.status='FAILED' THEN 'PENDING' ELSE media_transforms.status END,
++                  error_code=CASE WHEN media_transforms.status='FAILED' THEN NULL ELSE media_transforms.error_code END,
++                  updated_at=now()
++                """,
++                id,
++                operation,
++                TRANSFORM_VERSION);
++        return transformation(user, id);
++    }
++
++    public TransformView transformation(UUID user, UUID id) {
++        get(user, id);
++        return jdbc
++                .query(
++                        "SELECT * FROM media_transforms WHERE image_id=? AND version=?",
++                        (r, n) ->
++                                new TransformView(
++                                        r.getObject("id", UUID.class),
++                                        id,
++                                        r.getString("status"),
++                                        r.getString("operation"),
++                                        r.getString("sha256"),
++                                        "READY".equals(r.getString("status"))
++                                                ? "/api/images/" + id + "/transform/content"
++                                                : null,
++                                        r.getString("error_code")),
++                        id,
++                        TRANSFORM_VERSION)
++                .stream()
++                .findFirst()
++                .orElseThrow(ImageService::notFound);
++    }
++
++    public ImageBytes transformedContent(UUID user, UUID id) {
++        var row = transformation(user, id);
++        if (!"READY".equals(row.status()))
++            throw new ResponseStatusException(HttpStatus.CONFLICT, "변환이 아직 완료되지 않았습니다.");
++        return new ImageBytes(storage.get(row.sha256()), "image/png", row.sha256());
++    }
++
++    public void requireAdmin(UUID user) {
++        if (!properties.adminIds().contains(user))
++            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "관리자 권한이 필요합니다.");
++    }
++
++    public CatalogView register(
++            UUID admin,
++            MultipartFile file,
++            String tag,
++            String strategies,
++            String emotions,
++            String keywords) {
++        requireAdmin(admin);
++        try {
++            MemeTag.valueOf(tag);
++        } catch (RuntimeException e) {
++            throw new IllegalArgumentException("유효한 짤 태그가 필요합니다.");
++        }
++        String[] ss = labels(strategies), ee = labels(emotions), kk = labels(keywords);
++        if (!Set.of(
++                        "DISAPPROVAL",
++                        "ABSURD_SERIOUSNESS",
++                        "SMUG",
++                        "PITY",
++                        "CELEBRATION",
++                        "RESIGNATION")
++                .containsAll(Arrays.asList(ee)))
++            throw new IllegalArgumentException("지원하지 않는 감정입니다.");
++        var image = upload(admin, file);
++        return tx.execute(
++                t -> {
++                    // 동일 관리자 원본의 중복 등록은 기존 카탈로그를 반환하고 승인/태그를 덮어쓰지 않는다.
++                    jdbc.queryForObject(
++                            "SELECT id FROM media_images WHERE id=? FOR UPDATE",
++                            UUID.class,
++                            image.id());
++                    var existing =
++                            jdbc.queryForList(
++                                    "SELECT id FROM meme_catalog_entries WHERE image_id=?",
++                                    UUID.class,
++                                    image.id());
++                    if (!existing.isEmpty()) return catalog(existing.getFirst());
++                    UUID id = UUID.randomUUID();
++                    String url = "/api/memes/" + id + "/image";
++                    jdbc.update(
++                            "INSERT INTO"
++                                + " meme_images(id,tag,strategies,emotions,keywords,image_url,is_active)"
++                                + " VALUES (?,?,?::text[],?::text[],?::text[],?,false)",
++                            id,
++                            tag,
++                            sqlArray(ss),
++                            sqlArray(ee),
++                            sqlArray(kk),
++                            url);
++                    jdbc.update(
++                            "INSERT INTO meme_catalog_entries(id,image_id) VALUES (?,?)",
++                            id,
++                            image.id());
++                    return catalog(id);
++                });
++    }
++
++    public List<CatalogView> list(UUID user) {
++        requireAdmin(user);
++        return jdbc.query(catalogSql() + " ORDER BY m.id", ImageService::catalogRow);
++    }
++
++    public CatalogView review(UUID user, UUID id, boolean approved) {
++        requireAdmin(user);
++        return tx.execute(
++                t -> {
++                    if (jdbc.update(
++                                    "UPDATE meme_catalog_entries SET"
++                                        + " approved=?,reviewed_by=?,reviewed_at=now() WHERE id=?",
++                                    approved,
++                                    user,
++                                    id)
++                            == 0) throw notFound();
++                    if (!approved)
++                        jdbc.update("UPDATE meme_images SET is_active=false WHERE id=?", id);
++                    return catalog(id);
++                });
++    }
++
++    public CatalogView active(UUID user, UUID id, boolean active) {
++        requireAdmin(user);
++        return tx.execute(
++                t -> {
++                    var approved =
++                            jdbc.queryForList(
++                                    "SELECT approved FROM meme_catalog_entries WHERE id=? FOR"
++                                        + " UPDATE",
++                                    Boolean.class,
++                                    id);
++                    if (approved.isEmpty()) throw notFound();
++                    if (active && !approved.getFirst())
++                        throw new ResponseStatusException(
++                                HttpStatus.CONFLICT, "검수 승인 후 활성화할 수 있습니다.");
++                    jdbc.update("UPDATE meme_images SET is_active=? WHERE id=?", active, id);
++                    return catalog(id);
++                });
++    }
++
++    public ImageBytes memeContent(UUID id) {
++        return catalogImage(id, true);
++    }
++
++    public ImageBytes adminContent(UUID user, UUID id) {
++        requireAdmin(user);
++        return catalogImage(id, false);
++    }
++
++    private ImageBytes catalogImage(UUID id, boolean requireActive) {
++        var rows =
++                jdbc.query(
++                        """
++                        SELECT CASE WHEN c.selected_version='GRAYSCALE' THEN t.sha256 ELSE i.sha256 END AS sha256,
++                               CASE WHEN c.selected_version='GRAYSCALE' THEN 'image/png' ELSE i.mime_type END AS mime_type
++                        FROM media_images i JOIN meme_catalog_entries c ON c.image_id=i.id
++                        JOIN meme_images m ON m.id=c.id
++                        LEFT JOIN media_transforms t ON t.image_id=i.id AND t.version=? AND t.status='READY'
++                        WHERE c.id=? AND (NOT ? OR (c.approved AND m.is_active))
++                        """,
++                        (r, n) -> new String[] {r.getString(1), r.getString(2)},
++                        TRANSFORM_VERSION,
++                        id,
++                        requireActive);
++        if (rows.isEmpty() || rows.getFirst()[0] == null) throw notFound();
++        return new ImageBytes(
++                storage.get(rows.getFirst()[0]), rows.getFirst()[1], rows.getFirst()[0]);
++    }
++
++    private UUID catalogOwner(UUID id) {
++        return jdbc
++                .queryForList(
++                        "SELECT i.owner_id FROM media_images i JOIN meme_catalog_entries c ON"
++                            + " c.image_id=i.id WHERE c.id=?",
++                        UUID.class,
++                        id)
++                .stream()
++                .findFirst()
++                .orElseThrow(ImageService::notFound);
++    }
++
++    public TransformView adminTransform(UUID user, UUID id, String operation) {
++        requireAdmin(user);
++        var c = catalog(id);
++        transform(catalogOwner(id), c.imageId(), operation);
++        return adminTransformation(user, id);
++    }
++
++    public TransformView adminTransformation(UUID user, UUID id) {
++        requireAdmin(user);
++        var c = catalog(id);
++        var t = transformation(catalogOwner(id), c.imageId());
++        return new TransformView(
++                t.id(),
++                t.imageId(),
++                t.status(),
++                t.operation(),
++                t.sha256(),
++                t.contentUrl() == null ? null : "/api/admin/memes/" + id + "/transform/content",
++                t.errorCode());
++    }
++
++    public ImageBytes adminTransformedContent(UUID user, UUID id) {
++        requireAdmin(user);
++        return transformedContent(catalogOwner(id), catalog(id).imageId());
++    }
++
++    public CatalogView selectVersion(UUID user, UUID id, String version) {
++        requireAdmin(user);
++        if (!Set.of("ORIGINAL", "GRAYSCALE").contains(version == null ? "" : version))
++            throw new IllegalArgumentException("이미지 버전이 필요합니다.");
++        return tx.execute(
++                t -> {
++                    var selected =
++                            jdbc.queryForList(
++                                    "SELECT selected_version FROM meme_catalog_entries WHERE id=?"
++                                        + " FOR UPDATE",
++                                    String.class,
++                                    id);
++                    if (selected.isEmpty()) throw notFound();
++                    if (selected.getFirst().equals(version)) return catalog(id);
++                    if (version.equals("GRAYSCALE")
++                            && !adminTransformation(user, id).status().equals("READY"))
++                        throw new ResponseStatusException(
++                                HttpStatus.CONFLICT, "변환 완료 후 선택할 수 있습니다.");
++                    jdbc.update(
++                            "UPDATE meme_catalog_entries SET"
++                                + " selected_version=?,approved=false,reviewed_by=NULL,reviewed_at=NULL"
++                                + " WHERE id=?",
++                            version,
++                            id);
++                    jdbc.update("UPDATE meme_images SET is_active=false WHERE id=?", id);
++                    return catalog(id);
++                });
++    }
++
++    private CatalogView catalog(UUID id) {
++        return jdbc.query(catalogSql() + " WHERE m.id=?", ImageService::catalogRow, id).stream()
++                .findFirst()
++                .orElseThrow(ImageService::notFound);
++    }
++
++    private static String catalogSql() {
++        return "SELECT m.id,c.image_id,m.tag,c.approved,m.is_active,m.image_url,c.selected_version"
++                   + " FROM meme_catalog_entries c JOIN meme_images m ON m.id=c.id";
++    }
++
++    private static CatalogView catalogRow(java.sql.ResultSet r, int n)
++            throws java.sql.SQLException {
++        return new CatalogView(
++                r.getObject("id", UUID.class),
++                r.getObject("image_id", UUID.class),
++                r.getString("tag"),
++                r.getBoolean("approved"),
++                r.getBoolean("is_active"),
++                r.getString("image_url"),
++                r.getString("selected_version"));
++    }
++
++    private static String[] labels(String value) {
++        if (value == null || value.isBlank()) return new String[0];
++        String[] labels =
++                Arrays.stream(value.split(","))
++                        .map(String::trim)
++                        .filter(s -> !s.isEmpty())
++                        .distinct()
++                        .toArray(String[]::new);
++        if (labels.length > 20
++                || Arrays.stream(labels)
++                        .anyMatch(
++                                s ->
++                                        s.length() > 60
++                                                || s.contains("{")
++                                                || s.contains("}")
++                                                || s.contains("\\")
++                                                || s.contains("\"")))
++            throw new IllegalArgumentException("태그는 20개 이하, 각 60자 이하이어야 합니다.");
++        return labels;
++    }
++
++    private static String sqlArray(String[] labels) {
++        return "{"
++                + String.join(",", Arrays.stream(labels).map(s -> "\"" + s + "\"").toList())
++                + "}";
++    }
++
++    static ResponseStatusException notFound() {
++        return new ResponseStatusException(HttpStatus.NOT_FOUND, "이미지가 없습니다.");
++    }
++
++    /** claim은 한 SQL로 커밋하고 디코딩/파일 쓰기는 트랜잭션 밖에서 수행한다. lease token이 이전 실행의 완료를 막는다. */
++    public boolean runTransform() {
++        UUID token = UUID.randomUUID();
++        var jobs =
++                jdbc.queryForList(
++                        """
++                        WITH next AS (SELECT id FROM media_transforms WHERE status='PENDING'
++                        OR (status='RENDERING' AND lease_until<now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1)
++                        UPDATE media_transforms j SET status='RENDERING',lease_token=?,lease_until=now()+interval '30 seconds',
++                        attempts=attempts+1,updated_at=now() FROM next WHERE j.id=next.id RETURNING j.*
++                        """,
++                        token);
++        if (jobs.isEmpty()) return false;
++        var job = jobs.getFirst();
++        UUID id = (UUID) job.get("id");
++        try {
++            String source =
++                    jdbc.queryForObject(
++                            "SELECT sha256 FROM media_images WHERE id=?",
++                            String.class,
++                            job.get("image_id"));
++            String recipe =
++                    MediaStorage.hash(
++                            (source + ":" + TRANSFORM_VERSION).getBytes(StandardCharsets.UTF_8));
++            byte[] output = storage.derived(recipe);
++            if (output == null) {
++                var original = ImageIO.read(new ByteArrayInputStream(storage.get(source)));
++                var gray =
++                        new BufferedImage(
++                                original.getWidth(),
++                                original.getHeight(),
++                                BufferedImage.TYPE_BYTE_GRAY);
++                var g = gray.createGraphics();
++                try {
++                    g.drawImage(original, 0, 0, null);
++                } finally {
++                    g.dispose();
++                }
++                output = MediaStorage.png(gray);
++                storage.saveDerived(recipe, output);
++            }
++            storage.validate(output);
++            String hash = storage.put(output);
++            jdbc.update(
++                    "UPDATE media_transforms SET"
++                        + " status='READY',sha256=?,error_code=NULL,lease_until=NULL,updated_at=now()"
++                        + " WHERE id=? AND lease_token=?",
++                    hash,
++                    id,
++                    token);
++        } catch (Exception e) {
++            jdbc.update(
++                    "UPDATE media_transforms SET"
++                        + " status='FAILED',error_code='TRANSFORM_FAILED',lease_until=NULL,updated_at=now()"
++                        + " WHERE id=? AND lease_token=?",
++                    id,
++                    token);
++        }
++        return true;
++    }
++}
+diff --git a/src/main/java/com/ttegeoji/backend/media/MediaProperties.java b/src/main/java/com/ttegeoji/backend/media/MediaProperties.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..91ef6e05fd82e63fd0af648b9a12fc9afb714472
+--- /dev/null
++++ b/src/main/java/com/ttegeoji/backend/media/MediaProperties.java
+@@ -0,0 +1,30 @@
++package com.ttegeoji.backend.media;
++
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.stereotype.Component;
++
++import java.nio.file.Path;
++import java.util.Arrays;
++import java.util.Set;
++import java.util.UUID;
++import java.util.stream.Collectors;
++
++@Component
++public record MediaProperties(Path root, Path fontPath, Set<UUID> adminIds, String sourceOrigin) {
++    @org.springframework.beans.factory.annotation.Autowired
++    public MediaProperties(
++            @Value("${geoji.media.root:./var/media}") String root,
++            @Value("${geoji.media.font-path:}") String fontPath,
++            @Value("${geoji.media.admin-ids:}") String adminIds,
++            @Value("${geoji.media.source-origin:}") String sourceOrigin) {
++        this(
++                Path.of(root).toAbsolutePath().normalize(),
++                fontPath.isBlank() ? null : Path.of(fontPath),
++                Arrays.stream(adminIds.split(","))
++                        .map(String::trim)
++                        .filter(s -> !s.isEmpty())
++                        .map(UUID::fromString)
++                        .collect(Collectors.toUnmodifiableSet()),
++                sourceOrigin);
++    }
++}
+diff --git a/src/main/java/com/ttegeoji/backend/media/MediaStorage.java b/src/main/java/com/ttegeoji/backend/media/MediaStorage.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..acf4dbcabe9f01f272312a2e49a0cb7782ea9227
+--- /dev/null
++++ b/src/main/java/com/ttegeoji/backend/media/MediaStorage.java
+@@ -0,0 +1,160 @@
++package com.ttegeoji.backend.media;
++
++import org.springframework.stereotype.Component;
++import org.springframework.web.multipart.MultipartFile;
++
++import java.awt.image.BufferedImage;
++import java.io.ByteArrayInputStream;
++import java.io.ByteArrayOutputStream;
++import java.io.IOException;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.StandardCopyOption;
++import java.security.MessageDigest;
++import java.security.NoSuchAlgorithmException;
++import java.util.HexFormat;
++
++import javax.imageio.ImageIO;
++
++/** 원본 이름/경로를 쓰지 않는 content-addressed 로컬 저장소. 외부 정적 파일 서비스에 노출하지 않는다. */
++@Component
++public class MediaStorage {
++    public static final int MAX_BYTES = 8 * 1024 * 1024;
++    private final Path root;
++
++    public MediaStorage(MediaProperties properties) {
++        root = properties.root();
++    }
++
++    public record Validated(byte[] bytes, String sha256, String mimeType, int width, int height) {}
++
++    public Validated validate(MultipartFile file) {
++        if (file.isEmpty() || file.getSize() > MAX_BYTES)
++            throw new IllegalArgumentException("이미지는 1바이트 이상 8MiB 이하이어야 합니다.");
++        try {
++            var result = validate(file.getBytes());
++            if (!result.mimeType().equals(file.getContentType()))
++                throw new IllegalArgumentException("파일 MIME과 실제 이미지 형식이 다릅니다.");
++            return result;
++        } catch (IOException e) {
++            throw new IllegalArgumentException("이미지 파일을 읽을 수 없습니다.");
++        }
++    }
++
++    public Validated validate(byte[] bytes) {
++        if (bytes.length == 0 || bytes.length > MAX_BYTES)
++            throw new IllegalArgumentException("이미지는 8MiB 이하이어야 합니다.");
++        try (var input = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
++            var readers = ImageIO.getImageReaders(input);
++            if (!readers.hasNext()) throw new IllegalArgumentException("디코딩 가능한 PNG/JPEG만 지원합니다.");
++            var reader = readers.next();
++            try {
++                String format = reader.getFormatName().toLowerCase(java.util.Locale.ROOT);
++                if (!format.equals("png") && !format.equals("jpeg") && !format.equals("jpg"))
++                    throw new IllegalArgumentException("PNG/JPEG만 지원합니다.");
++                reader.setInput(input, true, true);
++                int width = reader.getWidth(0), height = reader.getHeight(0);
++                if (width < 1
++                        || height < 1
++                        || width > 4096
++                        || height > 4096
++                        || (long) width * height > 16_000_000)
++                    throw new IllegalArgumentException("이미지는 각 변 4096px, 총 1600만 픽셀 이하이어야 합니다.");
++                if (reader.read(0) == null) throw new IllegalArgumentException("이미지가 손상되었습니다.");
++                return new Validated(
++                        bytes,
++                        hash(bytes),
++                        format.equals("png") ? "image/png" : "image/jpeg",
++                        width,
++                        height);
++            } finally {
++                reader.dispose();
++            }
++        } catch (IOException e) {
++            throw new IllegalArgumentException("이미지가 손상되었습니다.");
++        }
++    }
++
++    public String put(byte[] bytes) {
++        String hash = hash(bytes);
++        writeOnce(blob(hash), bytes);
++        return hash;
++    }
++
++    public byte[] get(String hash) {
++        try {
++            byte[] bytes = Files.readAllBytes(blob(hash));
++            if (!hash(bytes).equals(hash)) throw new IllegalStateException("저장 이미지 해시가 일치하지 않습니다.");
++            return bytes;
++        } catch (IOException e) {
++            throw new IllegalStateException("저장 이미지가 없습니다.", e);
++        }
++    }
++
++    public byte[] derived(String recipe) {
++        Path path = recipePath(recipe);
++        try {
++            return Files.exists(path) ? Files.readAllBytes(path) : null;
++        } catch (IOException e) {
++            throw new IllegalStateException("변환 결과를 읽을 수 없습니다.", e);
++        }
++    }
++
++    public void saveDerived(String recipe, byte[] bytes) {
++        writeOnce(recipePath(recipe), bytes);
++    }
++
++    private Path recipePath(String recipe) {
++        requireHash(recipe);
++        return root.resolve("derived").resolve(recipe + ".png");
++    }
++
++    private Path blob(String hash) {
++        requireHash(hash);
++        return root.resolve("blobs").resolve(hash.substring(0, 2)).resolve(hash);
++    }
++
++    private static void requireHash(String hash) {
++        if (hash == null || !hash.matches("[a-f0-9]{64}"))
++            throw new IllegalArgumentException("잘못된 이미지 해시입니다.");
++    }
++
++    private void writeOnce(Path destination, byte[] bytes) {
++        try {
++            Files.createDirectories(destination.getParent());
++            if (Files.exists(destination)) {
++                if (!MessageDigest.isEqual(Files.readAllBytes(destination), bytes))
++                    throw new IllegalStateException("저장 파일이 손상되었습니다.");
++                return;
++            }
++            Path temp = Files.createTempFile(destination.getParent(), ".write-", ".tmp");
++            try {
++                Files.write(temp, bytes);
++                Files.move(temp, destination, StandardCopyOption.ATOMIC_MOVE);
++            } finally {
++                Files.deleteIfExists(temp);
++            }
++        } catch (IOException e) {
++            throw new IllegalStateException("이미지 저장 실패", e);
++        }
++    }
++
++    public static String hash(byte[] bytes) {
++        try {
++            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
++        } catch (NoSuchAlgorithmException e) {
++            throw new IllegalStateException(e);
++        }
++    }
++
++    public static byte[] png(BufferedImage image) {
++        try {
++            var out = new ByteArrayOutputStream();
++            if (!ImageIO.write(image, "png", out))
++                throw new IllegalStateException("PNG 인코더가 없습니다.");
++            return out.toByteArray();
++        } catch (IOException e) {
++            throw new IllegalStateException("PNG 인코딩 실패", e);
++        }
++    }
++}
+diff --git a/src/main/java/com/ttegeoji/backend/media/MediaWorker.java b/src/main/java/com/ttegeoji/backend/media/MediaWorker.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..a5d697c682fc46524e717309d498d7bd8af19a63
+--- /dev/null
++++ b/src/main/java/com/ttegeoji/backend/media/MediaWorker.java
+@@ -0,0 +1,57 @@
++package com.ttegeoji.backend.media;
++
++import jakarta.annotation.PostConstruct;
++import jakarta.annotation.PreDestroy;
++
++import lombok.extern.slf4j.Slf4j;
++
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.stereotype.Component;
++
++import java.util.concurrent.Executors;
++import java.util.concurrent.ScheduledExecutorService;
++import java.util.concurrent.TimeUnit;
++
++/** 디코딩/파일 작업은 판결 watchdog 스케줄러를 막지 않는 전용 실행기에서 수행한다. */
++@Slf4j
++@Component
++@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
++        name = "geoji.media.enabled",
++        havingValue = "true",
++        matchIfMissing = true)
++public class MediaWorker {
++    private final CardService cards;
++    private final ImageService images;
++    private final long pollMs;
++    private final ScheduledExecutorService executor =
++            Executors.newSingleThreadScheduledExecutor(
++                    Thread.ofPlatform().daemon(true).name("media-worker").factory());
++
++    public MediaWorker(
++            CardService cards,
++            ImageService images,
++            @Value("${geoji.media.poll-ms:1000}") long pollMs) {
++        this.cards = cards;
++        this.images = images;
++        this.pollMs = Math.max(100, pollMs);
++    }
++
++    @PostConstruct
++    public void start() {
++        executor.scheduleWithFixedDelay(this::poll, pollMs, pollMs, TimeUnit.MILLISECONDS);
++    }
++
++    @PreDestroy
++    public void stop() {
++        executor.shutdownNow();
++    }
++
++    public void poll() {
++        try {
++            cards.runCard();
++            images.runTransform();
++        } catch (Exception e) {
++            log.warn("미디어 작업 재시도 대기: {}", e.getClass().getSimpleName());
++        }
++    }
++}
+diff --git a/src/main/java/com/ttegeoji/backend/privacy/InvalidationQueries.java b/src/main/java/com/ttegeoji/backend/privacy/InvalidationQueries.java
+index b403d72476f8db3b69aed3fc21e12764e6f09672..099d9cd2516f667dc5b1e05410b677825cba5d69 100644
+--- a/src/main/java/com/ttegeoji/backend/privacy/InvalidationQueries.java
++++ b/src/main/java/com/ttegeoji/backend/privacy/InvalidationQueries.java
+@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
+ import java.io.IOException;
+ import java.io.UncheckedIOException;
+ import java.nio.charset.StandardCharsets;
++import java.util.ArrayList;
+ import java.util.Arrays;
+ import java.util.List;
+ import java.util.Map;
+@@ -19,7 +20,7 @@ import java.util.regex.Pattern;
+ 
+ /**
+  * 10 §8 무효화용 조회·갱신. 트랜잭션은 호출자가 연다.
+- * invalidate_scope.sql 은 AI 저장소 database/sql/invalidate_scope.sql @ 72dac76ba7a1b4d8c017fa4ef73916c62511cbe2 복사본이다(10 §16.3).
++ * invalidate_scope.sql 은 AI 저장소 database/sql/invalidate_scope.sql 복사본이다(10 §16.3).
+  */
+ @Component
+ public class InvalidationQueries {
+@@ -38,6 +39,9 @@ public class InvalidationQueries {
+     public record AffectedVerdictText(UUID id, UUID verdictId, SpiceLevel intensity, long textVersion) {
+     }
+ 
++    private record SourceKey(String type, String id) {
++    }
++
+     private static final RowMapper<PendingInvalidation> PENDING = (rs, i) -> new PendingInvalidation(
+             rs.getLong("id"), rs.getString("scope_key"), rs.getString("source_type"), rs.getString("source_id"),
+             rs.getInt("attempts"));
+@@ -84,6 +88,25 @@ public class InvalidationQueries {
+                 "SELECT deleted_at IS NOT NULL FROM posts WHERE id = ?", Boolean.class, postId));
+     }
+ 
++    /** 과거 사건의 epoch가 현재 사건 snapshot에 없어도 삭제된 원천의 현재 인용은 즉시 가린다. */
++    public boolean citesDeletedSource(UUID verdictId, String intensity, long textVersion) {
++        return Boolean.TRUE.equals(jdbc.queryForObject("""
++                SELECT EXISTS (
++                    SELECT 1 FROM ai.text_evidence_refs r
++                    JOIN ai.evidence_sources es ON es.evidence_id = r.evidence_id
++                    WHERE r.verdict_id = ? AND r.intensity = ? AND r.text_version = ?
++                      AND (
++                        (es.source_type = 'POST' AND EXISTS (
++                            SELECT 1 FROM posts p WHERE p.id::text = es.source_id AND p.deleted_at IS NOT NULL))
++                        OR (es.source_type = 'VERDICT' AND EXISTS (
++                            SELECT 1 FROM verdicts v JOIN posts p ON p.id = v.post_id
++                            WHERE v.id::text = es.source_id AND p.deleted_at IS NOT NULL))
++                        OR (es.source_type = 'COMMENT' AND EXISTS (
++                            SELECT 1 FROM post_comments c JOIN posts p ON p.id = c.post_id
++                            WHERE c.id::text = es.source_id AND (c.deleted_at IS NOT NULL OR p.deleted_at IS NOT NULL)))
++                      ))""", Boolean.class, verdictId, intensity, textVersion));
++    }
++
+     public void insertPending(String scopeKey, String sourceType, String sourceId) {
+         jdbc.update("INSERT INTO privacy_invalidations (scope_key, source_type, source_id) VALUES (?, ?, ?)",
+                 scopeKey, sourceType, sourceId);
+@@ -109,19 +132,41 @@ public class InvalidationQueries {
+                    FOR UPDATE SKIP LOCKED""", PENDING, id).stream().findFirst();
+     }
+ 
+-    /** invalidate_scope.sql 5문장을 호출자 트랜잭션에서 차례로 실행한다 */
++    /** POST 작업은 같은 게시물의 판결·댓글 출처도 기존 SQL로 정리한다. 트랜잭션은 하나다. */
+     public void runInvalidateScope(String sourceType, String sourceId, String scopeKey) {
+-        Map<String, Object> params = Map.of("t", sourceType, "id", sourceId, "scope_key", scopeKey);
+-        for (String statement : invalidateStatements) {
+-            named.update(statement, params);
++        for (SourceKey source : invalidationSources(sourceType, sourceId)) {
++            Map<String, Object> params = Map.of("t", source.type(), "id", source.id(), "scope_key", scopeKey);
++            for (String statement : invalidateStatements) {
++                named.update(statement, params);
++            }
+         }
+     }
+ 
++    private List<SourceKey> invalidationSources(String sourceType, String sourceId) {
++        List<SourceKey> sources = new ArrayList<>();
++        sources.add(new SourceKey(sourceType, sourceId));
++        if ("POST".equals(sourceType)) {
++            sources.addAll(jdbc.query("""
++                    SELECT 'VERDICT' AS source_type, id::text AS source_id FROM verdicts WHERE post_id::text = ?
++                    UNION ALL
++                    SELECT 'COMMENT' AS source_type, id::text AS source_id FROM post_comments WHERE post_id::text = ?
++                    ORDER BY source_type, source_id""",
++                    (rs, i) -> new SourceKey(rs.getString("source_type"), rs.getString("source_id")), sourceId, sourceId));
++        }
++        return sources;
++    }
++
+     /**
+      * 무효화된 evidence(출처가 (t, id))를 현재 text_version 으로 인용한 verdict_texts.
+      * 이번 UPDATE 결과가 아니라 invalidated_at 으로 다시 찾으므로 재실행해도 같은 집합이다.
+      */
+     public List<AffectedVerdictText> findAffectedVerdictTexts(String sourceType, String sourceId) {
++        return invalidationSources(sourceType, sourceId).stream()
++                .flatMap(source -> findAffectedTextsForSource(source.type(), source.id()).stream())
++                .distinct().toList();
++    }
++
++    private List<AffectedVerdictText> findAffectedTextsForSource(String sourceType, String sourceId) {
+         return jdbc.query("""
+                 SELECT DISTINCT vt.id, vt.verdict_id, vt.intensity::text AS intensity, vt.text_version
+                   FROM ai.evidence_sources es
+diff --git a/src/main/java/com/ttegeoji/backend/privacy/VerdictReadGuard.java b/src/main/java/com/ttegeoji/backend/privacy/VerdictReadGuard.java
+index 5add8b13fb18f2395282543b672e861aa2f889dc..f9931b5c1a69d2685355e4a74796c9c2cfd0a610 100644
+--- a/src/main/java/com/ttegeoji/backend/privacy/VerdictReadGuard.java
++++ b/src/main/java/com/ttegeoji/backend/privacy/VerdictReadGuard.java
+@@ -29,6 +29,16 @@ public class VerdictReadGuard {
+     private final InvalidationQueries queries;
+     private final PrivacyEpochRepository epochs;
+ 
++    /** 현재 강도·버전 인용을 검사한다. 스케줄러 전에도 다른 사건의 POST·VERDICT·COMMENT 삭제가 반영된다. */
++    public Decision decide(UUID postId, String privacyEpochSnapshotJson, UUID verdictId,
++                           String intensity, long textVersion) {
++        Decision decision = decide(postId, privacyEpochSnapshotJson);
++        if (decision != Decision.ORIGINAL) {
++            return decision;
++        }
++        return queries.citesDeletedSource(verdictId, intensity, textVersion) ? Decision.TEMPLATE : Decision.ORIGINAL;
++    }
++
+     /**
+      * @param privacyEpochSnapshotJson verdict_texts.privacy_epoch_snapshot 원문 [{scope_key, epoch}]
+      */
+diff --git a/src/main/java/com/ttegeoji/backend/submission/SubmissionService.java b/src/main/java/com/ttegeoji/backend/submission/SubmissionService.java
+index 76fa7cc78002dd85449ff3511c28d2476d484a3c..94ba1db61f6c37318ab459fcb210bcfb978c0724 100644
+--- a/src/main/java/com/ttegeoji/backend/submission/SubmissionService.java
++++ b/src/main/java/com/ttegeoji/backend/submission/SubmissionService.java
+@@ -12,9 +12,12 @@ import com.ttegeoji.backend.submission.dto.CompleteRequest;
+ import com.ttegeoji.backend.submission.dto.SubmissionResponse;
+ import com.ttegeoji.backend.submission.dto.SubmitRequest;
+ import com.ttegeoji.backend.util.Json;
++
+ import jakarta.persistence.EntityManager;
+ import jakarta.persistence.LockModeType;
++
+ import lombok.extern.slf4j.Slf4j;
++
+ import org.springframework.http.HttpStatus;
+ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.PlatformTransactionManager;
+@@ -37,7 +40,8 @@ import java.util.function.Consumer;
+ public class SubmissionService {
+ 
+     // AI API 422 중 입력 검증 결과(10 §4). 백엔드 검증과 같아 보통 오지 않는다
+-    private static final Set<String> INPUT_CODES = Set.of("ITEM_LENGTH", "REASON_LENGTH", "AMOUNT", "INVALID_REQUEST");
++    private static final Set<String> INPUT_CODES =
++            Set.of("ITEM_LENGTH", "REASON_LENGTH", "AMOUNT", "INVALID_REQUEST");
+ 
+     private final IntakeClient intakeClient;
+     private final PostCreator postCreator;
+@@ -45,10 +49,17 @@ public class SubmissionService {
+     private final SubmissionRepository submissionRepository;
+     private final EntityManager entityManager;
+     private final TransactionTemplate tx;
++    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+ 
+-    public SubmissionService(IntakeClient intakeClient, PostCreator postCreator, SubmissionQueries queries,
+-                             SubmissionRepository submissionRepository, EntityManager entityManager,
+-                             PlatformTransactionManager transactionManager) {
++    public SubmissionService(
++            IntakeClient intakeClient,
++            PostCreator postCreator,
++            SubmissionQueries queries,
++            SubmissionRepository submissionRepository,
++            EntityManager entityManager,
++            PlatformTransactionManager transactionManager,
++            org.springframework.jdbc.core.JdbcTemplate jdbc) {
++        this.jdbc = jdbc;
+         this.intakeClient = intakeClient;
+         this.postCreator = postCreator;
+         this.queries = queries;
+@@ -58,35 +69,144 @@ public class SubmissionService {
+     }
+ 
+     public SubmissionResponse submit(UUID actorId, SubmitRequest request) {
+-        SubmissionPayload payload = SubmissionPayload.normalize(request.postType(), request.amountKrw(),
+-                request.category(), request.item(), request.reason(), request.roomIds());
++        return submit(actorId, request, null);
++    }
++
++    public SubmissionResponse submit(UUID actorId, SubmitRequest request, String requestKey) {
++        if (requestKey != null && !requestKey.matches("[A-Za-z0-9._:-]{1,128}")) {
++            throw new IllegalArgumentException("Idempotency-Key는 1~128자 영문·숫자·._:-이어야 합니다.");
++        }
++        SubmissionPayload payload =
++                SubmissionPayload.normalize(
++                        request.postType(),
++                        request.amountKrw(),
++                        request.category(),
++                        request.item(),
++                        request.reason(),
++                        request.roomIds());
+         requireMembership(actorId, payload);
+ 
+-        Submission created = submissionRepository.save(Submission.builder()
+-                .actorId(actorId)
+-                .payloadHash(payload.hash())
+-                .build());
++        Submission created =
++                requestKey == null
++                        ? submissionRepository.save(
++                                Submission.builder()
++                                        .actorId(actorId)
++                                        .payloadHash(payload.hash())
++                                        .build())
++                        : reserve(actorId, payload.hash(), requestKey);
++        if (created.getStatus() != SubmissionStatus.NEW) return response(created);
+         UUID submissionId = created.getId();
+ 
+-        IntakeResult intake = callIntake(submissionId, payload, Mode.INITIAL);
++        IntakeResult intake;
++        try {
++            intake = callIntake(submissionId, payload, Mode.INITIAL);
++        } catch (RuntimeException e) {
++            if (requestKey != null)
++                jdbc.update(
++                        "UPDATE submission_request_keys SET lease_until=now() WHERE actor_id=? AND"
++                            + " request_key=?",
++                        actorId,
++                        requestKey);
++            throw e;
++        }
+         return switch (intake.status()) {
+-            case PASS -> completed(submissionId, postCreator.create(submissionId, payload, intake, IntakeStatus.PASS),
+-                    payload, intake);
+-            case NEEDS_CLARIFICATION -> update(submissionId, s -> {
+-                s.setStatus(SubmissionStatus.NEEDS_INPUT);
+-                s.setQuestionShown(true);
+-                s.setIntakeResult(Json.write(intake.toMap()));
+-            });
+-            case BLOCKED -> update(submissionId, s -> {
+-                s.setStatus(SubmissionStatus.BLOCKED);
+-                s.setIntakeResult(Json.write(intake.toMap()));
+-            });
++            case PASS ->
++                    completed(
++                            submissionId,
++                            postCreator.create(submissionId, payload, intake, IntakeStatus.PASS),
++                            payload,
++                            intake);
++            case NEEDS_CLARIFICATION ->
++                    update(
++                            submissionId,
++                            s -> {
++                                s.setStatus(SubmissionStatus.NEEDS_INPUT);
++                                s.setQuestionShown(true);
++                                s.setIntakeResult(Json.write(intake.toMap()));
++                            });
++            case BLOCKED ->
++                    update(
++                            submissionId,
++                            s -> {
++                                s.setStatus(SubmissionStatus.BLOCKED);
++                                s.setIntakeResult(Json.write(intake.toMap()));
++                            });
+         };
+     }
+ 
++    /** 같은 키는 한 submission으로 수렴한다. HTTP는 잠금/트랜잭션 밖이며 중단된 NEW는 15초 lease 뒤 복구한다. */
++    private Submission reserve(UUID actor, String hash, String key) {
++        return tx.execute(
++                t -> {
++                    jdbc.update(
++                            "INSERT INTO submission_request_keys(actor_id,request_key,payload_hash)"
++                                + " VALUES (?,?,?) ON CONFLICT DO NOTHING",
++                            actor,
++                            key,
++                            hash);
++                    var row =
++                            jdbc.queryForMap(
++                                    "SELECT *,lease_until>now() AS leased FROM"
++                                        + " submission_request_keys WHERE actor_id=? AND"
++                                        + " request_key=? FOR UPDATE",
++                                    actor,
++                                    key);
++                    if (!hash.equals(row.get("payload_hash")))
++                        throw new IllegalStateException("Idempotency-Key에 다른 제출 내용이 있습니다.");
++                    Submission submission;
++                    if (row.get("submission_id") != null) {
++                        submission =
++                                submissionRepository
++                                        .findByIdAndActorId((UUID) row.get("submission_id"), actor)
++                                        .orElseThrow();
++                        if (submission.getStatus() != SubmissionStatus.NEW) return submission;
++                        if (Boolean.TRUE.equals(row.get("leased")))
++                            throw new IllegalStateException("같은 제출을 처리 중입니다. 잠시 뒤 같은 키로 재시도하세요.");
++                    } else {
++                        submission =
++                                submissionRepository.saveAndFlush(
++                                        Submission.builder()
++                                                .actorId(actor)
++                                                .payloadHash(hash)
++                                                .build());
++                    }
++                    jdbc.update(
++                            "UPDATE submission_request_keys SET"
++                                + " submission_id=?,lease_until=now()+interval '15 seconds' WHERE"
++                                + " actor_id=? AND request_key=?",
++                            submission.getId(),
++                            actor,
++                            key);
++                    return submission;
++                });
++    }
++
++    public SubmissionResponse get(UUID actor, UUID id) {
++        Submission submission =
++                submissionRepository
++                        .findByIdAndActorId(id, actor)
++                        .orElseThrow(
++                                () ->
++                                        new ResponseStatusException(
++                                                HttpStatus.NOT_FOUND, "제출이 없습니다."));
++        return submission.getIntakeResult() == null
++                ? new SubmissionResponse(
++                        id,
++                        submission.getStatus(),
++                        submission.getPayloadHash(),
++                        null,
++                        submission.getPostId())
++                : response(submission);
++    }
++
+     public SubmissionResponse complete(UUID actorId, UUID submissionId, CompleteRequest request) {
+-        Submission submission = submissionRepository.findByIdAndActorId(submissionId, actorId)
+-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "제출이 없습니다."));
++        Submission submission =
++                submissionRepository
++                        .findByIdAndActorId(submissionId, actorId)
++                        .orElseThrow(
++                                () ->
++                                        new ResponseStatusException(
++                                                HttpStatus.NOT_FOUND, "제출이 없습니다."));
+         // 중복 완료는 기존 post 를 돌려준다(10 §13 작업 7)
+         if (submission.getPostId() != null) {
+             return response(submission);
+@@ -95,8 +215,14 @@ public class SubmissionService {
+             throw new IllegalArgumentException("action 은 REVISE 또는 PROCEED 여야 합니다.");
+         }
+         requireRevision(submission, request.revision());
+-        SubmissionPayload payload = SubmissionPayload.normalize(request.postType(), request.amountKrw(),
+-                request.category(), request.item(), request.reason(), request.roomIds());
++        SubmissionPayload payload =
++                SubmissionPayload.normalize(
++                        request.postType(),
++                        request.amountKrw(),
++                        request.category(),
++                        request.item(),
++                        request.reason(),
++                        request.roomIds());
+         requireMembership(actorId, payload);
+ 
+         return request.action() == CompleteRequest.Action.PROCEED
+@@ -116,21 +242,24 @@ public class SubmissionService {
+             throw new IllegalStateException("검토한 값과 다릅니다. 고친 값은 REVISE 로 보내 주세요.");
+         }
+         IntakeResult last = IntakeResult.fromJson(submission.getIntakeResult());
+-        UUID postId = postCreator.create(submission.getId(), payload, last, IntakeStatus.UNCLARIFIED);
++        UUID postId =
++                postCreator.create(submission.getId(), payload, last, IntakeStatus.UNCLARIFIED);
+         return completed(submission.getId(), postId, payload, last);
+     }
+ 
+     // 고친 값으로 FINAL_CHECK 1회(final_check_count). FINAL_CHECK 가 BLOCKED 면 더 고칠 수 없다
+-    private SubmissionResponse revise(Submission submission, SubmissionPayload payload, String revision) {
++    private SubmissionResponse revise(
++            Submission submission, SubmissionPayload payload, String revision) {
+         requireRevisable(submission);
+         // FINAL_CHECK 기회를 먼저 잠그고 커밋한다. 같은 revision 으로 동시에 온 REVISE 는 한 번만 intake 를 부른다
+-        tx.executeWithoutResult(status -> {
+-            Submission locked = lock(submission.getId());
+-            requireRevision(locked, revision);
+-            requireRevisable(locked);
+-            locked.setFinalCheckCount(locked.getFinalCheckCount() + 1);
+-            locked.setPayloadHash(payload.hash());
+-        });
++        tx.executeWithoutResult(
++                status -> {
++                    Submission locked = lock(submission.getId());
++                    requireRevision(locked, revision);
++                    requireRevisable(locked);
++                    locked.setFinalCheckCount(locked.getFinalCheckCount() + 1);
++                    locked.setPayloadHash(payload.hash());
++                });
+ 
+         IntakeResult intake = callIntake(submission.getId(), payload, Mode.FINAL_CHECK);
+         return switch (intake.status()) {
+diff --git a/src/main/java/com/ttegeoji/backend/verdict/FinalizeService.java b/src/main/java/com/ttegeoji/backend/verdict/FinalizeService.java
+index c1071f35f4604fd4a580f8d55bb92a687121cec6..1989f3a7e98899da07a6bf7a7f29d5de43cd329b 100644
+--- a/src/main/java/com/ttegeoji/backend/verdict/FinalizeService.java
++++ b/src/main/java/com/ttegeoji/backend/verdict/FinalizeService.java
+@@ -5,6 +5,7 @@ import com.ttegeoji.backend.config.InternalApiException;
+ import com.ttegeoji.backend.domain.Verdict;
+ import com.ttegeoji.backend.domain.VerdictText;
+ import com.ttegeoji.backend.domain.enums.ContentSource;
++import com.ttegeoji.backend.domain.enums.VerdictType;
+ import com.ttegeoji.backend.domain.enums.Sentence;
+ import com.ttegeoji.backend.domain.enums.SentenceStatus;
+ import com.ttegeoji.backend.domain.enums.SpiceLevel;
+@@ -162,10 +163,11 @@ public class FinalizeService {
+         if (firstFix) {
+             var sentencing = request.sentencing();
+             verdict.setSentenceStatus(SentenceStatus.FINAL);
+-            verdict.setSentence(Sentence.valueOf(sentencing.sentence()));
+-            verdict.setSentenceSource(ContentSource.AI);
+-            verdict.setSentencingReason(sentencing.sentencingReason());
+-            verdict.setReasonSource(ContentSource.valueOf(sentencing.reasonSource()));
++            // 형량이 없는 무죄·동의·기각도 최초 확정은 FINAL이다.
++            verdict.setSentence(sentencing == null ? null : Sentence.valueOf(sentencing.sentence()));
++            verdict.setSentenceSource(sentencing == null ? null : ContentSource.AI);
++            verdict.setSentencingReason(sentencing == null ? null : sentencing.sentencingReason());
++            verdict.setReasonSource(sentencing == null ? null : ContentSource.valueOf(sentencing.reasonSource()));
+         }
+ 
+         // 9. 받은 강도 행을 새 text_version 으로. 나머지 강도 행은 그대로(TEXT_RETRY ⊆, 9/14 채택)
+@@ -268,7 +270,9 @@ public class FinalizeService {
+ 
+         // 형량: 최초는 DB 허용 목록 안, FINAL 이면 기존 형량·이유와 같아야 한다(D-19)
+         var sentencing = request.sentencing();
+-        if (firstFix) {
++        if (firstFix && verdict.getJuryResult() != VerdictType.guilty) {
++            if (sentencing != null) throw FinalizeRequestParser.invalid();
++        } else if (firstFix) {
+             JsonNode policy = readJson(verdict.getPolicySnapshot());
+             Set<String> allowed = new LinkedHashSet<>();
+             policy.path("allowed_sentences").values().forEach(item -> allowed.add(item.path("code").asString("")));
+diff --git a/src/main/java/com/ttegeoji/backend/verdictview/PostDetailAssembler.java b/src/main/java/com/ttegeoji/backend/verdictview/PostDetailAssembler.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..f7251d3d0eb9c9b3a46f24fc37958ae5a8df1e29
+--- /dev/null
++++ b/src/main/java/com/ttegeoji/backend/verdictview/PostDetailAssembler.java
+@@ -0,0 +1,51 @@
++package com.ttegeoji.backend.verdictview;
++
++import com.ttegeoji.backend.verdictview.dto.PostDetailResponse;
++import lombok.RequiredArgsConstructor;
++import org.springframework.http.HttpStatus;
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Transactional;
++
++import java.util.List;
++import java.util.UUID;
++
++/** 판결 조회 권한을 재사용하고 실제 투표 서비스의 마감·중복 조건을 표시한다. */
++@Service
++@RequiredArgsConstructor
++public class PostDetailAssembler {
++    private final VerdictViewQueries queries;
++    private final VerdictViewAssembler verdictViews;
++    private final PostDetailQueries details;
++
++    @Transactional(readOnly = true)
++    public PostDetailResponse assemble(UUID postId, UUID userId) {
++        var post = queries.findPost(postId).filter(p -> !p.deleted())
++                .orElseThrow(PublicApiRejection::notFound);
++        if (!verdictViews.canView(post, userId, null)) {
++            throw PublicApiRejection.notFound();
++        }
++        var detail = details.findVisible(postId, userId).orElseThrow(PublicApiRejection::notFound);
++        return response(detail, userId);
++    }
++
++    @Transactional(readOnly = true)
++    public List<PostDetailResponse> list(UUID roomId, UUID userId, int limit) {
++        if (!details.canViewRoom(roomId, userId)) {
++            throw PublicApiRejection.notFound();
++        }
++        if (limit < 1 || limit > 100) {
++            throw new PublicApiRejection(HttpStatus.BAD_REQUEST, "조회 개수는 1~100이어야 합니다.");
++        }
++        return details.recentInRoom(roomId, userId, limit).stream()
++                .map(detail -> response(detail, userId)).toList();
++    }
++
++    private PostDetailResponse response(PostDetailQueries.Detail detail, UUID userId) {
++        boolean author = detail.authorId().equals(userId);
++        boolean canVote = !author && !detail.roomIds().isEmpty() && !detail.deadlinePassed()
++                && detail.myVote() == null && detail.juryStatus() == null;
++        return new PostDetailResponse(detail.id(), detail.authorId(), detail.postType(), detail.amountKrw(),
++                detail.category(), detail.item(), detail.reason(), detail.roomIds(), detail.voteDeadlineAt(),
++                detail.myVote(), canVote, detail.juryStatus(), detail.textStatus());
++    }
++}
+diff --git a/src/main/java/com/ttegeoji/backend/verdictview/PostDetailQueries.java b/src/main/java/com/ttegeoji/backend/verdictview/PostDetailQueries.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..88c8e925e26a6f4387a39de6ba5f53adefb14478
+--- /dev/null
++++ b/src/main/java/com/ttegeoji/backend/verdictview/PostDetailQueries.java
+@@ -0,0 +1,84 @@
++package com.ttegeoji.backend.verdictview;
++
++import lombok.RequiredArgsConstructor;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.stereotype.Component;
++
++import java.sql.ResultSet;
++import java.sql.SQLException;
++import java.time.OffsetDateTime;
++import java.util.Arrays;
++import java.util.List;
++import java.util.Optional;
++import java.util.UUID;
++
++/** 사건 입력과 요청자 자신의 투표만 조회한다. 마감 판단은 투표 서비스와 같은 DB now(). */
++@Component
++@RequiredArgsConstructor
++public class PostDetailQueries {
++    private final JdbcTemplate jdbc;
++
++    public record Detail(UUID id, UUID authorId, String postType, int amountKrw, String category,
++                         String item, String reason, OffsetDateTime voteDeadlineAt,
++                         boolean deadlinePassed, String myVote, String juryStatus,
++                         String textStatus, List<UUID> roomIds) {
++    }
++
++    private static final String SELECT_DETAIL = """
++            SELECT p.id, p.author_id, p.post_type::text AS post_type, p.amount_krw,
++                   p.category, p.item, p.reason, p.vote_deadline_at,
++                   p.vote_deadline_at <= now() AS deadline_passed,
++                   (SELECT v.verdict::text FROM votes v
++                     WHERE v.post_id=p.id AND v.voter_id=?) AS my_vote,
++                   verdict.jury_result::text AS jury_status,
++                   COALESCE(verdict.text_status, 'PENDING') AS text_status,
++                   ARRAY(SELECT pr.room_id FROM post_rooms pr JOIN rooms r ON r.id=pr.room_id
++                          WHERE pr.post_id=p.id AND pr.revoked_at IS NULL AND r.deleted_at IS NULL
++                            AND (p.author_id=? OR EXISTS (SELECT 1 FROM room_members rm
++                                                         WHERE rm.room_id=pr.room_id AND rm.user_id=?))
++                          ORDER BY pr.room_id) AS room_ids
++              FROM posts p LEFT JOIN verdicts verdict ON verdict.post_id=p.id
++            """;
++
++    private static Detail map(ResultSet rs, int index) throws SQLException {
++        Object[] roomIds = (Object[]) rs.getArray("room_ids").getArray();
++        return new Detail(rs.getObject("id", UUID.class), rs.getObject("author_id", UUID.class),
++                rs.getString("post_type"), rs.getInt("amount_krw"), rs.getString("category"),
++                rs.getString("item"), rs.getString("reason"),
++                rs.getObject("vote_deadline_at", OffsetDateTime.class),
++                rs.getBoolean("deadline_passed"), rs.getString("my_vote"),
++                rs.getString("jury_status"), rs.getString("text_status"),
++                Arrays.stream(roomIds).map(id -> UUID.fromString(id.toString())).toList());
++    }
++
++    public Optional<Detail> findVisible(UUID postId, UUID userId) {
++        return jdbc.query(SELECT_DETAIL + """
++                         WHERE p.id=? AND p.deleted_at IS NULL
++                           AND (p.author_id=? OR EXISTS (
++                               SELECT 1 FROM post_rooms pr JOIN room_members rm ON rm.room_id=pr.room_id
++                               JOIN rooms r ON r.id=pr.room_id
++                                WHERE pr.post_id=p.id AND pr.revoked_at IS NULL AND rm.user_id=?
++                                  AND r.deleted_at IS NULL))
++                        """,
++                PostDetailQueries::map, userId, userId, userId, postId, userId, userId).stream().findFirst();
++    }
++
++    public boolean canViewRoom(UUID roomId, UUID userId) {
++        return Boolean.TRUE.equals(jdbc.queryForObject("""
++                SELECT EXISTS(SELECT 1 FROM rooms r JOIN room_members rm ON rm.room_id=r.id
++                               WHERE r.id=? AND r.deleted_at IS NULL AND rm.user_id=?)
++                """, Boolean.class, roomId, userId));
++    }
++
++    public List<Detail> recentInRoom(UUID roomId, UUID userId, int limit) {
++        return jdbc.query(SELECT_DETAIL + """
++                         WHERE p.deleted_at IS NULL AND EXISTS (
++                             SELECT 1 FROM post_rooms pr JOIN rooms r ON r.id=pr.room_id
++                             JOIN room_members rm ON rm.room_id=r.id
++                             WHERE pr.post_id=p.id AND pr.room_id=? AND pr.revoked_at IS NULL
++                               AND r.deleted_at IS NULL AND rm.user_id=?)
++                         ORDER BY p.created_at DESC, p.id DESC LIMIT ?
++                        """,
++                PostDetailQueries::map, userId, userId, userId, roomId, userId, limit);
++    }
++}
+diff --git a/src/main/java/com/ttegeoji/backend/verdictview/ShareCardAssembler.java b/src/main/java/com/ttegeoji/backend/verdictview/ShareCardAssembler.java
+index 073064ddc07fbff162a280b5bf47ffd16432eb95..a89c27ac98da262238ceb25269cbe6a5532b8737 100644
+--- a/src/main/java/com/ttegeoji/backend/verdictview/ShareCardAssembler.java
++++ b/src/main/java/com/ttegeoji/backend/verdictview/ShareCardAssembler.java
+@@ -49,7 +49,8 @@ public class ShareCardAssembler {
+         String headline = template.headline();
+         List<String> statement = template.statement();
+         if (text.isPresent()) {
+-            Decision decision = readGuard.decide(postId, text.get().privacyEpochSnapshotJson());
++            Decision decision = readGuard.decide(postId, text.get().privacyEpochSnapshotJson(), verdict.id(), intensity,
++                    text.get().textVersion());
+             if (decision == Decision.BLOCKED) {
+                 throw PublicApiRejection.notFound();
+             }
+diff --git a/src/main/java/com/ttegeoji/backend/verdictview/VerdictViewAssembler.java b/src/main/java/com/ttegeoji/backend/verdictview/VerdictViewAssembler.java
+index 633cef7879299dbc7f12a7fb125ea9db75b26544..09fe2429fd8d25c4e28cd16d57e5b321acf50f7b 100644
+--- a/src/main/java/com/ttegeoji/backend/verdictview/VerdictViewAssembler.java
++++ b/src/main/java/com/ttegeoji/backend/verdictview/VerdictViewAssembler.java
+@@ -73,7 +73,8 @@ public class VerdictViewAssembler {
+             return response(postId, verdict, null, poll);
+         }
+ 
+-        Decision decision = readGuard.decide(postId, text.get().privacyEpochSnapshotJson());
++        Decision decision = readGuard.decide(postId, text.get().privacyEpochSnapshotJson(), verdict.id(), intensity,
++                text.get().textVersion());
+         VerdictTextView view = switch (decision) {
+             case BLOCKED -> throw PublicApiRejection.notFound();
+             case TEMPLATE -> templateView(postId, verdict, intensity);
+diff --git a/src/main/java/com/ttegeoji/backend/verdictview/dto/PostDetailResponse.java b/src/main/java/com/ttegeoji/backend/verdictview/dto/PostDetailResponse.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..32db948b38b9566ab05e2135ece207945cd91759
+--- /dev/null
++++ b/src/main/java/com/ttegeoji/backend/verdictview/dto/PostDetailResponse.java
+@@ -0,0 +1,12 @@
++package com.ttegeoji.backend.verdictview.dto;
++
++import java.time.OffsetDateTime;
++import java.util.List;
++import java.util.UUID;
++
++/** 신규 posts 재판 화면 입력. 타인 표·사유·접근할 수 없는 방은 반환하지 않는다. */
++public record PostDetailResponse(UUID id, UUID authorId, String postType, int amountKrw,
++                                 String category, String item, String reason, List<UUID> roomIds,
++                                 OffsetDateTime voteDeadlineAt, String myVote, boolean canVote,
++                                 String juryStatus, String textStatus) {
++}
+diff --git a/src/main/resources/application.yml b/src/main/resources/application.yml
+index d223ecb92dc95efb74fd880d950f8020672c8056..22c84ed51b5fa0a95574e59fa2ac865a2df4048a 100644
+--- a/src/main/resources/application.yml
++++ b/src/main/resources/application.yml
+@@ -7,6 +7,11 @@ spring:
+     username: ${DB_USERNAME:postgres}
+     password: ${DB_PASSWORD:}
+ 
++  servlet:
++    multipart:
++      max-file-size: 8MB
++      max-request-size: 9MB
++
+   jpa:
+     open-in-view: false
+     hibernate:
+@@ -26,6 +31,11 @@ server:
+   port: ${PORT:8080}
+ 
+ geoji:
++  media:
++    root: ${GEOJI_MEDIA_ROOT:./var/media}
++    font-path: ${GEOJI_MEDIA_FONT_PATH:}
++    admin-ids: ${GEOJI_MEDIA_ADMIN_IDS:}
++    source-origin: ${GEOJI_MEDIA_SOURCE_ORIGIN:}
+   internal:
+     # 워커 ↔ 백엔드 양방향 같은 값(10 §4.7). 비어 있으면 내부 API 는 전부 401
+     service-token: ${SERVICE_AUTH_TOKEN:}
+@@ -37,3 +47,6 @@ geoji:
+ logging:
+   level:
+     org.hibernate.SQL: debug
++
++# 로컬 미디어 adapter. 파일은 JWT가 적용된 API로만 읽는다. 운영 스토리지는 별도 도입한다.
++# font-path는 배포 환경에서 명시적으로 제공하는 한국어 TTF/TTC 경로다.
+diff --git a/src/main/resources/sql/invalidate_scope.sql b/src/main/resources/sql/invalidate_scope.sql
+index 5595faf932d42c6ecda3aa520117726199f81598..0d5c0b2d621481a927f02d65d0f276740982bf28 100644
+--- a/src/main/resources/sql/invalidate_scope.sql
++++ b/src/main/resources/sql/invalidate_scope.sql
+@@ -1,4 +1,4 @@
+--- 출처: geoji-agent database/sql/invalidate_scope.sql @ 72dac76ba7a1b4d8c017fa4ef73916c62511cbe2 (그대로 복사, 10 §8·§16.3). 이 줄 아래를 고치지 않는다.
++-- 출처: geoji-agent database/sql/invalidate_scope.sql (2026-09-16 Q2 정정본, 그대로 복사, 10 §8·§16.3). 이 줄 아래를 고치지 않는다.
+ -- 04 §3.5 무효화 SQL. 백엔드 스케줄러가 한 트랜잭션으로 실행한다(10 §8). 우리가 제공하고 백엔드 저장소로 복사한다.
+ -- 바인드: :t = source_type, :id = source_id, :scope_key = privacy_epochs 의 scope_key.
+ -- node_results 조건은 원문 `privacy_versions ? :scope_key` 대신 `@>` 다. privacy_versions 는
+@@ -8,6 +8,8 @@ WITH hit AS (SELECT evidence_id FROM ai.evidence_sources WHERE source_type = :t
+ UPDATE ai.evidence SET invalidated_at = now() WHERE id IN (SELECT evidence_id FROM hit) AND invalidated_at IS NULL;
+ UPDATE ai.dossiers d SET invalidated_at = now() WHERE invalidated_at IS NULL AND EXISTS (SELECT 1 FROM ai.evidence e WHERE e.dossier_id = d.id AND e.invalidated_at IS NOT NULL);
+ UPDATE ai.trial_prep SET status = 'INVALIDATED', invalidated_at = now() WHERE dossier_id IN (SELECT id FROM ai.dossiers WHERE invalidated_at IS NOT NULL) AND invalidated_at IS NULL;
+-UPDATE ai.memory_facts SET deleted_at = now() WHERE deleted_at IS NULL AND source_type = :t AND source_id = :id;
++-- POST 삭제·철회는 같은 게시물에서 파생한 VERDICT·COMMENT·RULE_HIT 등도 정리한다.
++UPDATE ai.memory_facts SET deleted_at = now() WHERE deleted_at IS NULL
++  AND ((source_type = :t AND source_id = :id) OR (:t = 'POST' AND payload ->> 'post_id' = :id));
+ UPDATE ai.node_results SET invalidated_at = now() WHERE invalidated_at IS NULL AND privacy_versions @> jsonb_build_array(jsonb_build_object('scope_key', CAST(:scope_key AS text)));
+ -- text_evidence_refs → verdict view 템플릿 전환은 백엔드(10 §8)
+diff --git a/src/test/java/com/ttegeoji/backend/ai/AiHttpVersionTest.java b/src/test/java/com/ttegeoji/backend/ai/AiHttpVersionTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..b9d8af95728cf63af3325ae410c3f8b0fe6b1be0
+--- /dev/null
++++ b/src/test/java/com/ttegeoji/backend/ai/AiHttpVersionTest.java
+@@ -0,0 +1,65 @@
++package com.ttegeoji.backend.ai;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import com.sun.net.httpserver.HttpServer;
++import com.ttegeoji.backend.config.AiApiClientConfig;
++import com.ttegeoji.backend.config.GeojiProperties;
++import com.ttegeoji.backend.domain.enums.PostType;
++
++import org.junit.jupiter.api.Test;
++
++import java.net.InetSocketAddress;
++import java.nio.charset.StandardCharsets;
++import java.util.ArrayList;
++import java.util.UUID;
++
++class AiHttpVersionTest {
++    @Test
++    void allAiClientsSendHttp11WithoutH2cUpgrade() throws Exception {
++        var upgrades = new ArrayList<String>();
++        var bodies = new ArrayList<String>();
++        var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
++        server.createContext(
++                "/",
++                exchange -> {
++                    upgrades.add(exchange.getRequestHeaders().getFirst("Upgrade"));
++                    bodies.add(
++                            new String(
++                                    exchange.getRequestBody().readAllBytes(),
++                                    StandardCharsets.UTF_8));
++                    var bytes = "{}".getBytes(StandardCharsets.UTF_8);
++                    exchange.getResponseHeaders().add("Content-Type", "application/json");
++                    exchange.sendResponseHeaders(200, bytes.length);
++                    exchange.getResponseBody().write(bytes);
++                    exchange.close();
++                });
++        server.start();
++        try {
++            var config =
++                    new GeojiProperties(
++                            new GeojiProperties.Internal("test"),
++                            new GeojiProperties.Ai(
++                                    "http://127.0.0.1:" + server.getAddress().getPort()),
++                            "guardrail-v2");
++            var client = new AiApiClientConfig().aiApiRestClient(config);
++            client.get().uri("/base").retrieve().toBodilessEntity();
++            new IntakeClient(client, config)
++                    .call(
++                            new IntakeClient.IntakeRequest(
++                                    UUID.randomUUID().toString(),
++                                    "hash",
++                                    IntakeClient.Mode.INITIAL,
++                                    PostType.spent,
++                                    1000,
++                                    "식비",
++                                    "밥",
++                                    null));
++            new AiTraceClient(client).fetch(UUID.randomUUID());
++            assertThat(upgrades).hasSize(3).containsOnlyNulls();
++            assertThat(bodies.get(1)).contains("\"item\":\"밥\"", "\"amount_krw\":1000");
++        } finally {
++            server.stop(0);
++        }
++    }
++}
+diff --git a/src/test/java/com/ttegeoji/backend/api/MediaApiTest.java b/src/test/java/com/ttegeoji/backend/api/MediaApiTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..d9b5fcc0667d000d06fce598ed0586472d409a13
+--- /dev/null
++++ b/src/test/java/com/ttegeoji/backend/api/MediaApiTest.java
+@@ -0,0 +1,319 @@
++package com.ttegeoji.backend.api;
++
++import static com.ttegeoji.backend.api.PostVerdictControllerTest.as;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
++
++import com.ttegeoji.backend.support.PostgresContainerSupport;
++
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.mock.web.MockMultipartFile;
++import org.springframework.security.oauth2.jwt.JwtDecoder;
++import org.springframework.test.context.bean.override.mockito.MockitoBean;
++import org.springframework.test.web.servlet.MockMvc;
++
++import tools.jackson.databind.json.JsonMapper;
++
++import java.awt.image.BufferedImage;
++import java.io.ByteArrayOutputStream;
++import java.util.UUID;
++
++import javax.imageio.ImageIO;
++
++@SpringBootTest(
++        properties = {
++            "geoji.media.root=/private/tmp/geoji-media-test",
++            "geoji.media.enabled=true",
++            "geoji.media.admin-ids=00000000-0000-4000-8000-000000000001",
++            "geoji.media.poll-ms=100",
++            "geoji.media.font-path=/System/Library/Fonts/AppleSDGothicNeo.ttc"
++        })
++@AutoConfigureMockMvc
++@org.springframework.test.annotation.DirtiesContext(
++        classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
++class MediaApiTest extends PostgresContainerSupport {
++    @Autowired MockMvc mvc;
++    @Autowired JdbcTemplate jdbc;
++    @MockitoBean JwtDecoder decoder;
++    private PostVerdictControllerTest.Fixtures f;
++    private UUID author, member, post, room;
++    private static final UUID ADMIN = UUID.fromString("00000000-0000-4000-8000-000000000001");
++    private static final JsonMapper JSON = JsonMapper.builder().build();
++
++    @BeforeEach
++    void seed() {
++        jdbc.update(
++                "INSERT INTO profiles(id,nickname,monthly_budget) VALUES (?,'admin',0) ON CONFLICT"
++                        + " DO NOTHING",
++                ADMIN);
++        f = new PostVerdictControllerTest.Fixtures(jdbc);
++        author = f.profile();
++        member = f.profile();
++        room = f.room(author, "mild");
++        f.member(room, author);
++        f.member(room, member);
++        post = f.post(author, "spent", "now() + interval '1 hour'");
++        f.share(post, room);
++        f.verdict(post, "guilty", "FINAL", "oneDay", "비공개 양형", "TEMPLATE_READY", 1, "mild");
++    }
++
++    private String card() {
++        return "/api/posts/" + post + "/share-card";
++    }
++
++    static byte[] png() throws Exception {
++        var image = new BufferedImage(32, 24, BufferedImage.TYPE_INT_RGB);
++        image.setRGB(0, 0, 0xFFFF3300);
++        var out = new ByteArrayOutputStream();
++        ImageIO.write(image, "png", out);
++        return out.toByteArray();
++    }
++
++    @Test
++    void pngIsStoredOnceAndProtectedAfterRevocationAndDeletion() throws Exception {
++        mvc.perform(post(card() + "/render").with(as(author))).andExpect(status().isAccepted());
++        String status = "";
++        for (int i = 0; i < 100; i++) {
++            status =
++                    mvc.perform(get(card() + "/render").with(as(author)))
++                            .andExpect(status().isOk())
++                            .andReturn()
++                            .getResponse()
++                            .getContentAsString();
++            if (JSON.readTree(status).path("status").asString().equals("READY")) break;
++            Thread.sleep(100);
++        }
++        assertThat(JSON.readTree(status).path("status").asString()).isEqualTo("READY");
++        byte[] inline =
++                mvc.perform(get(card() + "/png").with(as(member)))
++                        .andExpect(status().isOk())
++                        .andExpect(content().contentType("image/png"))
++                        .andReturn()
++                        .getResponse()
++                        .getContentAsByteArray();
++        byte[] download =
++                mvc.perform(get(card() + "/download").with(as(author)))
++                        .andExpect(status().isOk())
++                        .andExpect(header().exists("Content-Disposition"))
++                        .andReturn()
++                        .getResponse()
++                        .getContentAsByteArray();
++        assertThat(inline).isEqualTo(download);
++        assertThat(ImageIO.read(new java.io.ByteArrayInputStream(inline)).getWidth())
++                .isEqualTo(1080);
++        mvc.perform(post(card() + "/render").with(as(author))).andExpect(status().isAccepted());
++        assertThat(
++                        jdbc.queryForObject(
++                                "select count(*) from share_card_jobs where post_id = ?",
++                                Integer.class,
++                                post))
++                .isEqualTo(1);
++        mvc.perform(get(card() + "/png")).andExpect(status().isUnauthorized());
++        f.revoke(post, room);
++        mvc.perform(get(card() + "/png").with(as(member))).andExpect(status().isNotFound());
++        jdbc.update("update posts set deleted_at=now() where id=?", post);
++        mvc.perform(get(card() + "/download").with(as(author))).andExpect(status().isNotFound());
++    }
++
++    @Test
++    void privateImageValidatesBytesAndDoesNotTrustFilenameOrOwner() throws Exception {
++        var bad = new MockMultipartFile("file", "safe.png", "image/png", "<svg/>".getBytes());
++        mvc.perform(multipart("/api/images").file(bad).with(as(author)))
++                .andExpect(status().isBadRequest());
++        var file = new MockMultipartFile("file", "../../safe.png", "image/png", png());
++        var body =
++                mvc.perform(multipart("/api/images").file(file).with(as(author)))
++                        .andExpect(status().isCreated())
++                        .andExpect(jsonPath("$.status").value("PRIVATE"))
++                        .andReturn()
++                        .getResponse()
++                        .getContentAsString();
++        String id = JSON.readTree(body).path("id").asString();
++        mvc.perform(get("/api/images/" + id + "/content").with(as(member)))
++                .andExpect(status().isNotFound());
++        mvc.perform(get("/api/images/" + id + "/content").with(as(author)))
++                .andExpect(status().isOk())
++                .andExpect(content().bytes(png()));
++        mvc.perform(multipart("/api/images").file(file).with(as(author)))
++                .andExpect(jsonPath("$.id").value(id));
++        mvc.perform(
++                        multipart("/api/admin/memes")
++                                .file(file)
++                                .param("tag", "GUILTY_HEAVY")
++                                .with(as(author)))
++                .andExpect(status().isForbidden());
++    }
++
++    @Test
++    void catalogReviewAndActivationAreSeparateAndTransformNeedsFreshReview() throws Exception {
++        var file = new MockMultipartFile("file", "meme.png", "image/png", png());
++        String body =
++                mvc.perform(
++                                multipart("/api/admin/memes")
++                                        .file(file)
++                                        .param("tag", "GUILTY_HEAVY")
++                                        .param("emotions", "DISAPPROVAL")
++                                        .with(as(ADMIN)))
++                        .andExpect(status().isCreated())
++                        .andExpect(jsonPath("$.approved").value(false))
++                        .andExpect(jsonPath("$.active").value(false))
++                        .andReturn()
++                        .getResponse()
++                        .getContentAsString();
++        String id = JSON.readTree(body).path("id").asString();
++        String base = "/api/admin/memes/" + id;
++        mvc.perform(get(base + "/image").with(as(ADMIN)))
++                .andExpect(status().isOk())
++                .andExpect(content().bytes(png()));
++        mvc.perform(get("/api/memes/" + id + "/image").with(as(member)))
++                .andExpect(status().isNotFound());
++        mvc.perform(
++                        put(base + "/active")
++                                .with(as(ADMIN))
++                                .contentType("application/json")
++                                .content("{\"active\":true}"))
++                .andExpect(status().isConflict());
++        mvc.perform(
++                        post(base + "/review")
++                                .with(as(ADMIN))
++                                .contentType("application/json")
++                                .content("{\"approved\":true}"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.active").value(false));
++        mvc.perform(
++                        put(base + "/active")
++                                .with(as(ADMIN))
++                                .contentType("application/json")
++                                .content("{\"active\":true}"))
++                .andExpect(status().isOk());
++        mvc.perform(get("/api/memes/" + id + "/image").with(as(member))).andExpect(status().isOk());
++        mvc.perform(
++                        post(base + "/transform")
++                                .with(as(ADMIN))
++                                .contentType("application/json")
++                                .content("{\"operation\":\"GRAYSCALE\"}"))
++                .andExpect(status().isAccepted());
++        for (int i = 0; i < 100; i++) {
++            String state =
++                    mvc.perform(get(base + "/transform").with(as(ADMIN)))
++                            .andReturn()
++                            .getResponse()
++                            .getContentAsString();
++            if (JSON.readTree(state).path("status").asString().equals("READY")) break;
++            Thread.sleep(100);
++        }
++        mvc.perform(
++                        put(base + "/image-version")
++                                .with(as(ADMIN))
++                                .contentType("application/json")
++                                .content("{\"version\":\"GRAYSCALE\"}"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.approved").value(false))
++                .andExpect(jsonPath("$.active").value(false));
++    }
++
++    @Test
++    void transformExpiredLeaseReusesFileAndSharingCanBeWithdrawn() throws Exception {
++        var file = new MockMultipartFile("file", "meme.png", "image/png", png());
++        String upload =
++                mvc.perform(multipart("/api/images").file(file).with(as(author)))
++                        .andReturn()
++                        .getResponse()
++                        .getContentAsString();
++        String id = JSON.readTree(upload).path("id").asString();
++        String base = "/api/images/" + id;
++        mvc.perform(
++                        post(base + "/transform")
++                                .with(as(author))
++                                .contentType("application/json")
++                                .content("{\"operation\":\"GRAYSCALE\"}"))
++                .andExpect(status().isAccepted());
++        String ready = "";
++        for (int i = 0; i < 100; i++) {
++            ready =
++                    mvc.perform(get(base + "/transform").with(as(author)))
++                            .andReturn()
++                            .getResponse()
++                            .getContentAsString();
++            if (JSON.readTree(ready).path("status").asString().equals("READY")) break;
++            Thread.sleep(100);
++        }
++        String hash = JSON.readTree(ready).path("sha256").asString();
++        assertThat(hash).hasSize(64);
++        mvc.perform(
++                        post(base + "/review")
++                                .with(as(author))
++                                .contentType("application/json")
++                                .content("{\"approved\":true,\"version\":\"GRAYSCALE\"}"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.selectedVersion").value("GRAYSCALE"));
++        jdbc.update(
++                "UPDATE media_transforms SET status='RENDERING',lease_until=now()-interval '1"
++                        + " second',sha256=NULL WHERE image_id=?",
++                UUID.fromString(id));
++        for (int i = 0; i < 100; i++) {
++            String state =
++                    mvc.perform(get(base + "/transform").with(as(author)))
++                            .andReturn()
++                            .getResponse()
++                            .getContentAsString();
++            if (JSON.readTree(state).path("status").asString().equals("READY")) break;
++            Thread.sleep(100);
++        }
++        mvc.perform(get(base + "/transform").with(as(author)))
++                .andExpect(jsonPath("$.sha256").value(hash));
++        mvc.perform(
++                        put(card() + "/sharing")
++                                .with(as(member))
++                                .contentType("application/json")
++                                .content("{\"enabled\":false}"))
++                .andExpect(status().isNotFound());
++        mvc.perform(
++                        put(card() + "/sharing")
++                                .with(as(author))
++                                .contentType("application/json")
++                                .content("{\"enabled\":false}"))
++                .andExpect(status().isOk());
++        mvc.perform(post(card() + "/render").with(as(author))).andExpect(status().isNotFound());
++    }
++
++    @Test
++    void unavailableMemeFailsOnlyCardAndCanBeRetried() throws Exception {
++        UUID meme = f.meme("GUILTY_HEAVY", "http://127.0.0.1:1/missing.png");
++        jdbc.update("UPDATE verdicts SET meme_image_id=? WHERE post_id=?", meme, post);
++        mvc.perform(post(card() + "/render").with(as(author))).andExpect(status().isAccepted());
++        for (int i = 0; i < 100; i++) {
++            String body =
++                    mvc.perform(get(card() + "/render").with(as(author)))
++                            .andReturn()
++                            .getResponse()
++                            .getContentAsString();
++            if (JSON.readTree(body).path("status").asString().equals("FAILED")) break;
++            Thread.sleep(100);
++        }
++        mvc.perform(get(card() + "/render").with(as(author)))
++                .andExpect(jsonPath("$.status").value("FAILED"))
++                .andExpect(jsonPath("$.errorCode").value("MEME_UNAVAILABLE"));
++        assertThat(
++                        jdbc.queryForObject(
++                                "SELECT sentence_status FROM verdicts WHERE post_id=?",
++                                String.class,
++                                post))
++                .isEqualTo("FINAL");
++        mvc.perform(post(card() + "/render/retry").with(as(author)))
++                .andExpect(status().isAccepted());
++        assertThat(
++                        jdbc.queryForObject(
++                                "SELECT count(*) FROM share_card_jobs WHERE post_id=?",
++                                Integer.class,
++                                post))
++                .isEqualTo(1);
++    }
++}
+diff --git a/src/test/java/com/ttegeoji/backend/api/MediaRecoveryTest.java b/src/test/java/com/ttegeoji/backend/api/MediaRecoveryTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..eecaf11eb2b950830d053ccfbefc4bf6f0ae373f
+--- /dev/null
++++ b/src/test/java/com/ttegeoji/backend/api/MediaRecoveryTest.java
+@@ -0,0 +1,136 @@
++package com.ttegeoji.backend.api;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.assertj.core.api.Assertions.assertThatThrownBy;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.ArgumentMatchers.startsWith;
++import static org.mockito.Mockito.doCallRealMethod;
++import static org.mockito.Mockito.doThrow;
++
++import com.ttegeoji.backend.media.CardService;
++import com.ttegeoji.backend.media.ImageService;
++import com.ttegeoji.backend.media.MediaStorage;
++import com.ttegeoji.backend.support.PostgresContainerSupport;
++
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.dao.DataAccessResourceFailureException;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.mock.web.MockMultipartFile;
++import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
++
++import java.awt.image.BufferedImage;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.attribute.FileTime;
++import java.util.UUID;
++
++/** 프로세스 중단/DB 응답 유실의 DB 상태를 재현한다. 실제 서버 재시작은 별도 E2E 러너가 검증한다. */
++@SpringBootTest(
++        properties = {
++            "geoji.media.root=/private/tmp/geoji-media-recovery-test",
++            "geoji.media.font-path=/System/Library/Fonts/AppleSDGothicNeo.ttc",
++            "geoji.media.enabled=false"
++        })
++class MediaRecoveryTest extends PostgresContainerSupport {
++    @Autowired ImageService images;
++    @Autowired CardService cards;
++    @Autowired MediaStorage storage;
++    @MockitoSpyBean JdbcTemplate jdbc;
++    private PostVerdictControllerTest.Fixtures f;
++    private UUID owner;
++
++    @BeforeEach
++    void seed() {
++        f = new PostVerdictControllerTest.Fixtures(jdbc);
++        owner = f.profile();
++    }
++
++    private MockMultipartFile file() {
++        var image = new BufferedImage(20, 20, BufferedImage.TYPE_INT_RGB);
++        image.setRGB(1, 1, UUID.randomUUID().hashCode());
++        return new MockMultipartFile("file", "valid.png", "image/png", MediaStorage.png(image));
++    }
++
++    @Test
++    void transformSavedBeforeDatabaseFailureIsReusedOnRetry() throws Exception {
++        var image = images.upload(owner, file());
++        images.transform(owner, image.id(), "GRAYSCALE");
++        doThrow(new DataAccessResourceFailureException("simulated completion failure"))
++                .when(jdbc)
++                .update(
++                        startsWith("UPDATE media_transforms SET status='READY'"),
++                        any(Object[].class));
++        try {
++            images.runTransform();
++        } finally {
++            doCallRealMethod()
++                    .when(jdbc)
++                    .update(
++                            startsWith("UPDATE media_transforms SET status='READY'"),
++                            any(Object[].class));
++        }
++        assertThat(images.transformation(owner, image.id()).status()).isEqualTo("FAILED");
++        String recipe =
++                MediaStorage.hash(
++                        (image.sha256() + ":" + ImageService.TRANSFORM_VERSION)
++                                .getBytes(StandardCharsets.UTF_8));
++        Path derived = Path.of("/private/tmp/geoji-media-recovery-test/derived", recipe + ".png");
++        assertThat(Files.exists(derived)).isTrue();
++        FileTime savedTime = FileTime.fromMillis(1234);
++        Files.setLastModifiedTime(derived, savedTime);
++        images.transform(owner, image.id(), "GRAYSCALE");
++        images.runTransform();
++        assertThat(images.transformation(owner, image.id()).status()).isEqualTo("READY");
++        assertThat(Files.getLastModifiedTime(derived)).isEqualTo(savedTime);
++    }
++
++    @Test
++    void cardExpiredRenderingLeaseRecoversSameStoredPng() throws Exception {
++        UUID post = f.post(owner, "spent", "now()+interval '1 hour'");
++        f.verdict(post, "guilty", "FINAL", "oneDay", "비공개", "TEMPLATE_READY", 1, "mild");
++        var job = cards.request(post, owner, false);
++        for (int i = 0; i < 10 && !cards.status(post, owner).status().equals("READY"); i++)
++            cards.runCard();
++        String hash = cards.status(post, owner).pngSha256();
++        assertThat(hash).hasSize(64);
++        Path derived =
++                Path.of("/private/tmp/geoji-media-recovery-test/derived", job.inputHash() + ".png");
++        FileTime savedTime = FileTime.fromMillis(1234);
++        Files.setLastModifiedTime(derived, savedTime);
++        jdbc.update(
++                "UPDATE share_card_jobs SET status='RENDERING',lease_until=now()-interval '1"
++                    + " second',png_sha256=NULL WHERE id=?",
++                job.id());
++        cards.runCard();
++        assertThat(cards.status(post, owner).status()).isEqualTo("READY");
++        assertThat(cards.content(post, owner).hash()).isEqualTo(hash);
++        assertThat(Files.getLastModifiedTime(derived)).isEqualTo(savedTime);
++    }
++
++    @Test
++    void mimeDimensionsAndTraversalAreValidatedBeforeWriting() throws Exception {
++        var valid = file();
++        var wrongMime = new MockMultipartFile("file", "ok.jpg", "image/jpeg", valid.getBytes());
++        assertThatThrownBy(() -> images.upload(owner, wrongMime))
++                .isInstanceOf(IllegalArgumentException.class);
++        var oversized =
++                new MockMultipartFile(
++                        "file", "big.png", "image/png", new byte[MediaStorage.MAX_BYTES + 1]);
++        assertThatThrownBy(() -> images.upload(owner, oversized))
++                .isInstanceOf(IllegalArgumentException.class);
++        var wide =
++                new MockMultipartFile(
++                        "file",
++                        "wide.png",
++                        "image/png",
++                        MediaStorage.png(new BufferedImage(4097, 1, BufferedImage.TYPE_INT_RGB)));
++        assertThatThrownBy(() -> images.upload(owner, wide))
++                .isInstanceOf(IllegalArgumentException.class);
++        assertThatThrownBy(() -> storage.get("../../secret"))
++                .isInstanceOf(IllegalArgumentException.class);
++    }
++}
+diff --git a/src/test/java/com/ttegeoji/backend/api/PostDetailControllerTest.java b/src/test/java/com/ttegeoji/backend/api/PostDetailControllerTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..de3187569402b25371517ef7959484d5b636fb53
+--- /dev/null
++++ b/src/test/java/com/ttegeoji/backend/api/PostDetailControllerTest.java
+@@ -0,0 +1,171 @@
++package com.ttegeoji.backend.api;
++
++import com.ttegeoji.backend.api.PostVerdictControllerTest.Fixtures;
++import com.ttegeoji.backend.support.PostgresContainerSupport;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.security.oauth2.jwt.JwtDecoder;
++import org.springframework.test.context.bean.override.mockito.MockitoBean;
++import org.springframework.test.web.servlet.MockMvc;
++
++import java.util.UUID;
++
++import static com.ttegeoji.backend.api.PostVerdictControllerTest.as;
++import static org.hamcrest.Matchers.containsInAnyOrder;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++
++@SpringBootTest
++@AutoConfigureMockMvc
++class PostDetailControllerTest extends PostgresContainerSupport {
++    @Autowired private MockMvc mockMvc;
++    @Autowired private JdbcTemplate jdbc;
++    @MockitoBean private JwtDecoder jwtDecoder;
++
++    private Fixtures f;
++    private UUID author;
++    private UUID voter;
++    private UUID room;
++    private UUID postId;
++
++    @BeforeEach
++    void seed() {
++        f = new Fixtures(jdbc);
++        author = f.profile();
++        voter = f.profile();
++        room = f.room(author, "mild");
++        f.member(room, author);
++        f.member(room, voter);
++        postId = f.post(author, "spent", "now() + interval '1 hour'");
++        f.share(postId, room);
++    }
++
++    @Test
++    @DisplayName("14 §6 신규 사건 상세는 실제 posts 입력과 투표 상태를 보여 주고 타방 id는 숨긴다")
++    void memberReadsOnlyVisibleRooms() throws Exception {
++        UUID hiddenRoom = f.room(author, "spicy");
++        f.member(hiddenRoom, author);
++        f.share(postId, hiddenRoom);
++        mockMvc.perform(get("/api/posts/" + postId).with(as(voter)))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.id").value(postId.toString()))
++                .andExpect(jsonPath("$.authorId").value(author.toString()))
++                .andExpect(jsonPath("$.postType").value("spent"))
++                .andExpect(jsonPath("$.amountKrw").value(98765))
++                .andExpect(jsonPath("$.category").value("식비"))
++                .andExpect(jsonPath("$.item").value("비밀마라탕"))
++                .andExpect(jsonPath("$.reason").value("야근했음"))
++                .andExpect(jsonPath("$.roomIds").value(containsInAnyOrder(room.toString())))
++                .andExpect(jsonPath("$.voteDeadlineAt").isString())
++                .andExpect(jsonPath("$.myVote").value((Object) null))
++                .andExpect(jsonPath("$.canVote").value(true));
++    }
++
++    @Test
++    @DisplayName("14 §6 작성자는 자기 사건을 조회하되 투표할 수 없다")
++    void authorCannotVote() throws Exception {
++        mockMvc.perform(get("/api/posts/" + postId).with(as(author)))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.canVote").value(false));
++    }
++
++    @Test
++    @DisplayName("14 §6 투표한 사용자는 자신의 평결만 보며 다시 투표할 수 없다")
++    void returnsOwnVote() throws Exception {
++        f.vote(postId, voter, room, "notGuilty");
++        mockMvc.perform(get("/api/posts/" + postId).with(as(voter)))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.myVote").value("notGuilty"))
++                .andExpect(jsonPath("$.canVote").value(false));
++        mockMvc.perform(get("/api/posts/" + postId).with(as(author)))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.myVote").value((Object) null));
++    }
++
++    @Test
++    @DisplayName("14 §6 DB 마감 또는 평결 확정 뒤에는 투표할 수 없다")
++    void closedVoting() throws Exception {
++        jdbc.update("UPDATE posts SET vote_deadline_at=now()-interval '1 second' WHERE id=?", postId);
++        mockMvc.perform(get("/api/posts/" + postId).with(as(voter)))
++                .andExpect(status().isOk()).andExpect(jsonPath("$.canVote").value(false));
++        jdbc.update("UPDATE posts SET vote_deadline_at=now()+interval '1 hour' WHERE id=?", postId);
++        f.verdict(postId, "notGuilty", "FINAL", null, null, "AI_READY", 1, "mild");
++        mockMvc.perform(get("/api/posts/" + postId).with(as(voter)))
++                .andExpect(status().isOk()).andExpect(jsonPath("$.canVote").value(false));
++    }
++
++    @Test
++    @DisplayName("10 §8 비회원·삭제·공유 철회·없는 사건은 같은 404")
++    void unavailablePostIs404() throws Exception {
++        mockMvc.perform(get("/api/posts/" + postId).with(as(f.profile())))
++                .andExpect(status().isNotFound());
++        mockMvc.perform(get("/api/posts/" + UUID.randomUUID()).with(as(author)))
++                .andExpect(status().isNotFound());
++        f.revoke(postId, room);
++        mockMvc.perform(get("/api/posts/" + postId).with(as(voter)))
++                .andExpect(status().isNotFound());
++        jdbc.update("UPDATE posts SET deleted_at=now() WHERE id=?", postId);
++        mockMvc.perform(get("/api/posts/" + postId).with(as(author)))
++                .andExpect(status().isNotFound());
++    }
++
++    @Test
++    @DisplayName("14 §6 실제 사건 상세는 JWT가 필요하다")
++    void requiresAuthentication() throws Exception {
++        mockMvc.perform(get("/api/posts/" + postId)).andExpect(status().isUnauthorized());
++    }
++
++    @Test
++    @DisplayName("14 §6 방 피드는 신규 posts와 판결 상태를 최신순으로 보여 준다")
++    void roomFeedIncludesVerdictStatusAndLimit() throws Exception {
++        UUID newer = f.post(author, "considering", "now()+interval '1 hour'");
++        f.share(newer, room);
++        jdbc.update("UPDATE posts SET created_at=now()+interval '1 second' WHERE id=?", newer);
++        f.verdict(newer, "agree", "FINAL", null, null, "AI_READY", 1, "mild");
++        mockMvc.perform(get("/api/rooms/" + room + "/posts?limit=1").with(as(voter)))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.length()").value(1))
++                .andExpect(jsonPath("$[0].id").value(newer.toString()))
++                .andExpect(jsonPath("$[0].juryStatus").value("agree"))
++                .andExpect(jsonPath("$[0].textStatus").value("AI_READY"))
++                .andExpect(jsonPath("$[0].canVote").value(false));
++        mockMvc.perform(get("/api/rooms/" + room + "/posts?limit=0").with(as(voter)))
++                .andExpect(status().isBadRequest());
++        mockMvc.perform(get("/api/rooms/" + room + "/posts?limit=101").with(as(voter)))
++                .andExpect(status().isBadRequest());
++    }
++
++    @Test
++    @DisplayName("10 §8 방 피드는 삭제·철회 게시물을 제외하고 비회원·삭제방은 404")
++    void roomFeedPrivacy() throws Exception {
++        UUID revoked = f.post(author, "spent", "now()+interval '1 hour'");
++        UUID deleted = f.post(author, "spent", "now()+interval '1 hour'");
++        f.share(revoked, room);
++        f.share(deleted, room);
++        f.revoke(revoked, room);
++        jdbc.update("UPDATE posts SET deleted_at=now() WHERE id=?", deleted);
++        mockMvc.perform(get("/api/rooms/" + room + "/posts").with(as(voter)))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.length()").value(1))
++                .andExpect(jsonPath("$[0].id").value(postId.toString()))
++                .andExpect(jsonPath("$[0].juryStatus").value((Object) null))
++                .andExpect(jsonPath("$[0].textStatus").value("PENDING"));
++        mockMvc.perform(get("/api/rooms/" + room + "/posts").with(as(f.profile())))
++                .andExpect(status().isNotFound());
++        jdbc.update("UPDATE rooms SET deleted_at=now() WHERE id=?", room);
++        mockMvc.perform(get("/api/rooms/" + room + "/posts").with(as(author)))
++                .andExpect(status().isNotFound());
++        mockMvc.perform(get("/api/posts/" + postId).with(as(voter)))
++                .andExpect(status().isNotFound());
++        mockMvc.perform(get("/api/posts/" + postId).with(as(author)))
++                .andExpect(status().isOk()).andExpect(jsonPath("$.roomIds").isEmpty());
++        mockMvc.perform(get("/api/rooms/" + room + "/posts"))
++                .andExpect(status().isUnauthorized());
++    }
++}
+diff --git a/src/test/java/com/ttegeoji/backend/media/CardRendererTest.java b/src/test/java/com/ttegeoji/backend/media/CardRendererTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..caaa3c695e0a7efc0952978b4736610231198908
+--- /dev/null
++++ b/src/test/java/com/ttegeoji/backend/media/CardRendererTest.java
+@@ -0,0 +1,148 @@
++package com.ttegeoji.backend.media;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import com.ttegeoji.backend.verdictview.dto.MemeView;
++import com.ttegeoji.backend.verdictview.dto.ShareCardResponse;
++
++import org.junit.jupiter.api.Test;
++
++import java.awt.image.BufferedImage;
++import java.io.ByteArrayInputStream;
++import java.util.List;
++
++import javax.imageio.ImageIO;
++
++class CardRendererTest {
++    @Test
++    void resultIsVisibleInHeaderEvenWhenMemeIsPresent() throws Exception {
++        var props =
++                new MediaProperties(
++                        "/private/tmp/geoji-card-renderer-test",
++                        "/System/Library/Fonts/AppleSDGothicNeo.ttc",
++                        "",
++                        "");
++        var renderer = new CardRenderer(props);
++        byte[] meme = MediaStorage.png(new BufferedImage(30, 30, BufferedImage.TYPE_INT_RGB));
++        var guilty = ImageIO.read(new ByteArrayInputStream(renderer.render(card("guilty"), meme)));
++        var innocent =
++                ImageIO.read(new ByteArrayInputStream(renderer.render(card("notGuilty"), meme)));
++        int different = 0;
++        for (int y = 0; y < 115; y++) {
++            for (int x = 0; x < 1080; x++) {
++                if (guilty.getRGB(x, y) != innocent.getRGB(x, y)) different++;
++            }
++        }
++        assertThat(different).isGreaterThan(100);
++    }
++
++    @Test
++    void fullThreeHundredKoreanCharactersRemainVisibleAboveTwoLineSentenceAndFooter()
++            throws Exception {
++        var renderer =
++                new CardRenderer(
++                        new MediaProperties(
++                                "/private/tmp/geoji-card-renderer-test",
++                                "/System/Library/Fonts/AppleSDGothicNeo.ttc",
++                                "",
++                                ""));
++        byte[] meme = MediaStorage.png(new BufferedImage(30, 30, BufferedImage.TYPE_INT_RGB));
++        String first = "가".repeat(295) + "끝까지표시";
++        String second = "가".repeat(295) + "다른마침말";
++        String sentence = "형량".repeat(25);
++        var left =
++                ImageIO.read(
++                        new ByteArrayInputStream(renderer.render(longCard(first, sentence), meme)));
++        var right =
++                ImageIO.read(
++                        new ByteArrayInputStream(
++                                renderer.render(longCard(second, sentence), meme)));
++        int different = 0;
++        for (int y = 940; y < 1270; y++) {
++            for (int x = 0; x < 1080; x++) {
++                if (left.getRGB(x, y) != right.getRGB(x, y)) different++;
++            }
++        }
++        assertThat(first.codePointCount(0, first.length())).isEqualTo(300);
++        assertThat(different).as("300자 본문의 마지막 글자도 본문 영역에 표시된다").isGreaterThan(100);
++        int outside = 0;
++        for (int y = 1270; y < 1440; y++) {
++            for (int x = 0; x < 1080; x++) {
++                if (left.getRGB(x, y) != right.getRGB(x, y)) outside++;
++            }
++        }
++        assertThat(outside).as("본문이 형량/하단 문구 영역으로 넘치지 않는다").isZero();
++    }
++
++    @Test
++    void unnecessaryWhitespaceDoesNotWasteBodyLines() throws Exception {
++        var renderer =
++                new CardRenderer(
++                        new MediaProperties(
++                                "/private/tmp/geoji-card-renderer-test",
++                                "/System/Library/Fonts/AppleSDGothicNeo.ttc",
++                                "",
++                                ""));
++        byte[] meme = MediaStorage.png(new BufferedImage(30, 30, BufferedImage.TYPE_INT_RGB));
++        byte[] normalized = renderer.render(longCard("공개 문구는 끝까지 확인합니다", "형량"), meme);
++        byte[] separated = renderer.render(longCard("공개\n\n문구는\t끝까지 확인합니다", "형량"), meme);
++        assertThat(separated).isEqualTo(normalized);
++    }
++
++    @Test
++    void wrappingKeepsGraphemeClustersAndEveryCharacter() {
++        var canvas = new BufferedImage(200, 200, BufferedImage.TYPE_INT_RGB);
++        var graphics = canvas.createGraphics();
++        try {
++            graphics.setFont(new java.awt.Font(java.awt.Font.DIALOG, java.awt.Font.PLAIN, 30));
++            String cluster = "🧑‍⚖️";
++            String input = ("가" + cluster + "é").repeat(20);
++            var metrics = graphics.getFontMetrics();
++            var lines =
++                    CardRenderer.wrap(input, metrics, Math.max(120, metrics.stringWidth(cluster)));
++            assertThat(String.join("", lines)).isEqualTo(input);
++            assertThat(lines)
++                    .allSatisfy(
++                            line -> {
++                                assertThat(line)
++                                        .doesNotStartWith("‍")
++                                        .doesNotStartWith("️")
++                                        .doesNotStartWith("́")
++                                        .doesNotEndWith("‍");
++                                assertThat(
++                                                Character.isHighSurrogate(
++                                                        line.charAt(line.length() - 1)))
++                                        .isFalse();
++                                assertThat(Character.isLowSurrogate(line.charAt(0))).isFalse();
++                            });
++        } finally {
++            graphics.dispose();
++        }
++    }
++
++    private ShareCardResponse longCard(String statement, String sentenceLabel) {
++        return new ShareCardResponse(
++                "id",
++                "spent",
++                "guilty",
++                "mild",
++                "판".repeat(30),
++                List.of(statement),
++                "oneDay",
++                sentenceLabel,
++                new MemeView("GUILTY_HEAVY", "id", "/api/memes/id/image"));
++    }
++
++    private ShareCardResponse card(String result) {
++        return new ShareCardResponse(
++                "id",
++                "spent",
++                result,
++                "mild",
++                "판결 카드",
++                List.of("공개 문구"),
++                null,
++                null,
++                new MemeView("GUILTY_HEAVY", "id", "/api/memes/id/image"));
++    }
++}
+diff --git a/src/test/java/com/ttegeoji/backend/privacy/DeletedPriorPrivacyTest.java b/src/test/java/com/ttegeoji/backend/privacy/DeletedPriorPrivacyTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..18b60ce07b83a5aefbe5c095d4e94bef59bf28d9
+--- /dev/null
++++ b/src/test/java/com/ttegeoji/backend/privacy/DeletedPriorPrivacyTest.java
+@@ -0,0 +1,170 @@
++package com.ttegeoji.backend.privacy;
++
++import com.ttegeoji.backend.privacy.InvalidationServiceTest.Fixtures;
++import com.ttegeoji.backend.support.PostgresContainerSupport;
++import com.ttegeoji.backend.verdictview.ShareCardAssembler;
++import com.ttegeoji.backend.verdictview.VerdictViewAssembler;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.ValueSource;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.jdbc.core.JdbcTemplate;
++import org.springframework.transaction.annotation.Transactional;
++
++import java.util.List;
++import java.util.UUID;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++/** 테스트 트랜잭션은 스케줄러에 보이지 않아 삭제 직후·비동기 정리 전 읽기를 결정적으로 재현한다. */
++@SpringBootTest
++@Transactional
++class DeletedPriorPrivacyTest extends PostgresContainerSupport {
++
++    @Autowired private JdbcTemplate jdbc;
++    @Autowired private InvalidationService service;
++    @Autowired private InvalidationQueries queries;
++    @Autowired private InvalidationScheduler scheduler;
++    @Autowired private VerdictViewAssembler verdictView;
++    @Autowired private ShareCardAssembler shareCard;
++
++    private Fixtures f;
++    private UUID author;
++    private UUID prior;
++
++    @BeforeEach
++    void setUp() {
++        f = new Fixtures(jdbc);
++        author = f.profile();
++        prior = f.post(author);
++    }
++
++    @Test
++    @DisplayName("Q2 POST 무효화 SQL은 같은 게시물의 VERDICT·COMMENT·RULE_HIT 기억도 지우고 다른 게시물은 유지")
++    void deletingPostInvalidatesAllMemoryFactsForItsPayload() {
++        UUID other = f.post(author);
++        List<UUID> target = List.of(memory(prior, "POST", "SPEND"), memory(prior, "VERDICT", "VERDICT"),
++                memory(prior, "COMMENT", "COMMENT"), memory(prior, "RULE", "RULE_HIT"));
++        UUID untouched = memory(other, "VERDICT", "VERDICT");
++
++        service.deletePost(prior, author);
++        // 스케줄러가 실행하는 바로 그 SQL. 현재 트랜잭션의 삭제·PENDING을 다른 스케줄러가 볼 수 없다.
++        queries.runInvalidateScope("POST", prior.toString(), ScopeKeys.post(prior));
++
++        for (UUID fact : target) {
++            assertThat(jdbc.queryForObject("SELECT deleted_at IS NOT NULL FROM ai.memory_facts WHERE id = ?",
++                    Boolean.class, fact)).isTrue();
++        }
++        assertThat(jdbc.queryForObject("SELECT deleted_at IS NULL FROM ai.memory_facts WHERE id = ?",
++                Boolean.class, untouched)).isTrue();
++    }
++
++    @ParameterizedTest
++    @ValueSource(strings = {"POST", "VERDICT", "COMMENT"})
++    @DisplayName("Q3 다른 게시물 PRIOR 삭제 직후 스케줄러 전에도 판결·공유카드에서 인용과 양형이유를 가린다")
++    void deletingPriorImmediatelyHidesCurrentCitation(String sourceType) {
++        UUID current = f.post(author);
++        UUID verdict = f.verdict(current);
++        var ai = f.aiCase(current.toString(), ScopeKeys.post(current));
++        UUID sourceId = sourceId(sourceType);
++        jdbc.update("UPDATE ai.evidence_sources SET source_type = ?, source_id = ? WHERE evidence_id = ?",
++                sourceType, sourceId.toString(), ai.evidence());
++        jdbc.update("UPDATE ai.evidence SET scope = '{\"visibility\":\"PUBLIC\",\"room_ids\":[]}'::jsonb WHERE id = ?",
++                ai.evidence());
++        text(verdict, "mild", ai.dossier());
++        f.ref(verdict, 2, "mild", ai.evidence());
++
++        assertThat(verdictView.assemble(current, author, null).view().source()).isEqualTo("AI");
++        assertThat(shareCard.assemble(current, author).statement()).containsExactly("삭제되면 가려야 하는 과거 사건");
++
++        service.deletePost(prior, author);
++
++        // Q 자체의 epoch는 바뀌지 않고 evidence도 아직 무효화되지 않았다.
++        assertThat(f.epoch(ScopeKeys.post(current))).isZero();
++        assertThat(jdbc.queryForObject("SELECT invalidated_at IS NULL FROM ai.evidence WHERE id = ?",
++                Boolean.class, ai.evidence())).isTrue();
++        var view = verdictView.assemble(current, author, null).view();
++        assertThat(view.source()).isEqualTo("TEMPLATE");
++        assertThat(view.statement()).doesNotContain("삭제되면 가려야 하는 과거 사건");
++        assertThat(view.sentencingReason()).isNull();
++        assertThat(shareCard.assemble(current, author).statement()).doesNotContain("삭제되면 가려야 하는 과거 사건");
++    }
++
++    @Test
++    @DisplayName("Q3 옛 textVersion 인용과 다른 강도 인용은 현재 공개 문구를 가리지 않는다")
++    void oldVersionAndOtherIntensityDoNotBlockCurrentText() {
++        UUID current = f.post(author);
++        UUID verdict = f.verdict(current);
++        var ai = f.aiCase(prior.toString(), ScopeKeys.post(prior));
++        text(verdict, "mild", ai.dossier());
++        f.ref(verdict, 1, "mild", ai.evidence());
++        f.ref(verdict, 2, "spicy", ai.evidence());
++
++        service.deletePost(prior, author);
++
++        assertThat(verdictView.assemble(current, author, null).view().source()).isEqualTo("AI");
++    }
++
++    @ParameterizedTest
++    @ValueSource(strings = {"VERDICT", "COMMENT"})
++    @DisplayName("Q2 POST 작업은 해당 판결·댓글 출처의 근거·조서·prep과 현재 인용 문구도 비동기 정리")
++    void postInvalidationTraversesDerivedSources(String sourceType) {
++        UUID current = f.post(author);
++        UUID verdict = f.verdict(current);
++        var ai = f.aiCase(current.toString(), ScopeKeys.post(current));
++        UUID source = sourceId(sourceType);
++        jdbc.update("UPDATE ai.evidence_sources SET source_type = ?, source_id = ? WHERE evidence_id = ?",
++                sourceType, source.toString(), ai.evidence());
++        text(verdict, "mild", ai.dossier());
++        f.ref(verdict, 2, "mild", ai.evidence());
++
++        service.deletePost(prior, author);
++        queries.runInvalidateScope("POST", prior.toString(), ScopeKeys.post(prior));
++        scheduler.convertAffectedTextsToTemplate(
++                new InvalidationQueries.PendingInvalidation(0, ScopeKeys.post(prior), "POST", prior.toString(), 0));
++
++        assertThat(f.aiState(ai).get("evidence")).isNotNull();
++        assertThat(f.aiState(ai).get("dossier")).isNotNull();
++        assertThat((String) f.aiState(ai).get("trial_prep")).startsWith("INVALIDATED ");
++        assertThat(f.verdictTextRow(verdict, "mild")).containsEntry("source", "TEMPLATE");
++        assertThat(jdbc.queryForObject("SELECT sentence::text FROM verdicts WHERE id = ?", String.class, verdict))
++                .isEqualTo("oneDay");
++    }
++
++    private UUID memory(UUID post, String sourceType, String factType) {
++        UUID id = UUID.randomUUID();
++        jdbc.update("""
++                INSERT INTO ai.memory_facts (id, bank_type, bank_id, fact_type, epistemic_type, source_type,
++                                             source_id, source_version, payload, scope, occurred_at)
++                VALUES (?, 'USER', ?, ?, 'DB_RECORD', ?, ?, 1,
++                        jsonb_build_object('post_id', CAST(? AS text)), '{}'::jsonb, now())""",
++                id, author.toString(), factType, sourceType,
++                "POST".equals(sourceType) ? post.toString() : UUID.randomUUID().toString(), post.toString());
++        return id;
++    }
++
++    private UUID sourceId(String sourceType) {
++        return switch (sourceType) {
++            case "VERDICT" -> f.verdict(prior);
++            case "COMMENT" -> {
++                UUID room = f.room(author);
++                yield jdbc.queryForObject("""
++                        INSERT INTO post_comments (post_id, room_id, user_id, content)
++                        VALUES (?, ?, ?, '과거 댓글') RETURNING id""", UUID.class, prior, room, author);
++            }
++            default -> prior;
++        };
++    }
++
++    private void text(UUID verdict, String intensity, UUID dossier) {
++        f.verdictText(verdict, intensity, 2);
++        jdbc.update("""
++                UPDATE verdict_texts SET statement = '[{"text":"삭제되면 가려야 하는 과거 사건", "kind":"fact", "evidence_labels":["F1"]}]'::jsonb,
++                       dossier_id = ?, privacy_epoch_snapshot = '[]'::jsonb
++                 WHERE verdict_id = ? AND intensity = CAST(? AS spice_level)""", dossier, verdict, intensity);
++        jdbc.update("UPDATE verdicts SET sentencing_reason = '과거 사건을 인용한 양형 이유' WHERE id = ?", verdict);
++    }
++}
+diff --git a/src/test/java/com/ttegeoji/backend/seed/DemoSeedRunnerTest.java b/src/test/java/com/ttegeoji/backend/seed/DemoSeedRunnerTest.java
+index 8da510afe0e0c9149e1c9fedf0a34d498d919078..b2e3da8acc3d59de3c08c9ed344f5e8a894e6d82 100644
+--- a/src/test/java/com/ttegeoji/backend/seed/DemoSeedRunnerTest.java
++++ b/src/test/java/com/ttegeoji/backend/seed/DemoSeedRunnerTest.java
+@@ -75,7 +75,7 @@ class DemoSeedRunnerTest extends PostgresContainerSupport {
+         IntakeClient client = mock(IntakeClient.class);
+         when(client.call(any())).thenAnswer(inv -> intake.apply(inv.getArgument(0)));
+         SubmissionService submissions = new SubmissionService(client, postCreator, submissionQueries,
+-                submissionRepository, entityManager, transactionManager);
++                submissionRepository, entityManager, transactionManager, jdbc);
+         return new DemoSeedRunner(new SeedQueries(jdbc), submissions, voteService, commentService, "");
+     }
+ 
+diff --git a/src/test/java/com/ttegeoji/backend/submission/SubmissionServiceTest.java b/src/test/java/com/ttegeoji/backend/submission/SubmissionServiceTest.java
+index 8939f66e8106d906950b97d33dd72a4cf11ff96a..a3d129fe84b5eba5e4f6c3370142286b18d0f9f8 100644
+--- a/src/test/java/com/ttegeoji/backend/submission/SubmissionServiceTest.java
++++ b/src/test/java/com/ttegeoji/backend/submission/SubmissionServiceTest.java
+@@ -108,6 +108,25 @@ class SubmissionServiceTest extends PostgresContainerSupport {
+         return first;
+     }
+ 
++    @Test
++    void submissionIdempotencyKeyReplaysLostResponseAndRejectsChangedPayload() throws Exception {
++        intakeReturns(Mode.INITIAL,Status.PASS);
++        var mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
++        String body=com.ttegeoji.backend.util.Json.write(submitRequest("아이스 아메리카노"));
++        String key=UUID.randomUUID().toString();
++        String first=mvc.perform(post("/api/post-submissions").with(jwt().jwt(j->j.subject(author.toString())))
++                .header("Idempotency-Key",key).contentType(MediaType.APPLICATION_JSON).content(body))
++                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
++        String second=mvc.perform(post("/api/post-submissions").with(jwt().jwt(j->j.subject(author.toString())))
++                .header("Idempotency-Key",key).contentType(MediaType.APPLICATION_JSON).content(body))
++                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
++        assertThat(second).isEqualTo(first);
++        verify(intakeClient,times(1)).call(any());
++        mvc.perform(post("/api/post-submissions").with(jwt().jwt(j->j.subject(author.toString())))
++                .header("Idempotency-Key",key).contentType(MediaType.APPLICATION_JSON).content(body.replace("아이스 아메리카노","카페라떼")))
++                .andExpect(status().isConflict());
++    }
++
+     @Test
+     @DisplayName("10 §9 최초 PASS → NEW→COMPLETED, 게시물 생성·PREPARE 1")
+     void passCreatesPost() {
+diff --git a/src/test/java/com/ttegeoji/backend/verdict/FinalizeServiceTest.java b/src/test/java/com/ttegeoji/backend/verdict/FinalizeServiceTest.java
+index 5d83c1f4e91ecf04dbf5f16180b9cdd1f275f363..c0c0e73d708426cd62277406dd95776c22126754 100644
+--- a/src/test/java/com/ttegeoji/backend/verdict/FinalizeServiceTest.java
++++ b/src/test/java/com/ttegeoji/backend/verdict/FinalizeServiceTest.java
+@@ -70,6 +70,27 @@ class FinalizeServiceTest extends PostgresContainerSupport {
+ 
+     // ---- 최초 SENTENCE ----
+ 
++    @Test
++    @DisplayName("로컬 E2E 회귀: 무죄·동의·기각 최초 finalize는 sentencing null로 FINAL/AI_READY")
++    void nonGuiltyFirstFinalizeAllowsNullSentencing() {
++        for(var entry:Map.of("notGuilty","NOT_GUILTY","agree","APPROVED","disagree","REJECTED").entrySet()) {
++            Case c=newCase();
++            jdbc.update("UPDATE verdicts SET jury_result=CAST(? AS verdict),policy_snapshot='{}'::jsonb WHERE id=?",entry.getKey(),c.verdictId);
++            var draft=draft();draft.put("meme_tag",entry.getValue());
++            var result=service.finalizeVerdict(c.verdictId.toString(),bytes(body(c,draft,null,evaluation())));
++            assertThat(result.textVersion()).isEqualTo(1);
++            var saved=jdbc.queryForMap("SELECT sentence_status,sentence,sentence_source,sentencing_reason,text_status FROM verdicts WHERE id=?",c.verdictId);
++            assertThat(saved).containsEntry("sentence_status","FINAL").containsEntry("sentence",null)
++                    .containsEntry("sentence_source",null).containsEntry("sentencing_reason",null).containsEntry("text_status","AI_READY");
++        }
++    }
++
++    @Test
++    void guiltyFirstFinalizeRejectsNullSentencing() {
++        Case c=newCase();
++        assertRejected(c,bytes(body(c,draft(),null,evaluation())),HttpStatus.UNPROCESSABLE_CONTENT,"INVALID_DRAFT");
++    }
++
+     @Test
+     @DisplayName("10 §5 최초 성공 → FINAL/AI·AI_READY·RETAIN 1·job SUCCEEDED·commit record")
+     void firstSuccess() {
+diff --git a/src/test/resources/application-test.yml b/src/test/resources/application-test.yml
+index bb8e4c7974dd8e29f3d44f21ea542677cc54d2bf..2a5557780a741d9bce79aec6b128fb80b6119395 100644
+--- a/src/test/resources/application-test.yml
++++ b/src/test/resources/application-test.yml
+@@ -11,6 +11,8 @@ spring:
+           issuer-uri: http://localhost:0/auth/v1
+ 
+ geoji:
++  media:
++    enabled: false
+   internal:
+     service-token: test-token
+   ai:
+diff --git a/src/test/resources/db/004b_media.sql b/src/test/resources/db/004b_media.sql
+new file mode 100644
+index 0000000000000000000000000000000000000000..6b708751d90f4ef33923f5d911768d994a6cb909
+--- /dev/null
++++ b/src/test/resources/db/004b_media.sql
+@@ -0,0 +1,62 @@
++-- 로컬 미디어/PNG 작업 초안. 운영 적용은 별도 승인 및 정식 migration 이관 후 수행한다.
++CREATE TABLE media_images (
++    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
++    owner_id uuid NOT NULL REFERENCES profiles(id),
++    sha256 text NOT NULL CHECK (sha256 ~ '^[0-9a-f]{64}$'),
++    mime_type text NOT NULL CHECK (mime_type IN ('image/png','image/jpeg')),
++    review_status text NOT NULL DEFAULT 'PENDING' CHECK(review_status IN ('PENDING','APPROVED','REJECTED')),
++    selected_version text CHECK(selected_version IN ('ORIGINAL','GRAYSCALE')),
++    width integer NOT NULL CHECK (width BETWEEN 1 AND 4096),
++    height integer NOT NULL CHECK (height BETWEEN 1 AND 4096),
++    created_at timestamptz NOT NULL DEFAULT now(),
++    UNIQUE (owner_id,sha256)
++);
++CREATE TABLE media_transforms (
++    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
++    image_id uuid NOT NULL REFERENCES media_images(id),
++    operation text NOT NULL CHECK (operation = 'GRAYSCALE'),
++    version text NOT NULL,
++    status text NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','RENDERING','READY','FAILED')),
++    sha256 text,
++    error_code text,
++    lease_token uuid,
++    lease_until timestamptz,
++    attempts integer NOT NULL DEFAULT 0,
++    created_at timestamptz NOT NULL DEFAULT now(),
++    updated_at timestamptz NOT NULL DEFAULT now(),
++    UNIQUE(image_id,operation,version)
++);
++CREATE TABLE meme_catalog_entries (
++    id uuid PRIMARY KEY REFERENCES meme_images(id),
++    image_id uuid NOT NULL UNIQUE REFERENCES media_images(id),
++    approved boolean NOT NULL DEFAULT false,
++    selected_version text NOT NULL DEFAULT 'ORIGINAL' CHECK (selected_version IN ('ORIGINAL','GRAYSCALE')),
++    reviewed_by uuid REFERENCES profiles(id),
++    reviewed_at timestamptz
++);
++CREATE TABLE share_card_sharing (
++    post_id uuid PRIMARY KEY REFERENCES posts(id),
++    enabled boolean NOT NULL DEFAULT true,
++    updated_at timestamptz NOT NULL DEFAULT now()
++);
++CREATE TABLE share_card_jobs (
++    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
++    post_id uuid NOT NULL REFERENCES posts(id),
++    requested_by uuid NOT NULL REFERENCES profiles(id),
++    input_hash text NOT NULL,
++    input_json jsonb NOT NULL,
++    meme_sha256 text,
++    font_sha256 text NOT NULL,
++    status text NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','RENDERING','READY','FAILED')),
++    png_sha256 text,
++    error_code text,
++    lease_token uuid,
++    lease_until timestamptz,
++    attempts integer NOT NULL DEFAULT 0,
++    created_at timestamptz NOT NULL DEFAULT now(),
++    updated_at timestamptz NOT NULL DEFAULT now(),
++    UNIQUE(post_id,input_hash)
++);
++CREATE INDEX share_card_jobs_pending ON share_card_jobs(status,lease_until,created_at);
++CREATE INDEX media_transforms_pending ON media_transforms(status,lease_until,created_at);
++GRANT SELECT,INSERT,UPDATE ON media_images,media_transforms,meme_catalog_entries,share_card_sharing,share_card_jobs TO backend;
+diff --git a/src/test/resources/db/004b_submission_idempotency.sql b/src/test/resources/db/004b_submission_idempotency.sql
+new file mode 100644
+index 0000000000000000000000000000000000000000..f4b628342a88c60987dec73db644f49f94a17138
+--- /dev/null
++++ b/src/test/resources/db/004b_submission_idempotency.sql
+@@ -0,0 +1,11 @@
++-- 공개 최초 제출의 응답 유실 복구. 키 범위는 사용자별이며 원문 대신 기존 canonical payload hash만 보관한다.
++CREATE TABLE submission_request_keys (
++    actor_id uuid NOT NULL REFERENCES profiles(id),
++    request_key text NOT NULL CHECK (char_length(request_key) BETWEEN 1 AND 128),
++    payload_hash text NOT NULL,
++    submission_id uuid REFERENCES submissions(id),
++    lease_until timestamptz,
++    created_at timestamptz NOT NULL DEFAULT now(),
++    PRIMARY KEY(actor_id,request_key)
++);
++GRANT SELECT,INSERT,UPDATE ON submission_request_keys TO backend;

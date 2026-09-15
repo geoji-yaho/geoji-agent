@@ -1,0 +1,14 @@
+{
+  "kind": "local-java2d-layout-fixture",
+  "template": "share-card-v3",
+  "statement_codepoints": 300,
+  "dimensions": [
+    1080,
+    1440
+  ],
+  "sentence_lines": 2,
+  "png_sha256": "7efea505809b6dcd88163a40cd571843499b2130a0871613b46b0b0d22b684b3",
+  "meme_sha256": "5e4479ae88c98dbfec222d5456669141fe85d9cd0cf0920cafcce7e7b2122dae",
+  "model_calls": 0,
+  "visual_check": "본문 마지막 문장, 두 줄 형량, footer가 겹침 없이 표시됨"
+}

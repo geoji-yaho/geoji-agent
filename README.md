@@ -7,6 +7,19 @@
 
 ## 실행 절차
 
+### 9/16 전달 상태
+
+이 저장소에는 AI 변경과 검증 도구를 반영한다. 프론트·백엔드 변경은 임시 checkout에서
+검증한 참고 패치이며, 해당 저장소에 커밋·푸시하지 않았다.
+[백엔드 요청사항](docs/plans/10-backend-contract.md)과
+[프론트 요청사항](docs/plans/16-frontend-handoff.md)을 각 담당자가 검토해 반영한다.
+
+로컬에서 `b-meme`으로 만든 이미지를 LLM 키 없이 등록하도록 **백엔드 업로드 API 반영을 요청**했다.
+관리자 인증·스토리지·짤 카탈로그를 관리하는 백엔드 담당자가 반영할 사항이며,
+에이전트에 중복 업로드 API는 추가하지 않았다(10 §16.5).
+
+### 개발 실행
+
 Python 3.12 와 [uv](https://docs.astral.sh/uv/) 가 필요하다. 시스템 Python 은 쓰지 않는다.
 
 ```bash
@@ -20,13 +33,31 @@ uv run uvicorn geoji_ai.api.app:app --host 127.0.0.1 --port 8100 --http h11 & cu
   `{"status":"not_ready","missing":[...]}` 를 낸다. `DATABASE_URL` 이 있는데 2초 안에 `SELECT 1` 이
   안 되면 503 과 `{"status":"not_ready","db":"unreachable"}` 이다.
 
-Spring 백엔드와 로컬 HTTP로 직접 연결할 때는 `--http h11`을 사용한다. 2026-09-15 실제
-Java 25 클라이언트 연결에서 기본 HTTP 파서가 HTTP/2 업그레이드 요청을 422로 거부했고,
-이 옵션으로 정상 처리되는 것을 확인했다. 백엔드의 HTTP/1.1 명시도 해결 후보다.
+2026-09-15 백엔드는 로컬 연결에 `--http h11`이 필요했다. 9/16 로컬 구현에서는 Java의
+HTTP 클라이언트 3곳에 HTTP/1.1을 명시했고 Uvicorn 기본 `auto`로 실제 연결을 검증했다.
+이 변경을 적용하지 않은 백엔드에는 위 `--http h11` 우회를 사용한다.
 
 백엔드·워커 동시 실행, 전원 투표 시뮬레이션, 짤·카드 저장의 구현 현황과 다음 검증은
-[로컬 전체 흐름 검증 계획](docs/plans/14-local-e2e-validation.md)을 참고한다.
+[로컬 구현·재실행 가이드](docs/plans/15-local-e2e-implementation.md)를 참고한다.
 키 없는 워커의 `TEMPLATE_READY`는 폴백 검증이며 실제 LLM 생성 성공을 뜻하지 않는다.
+
+### 실제 Spring + 테스트 모델 E2E
+
+Docker, JDK 25, 빌드된 백엔드 JAR가 필요하다. 새 전용 DB만 만들며 외부 모델 키를 제거한다.
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/run_local_e2e.py \
+  --backend /path/to/geoji-server --frontend /path/to/geoji-web \
+  --java-home /path/to/jdk-25/Contents/Home --keep
+# 출력된 geoji-e2e-* 디렉터리로 Vite 실행(Node 24, pnpm 필요)
+.venv/bin/python scripts/start_local_e2e_web.py /path/to/geoji-e2e-run --frontend /path/to/geoji-web
+# 브라우저: http://localhost:3800
+.venv/bin/python scripts/stop_local_e2e.py /path/to/geoji-e2e-run
+```
+
+`--keep` 없이 실행하면 자동 종료한다. `report.json`은 검증 결과이며, `state.json`에는
+짧게 사용하는 로컬 JWT·DB 비밀번호가 있어 공유하지 않는다. 실제 유료 모델 실측은 별도
+`scripts/run_local_live_e2e.py`를 사용한다. 기본 실행은 비용 없는 계획 출력이다.
 
 ### 큐와 워커 (02 §4.3)
 
@@ -144,6 +175,35 @@ uv run python tools/gen_contracts.py
 1. production 인데 `GUARDRAIL_POLICY_VERSION` 을 환경변수로 직접 적지 않았으면(기본값 의존) `StartupError`. 목록 밖 값은 설정 생성 단계에서 이미 거부된다.
 2. `MODEL_WRITER` 가 `grok-4.6`·`grok-4.5`·`grok-4.3` 이면 `StartupError`(환경 무관).
 3. `OPENAI_API_KEY`·`XAI_API_KEY` 가 비면 기동은 되고 `/health/ready` 가 503 을 낸다.
+
+### 배포 시 키 주입
+
+`Settings`는 이미 **프로세스 환경변수 → 로컬 `.env` → 기본값** 순서로 읽는다.
+배포 환경에는 `.env` 파일을 만들 필요가 없다. 배포 플랫폼의 비밀값 설정을 통해
+AI API와 worker 프로세스에 아래 이름으로 주입한다.
+
+| 변수 | 주입 대상/용도 |
+| --- | --- |
+| `OPENAI_API_KEY`, `XAI_API_KEY` | AI API와 worker. 실제 텍스트 모델 호출 |
+| `DATABASE_URL` | AI API와 worker. `postgresql+asyncpg://...` 연결 |
+| `SERVICE_AUTH_TOKEN` | AI API·worker·백엔드에 같은 내부 인증 토큰 |
+| `BACKEND_INTERNAL_URL` | AI 프로세스에서 접근할 백엔드 호스트 루트. `/internal/v1`을 붙이지 않음 |
+| `APP_ENV=production`, `GUARDRAIL_POLICY_VERSION=guardrail-v2` | AI API와 worker의 운영 기동 검사 |
+
+키 설정 여부만 확인하며 실제 값이나 모델 호출 없이 검사할 수 있다:
+
+```bash
+uv run python - <<'PY'
+from geoji_ai.core.config import Settings, secret_value
+s = Settings(_env_file=None)
+print({name: bool(secret_value(s, name)) for name in ("OPENAI_API_KEY", "XAI_API_KEY")})
+PY
+```
+
+키 변경 후 **API와 worker 모두 재시작**한다. 실행 중인 설정·벤더 클라이언트는 자동 갱신되지 않는다.
+기동 후 `/health/ready`는 키 존재와 DB 연결을 확인한다. 200이어도 모델 계정 권한/결제까지
+검증한 것은 아니며, 실제 호출 검증은 승인된 실측 실행기로 별도 수행한다.
+이미 만들어진 b-meme 파일의 백엔드 등록·검수·활성화는 두 LLM 키 및 AI readiness와 독립이다.
 
 ## 배치
 

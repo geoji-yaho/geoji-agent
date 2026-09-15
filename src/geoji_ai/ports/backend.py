@@ -93,6 +93,14 @@ class RoomRule(_Model):
     text: str
 
 
+class SnapshotNotFound(Exception):
+    """snapshot 대상이 삭제되었거나 없다. 일반 경로 404와 구분하는 종료 신호."""
+
+    status = 404
+    code = "NOT_FOUND"
+    error_code = "SNAPSHOT_NOT_FOUND"
+
+
 class RecentVerdict(_Model):
     post_id: str
     post_version: int
@@ -100,7 +108,7 @@ class RecentVerdict(_Model):
     amount_krw: int
     reason: str | None
     result: str
-    sentence: str
+    sentence: str | None
     judged_at: datetime
     scope: EvidenceScope
 

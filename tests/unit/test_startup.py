@@ -16,7 +16,7 @@ from pydantic import ValidationError
 
 from geoji_ai.api import health
 from geoji_ai.api.app import create_app
-from geoji_ai.core.config import SECRET_FIELDS, Settings, is_production, redact
+from geoji_ai.core.config import SECRET_FIELDS, Settings, get_settings, is_production, redact
 from geoji_ai.core.startup import (
     REASONING_WRITER_MODELS,
     StartupError,
@@ -164,6 +164,72 @@ def test_env_example_을_그대로_복사해도_설정이_뜬다(tmp_path):
     # 키 이름이 설정 필드와 1:1 이다.
     keys = {ln.split("=", 1)[0] for ln in text.splitlines() if ln and not ln.startswith("#")}
     assert keys == set(Settings.model_fields)
+
+
+def test_dotenv_없이_process_env_비밀값으로_production_설정이_뜬다(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.chdir(tmp_path)
+    assert not (tmp_path / ".env").exists()
+    secrets = {name: f"test-process-only-{name}" for name in SECRET_FIELDS}
+    for name, value in secrets.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("GUARDRAIL_POLICY_VERSION", "guardrail-v2")
+
+    settings = Settings()
+
+    validate(settings)
+    assert is_production(settings)
+    assert missing_keys(settings) == []
+    for name, value in secrets.items():
+        assert getattr(settings, name).get_secret_value() == value
+
+
+def test_process_env_키가_dotenv_키보다_우선하고_없는_키만_파일에서_읽는다(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text(
+        "OPENAI_API_KEY=test-file-openai\nXAI_API_KEY=test-file-xai\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("OPENAI_API_KEY", "test-process-openai")
+
+    settings = Settings()
+
+    assert settings.OPENAI_API_KEY.get_secret_value() == "test-process-openai"
+    assert settings.XAI_API_KEY.get_secret_value() == "test-file-xai"
+
+
+def test_get_settings_키교체는_캐시_재생성_뒤_반영되고_표시는_가려진다(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.chdir(tmp_path)
+    before = "test-cached-secret-before"
+    after = "test-cached-secret-after"
+    get_settings.cache_clear()
+    try:
+        monkeypatch.setenv("OPENAI_API_KEY", before)
+        cached = get_settings()
+        monkeypatch.setenv("OPENAI_API_KEY", after)
+
+        assert get_settings() is cached
+        assert get_settings().OPENAI_API_KEY.get_secret_value() == before
+        # Settings 객체는 최초 생성 시 읽는다. 새 프로세스는 빈 캐시에서 새 설정을 만든다.
+        get_settings.cache_clear()
+        refreshed = get_settings()
+        assert refreshed is not cached
+        assert refreshed.OPENAI_API_KEY.get_secret_value() == after
+        for settings in (cached, refreshed):
+            representations = (
+                repr(settings),
+                str(settings.model_dump()),
+                settings.model_dump_json(),
+                str(redact(settings)),
+            )
+            assert all(before not in value and after not in value for value in representations)
+    finally:
+        get_settings.cache_clear()
 
 
 # --- ② 서기·드립 추론 모델 ---------------------------------------------------

@@ -1,0 +1,1823 @@
+diff --git a/src/app/router/routes.tsx b/src/app/router/routes.tsx
+index 7c3936653119cc691fcbd39660bb8853088b4536..cfe522583f17d861fc872f14a718cbb7f20c8821 100644
+--- a/src/app/router/routes.tsx
++++ b/src/app/router/routes.tsx
+@@ -2,8 +2,16 @@ import { createBrowserRouter } from "react-router";
+ 
+ import { BudgetOnboardingPage, LoginPage } from "@/features/auth";
+ import { HomePage } from "@/features/home";
++import { AdminImagesPage, ImageUploadPage, PrivateImagePage } from "@/features/images";
+ import { BudgetEditPage, MyPage } from "@/features/me";
+-import { ExpenseCreatePage, VerdictCardPage, VerdictPage, VotePage } from "@/features/post";
++import {
++	ExpenseCreatePage,
++	PostCardPage,
++	PostVerdictPage,
++	VerdictCardPage,
++	VerdictPage,
++	VotePage
++} from "@/features/post";
+ import { RoomCreatePage, RoomFeedPage, RoomInfoPage, RoomJoinPage, RoomRankingPage } from "@/features/room";
+ 
+ import { AppLayout } from "../layouts/AppLayout";
+@@ -30,9 +38,15 @@ export const router = createBrowserRouter(
+ 				},
+ 				{ path: "invite/:code", element: <RoomJoinPage /> },
+ 				{ path: "posts/new", element: <ExpenseCreatePage /> },
+-				{ path: "posts/:postId", element: <VerdictPage /> },
+-				{ path: "posts/:postId/card", element: <VerdictCardPage /> },
+-				{ path: "posts/:postId/vote", element: <VotePage /> },
++				{ path: "expenses/:postId", element: <VerdictPage /> },
++				{ path: "posts/:postId", element: <PostVerdictPage /> },
++				{ path: "expenses/:postId/card", element: <VerdictCardPage /> },
++				{ path: "posts/:postId/card", element: <PostCardPage /> },
++				{ path: "expenses/:postId/vote", element: <VotePage /> },
++				{ path: "posts/:postId/vote", element: <PostVerdictPage /> },
++				{ path: "images/new", element: <ImageUploadPage /> },
++				{ path: "images/:imageId", element: <PrivateImagePage /> },
++				{ path: "admin/images", element: <AdminImagesPage /> },
+ 				{ path: "me", element: <MyPage /> },
+ 				{ path: "me/budget", element: <BudgetEditPage /> }
+ 			]
+diff --git a/src/features/home/pages/HomePage.tsx b/src/features/home/pages/HomePage.tsx
+index 5895b8d3a7744ff3440e74c0192db04c85edcf4e..2b2abbf592c2aef993ae30238e8837862536eab8 100644
+--- a/src/features/home/pages/HomePage.tsx
++++ b/src/features/home/pages/HomePage.tsx
+@@ -10,6 +10,7 @@ import { formatVoteDeadlineLabel } from "@/shared/domain/room";
+ import { useMyMonthStats } from "@/shared/hooks/useMyMonthStats";
+ import { isOnboardingSkipped } from "@/shared/lib/onboarding-skip";
+ import { Alert } from "@/shared/ui/Alert";
++import { Button } from "@/shared/ui/Button";
+ import { Card } from "@/shared/ui/Card";
+ import { Reveal } from "@/shared/ui/Reveal";
+ import { StickyCta } from "@/shared/ui/StickyCta";
+@@ -43,6 +44,12 @@ export function HomePage() {
+ 			</div>
+ 
+ 			<div className="flex flex-1 flex-col gap-3.5 px-5 pt-1.5">
++				<Button variant="ink" onClick={() => void navigate("/posts/new")}>
++					지출 등록하고 재판받기
++				</Button>
++				<Button variant="outline" onClick={() => void navigate("/images/new")}>
++					내 이미지 비공개 업로드
++				</Button>
+ 				{stats.isPending && (
+ 					<Card role="status" className="p-4.5 text-chip text-mute">
+ 						프로필을 불러오는 중
+diff --git a/src/features/images/api/images.ts b/src/features/images/api/images.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..63fcae74aa8698d849eb2046951180a89dbfe4fb
+--- /dev/null
++++ b/src/features/images/api/images.ts
+@@ -0,0 +1,150 @@
++import { queryOptions } from "@tanstack/react-query";
++
++import { isApiError } from "@/shared/api/api-error";
++import { http } from "@/shared/api/http";
++
++export type PrivateImage = {
++	id: string;
++	sha256: string;
++	mimeType: string;
++	width: number;
++	height: number;
++	status: "PRIVATE";
++	reviewStatus: "PENDING" | "APPROVED" | "REJECTED";
++	selectedVersion: "ORIGINAL" | "GRAYSCALE" | null;
++	contentUrl: string;
++};
++
++export type ImageTransform = {
++	id: string;
++	imageId: string;
++	status: "PENDING" | "RENDERING" | "READY" | "FAILED";
++	operation: "GRAYSCALE";
++	sha256: string | null;
++	contentUrl: string | null;
++	errorCode: string | null;
++};
++
++export type CatalogMeme = {
++	id: string;
++	imageId: string;
++	selectedVersion: "ORIGINAL" | "GRAYSCALE";
++	tag: string;
++	approved: boolean;
++	active: boolean;
++	imageUrl: string;
++};
++
++export const MEME_TAGS = ["GUILTY_HEAVY", "GUILTY_LIGHT", "NOT_GUILTY", "APPROVED", "REJECTED"] as const;
++const POLL_INTERVAL_MS = 1000;
++
++function imagePath(imageId: string) {
++	return `/api/images/${encodeURIComponent(imageId)}`;
++}
++
++async function fetchOptional<T>(path: string, signal: AbortSignal) {
++	try {
++		return await http.get<T>(path, { signal });
++	} catch (error) {
++		if (isApiError(error) && error.kind === "notFound") {
++			return null;
++		}
++		throw error;
++	}
++}
++
++export function uploadPrivateImage(file: File) {
++	const body = new FormData();
++	body.set("file", file);
++	return http.post<PrivateImage>("/api/images", { body });
++}
++
++export function reviewPrivateImage(imageId: string, input: { approved: boolean; version: "ORIGINAL" | "GRAYSCALE" }) {
++	return http.post<PrivateImage>(`${imagePath(imageId)}/review`, { body: input });
++}
++
++export function createImageTransform(imageId: string) {
++	return http.post<ImageTransform>(`${imagePath(imageId)}/transform`, { body: { operation: "GRAYSCALE" } });
++}
++
++export function createCatalogTransform(memeId: string) {
++	return http.post<ImageTransform>(`/api/admin/memes/${encodeURIComponent(memeId)}/transform`, {
++		body: { operation: "GRAYSCALE" }
++	});
++}
++
++export function updateCatalogMemeVersion(memeId: string, version: "ORIGINAL" | "GRAYSCALE") {
++	return http.put<CatalogMeme>(`/api/admin/memes/${encodeURIComponent(memeId)}/image-version`, { body: { version } });
++}
++
++export function uploadCatalogMeme(input: {
++	file: File;
++	tag: string;
++	strategies: string;
++	emotions: string;
++	keywords: string;
++}) {
++	const body = new FormData();
++	body.set("file", input.file);
++	body.set("tag", input.tag);
++	body.set("strategies", input.strategies);
++	body.set("emotions", input.emotions);
++	body.set("keywords", input.keywords);
++	return http.post<CatalogMeme>("/api/admin/memes", { body });
++}
++
++export function reviewCatalogMeme(id: string, approved: boolean) {
++	return http.post<CatalogMeme>(`/api/admin/memes/${encodeURIComponent(id)}/review`, { body: { approved } });
++}
++
++export function updateCatalogMemeActive(id: string, active: boolean) {
++	return http.put<CatalogMeme>(`/api/admin/memes/${encodeURIComponent(id)}/active`, { body: { active } });
++}
++
++export const imageQueries = {
++	all: () => ["images"] as const,
++	detail: (imageId: string) =>
++		queryOptions({
++			queryKey: [...imageQueries.all(), "detail", imageId] as const,
++			queryFn: ({ signal }) => fetchOptional<PrivateImage>(imagePath(imageId), signal)
++		}),
++	content: (imageId: string, transformed: boolean, sha256: string | null) =>
++		queryOptions({
++			queryKey: [...imageQueries.all(), "content", imageId, transformed, sha256] as const,
++			queryFn: ({ signal }) =>
++				http.getBlob(`${imagePath(imageId)}${transformed ? "/transform" : ""}/content`, { signal }),
++			staleTime: 0,
++			gcTime: 0
++		}),
++	transform: (imageId: string) =>
++		queryOptions({
++			queryKey: [...imageQueries.all(), "transform", imageId] as const,
++			queryFn: ({ signal }) => fetchOptional<ImageTransform>(`${imagePath(imageId)}/transform`, signal),
++			refetchInterval: (query) => {
++				const status = query.state.data?.status;
++				return status === "PENDING" || status === "RENDERING" ? POLL_INTERVAL_MS : false;
++			}
++		}),
++	catalogContent: (memeId: string, version: string) =>
++		queryOptions({
++			queryKey: [...imageQueries.all(), "catalog-content", memeId, version] as const,
++			queryFn: ({ signal }) => http.getBlob(`/api/admin/memes/${encodeURIComponent(memeId)}/image`, { signal }),
++			staleTime: 0,
++			gcTime: 0
++		}),
++	catalogTransform: (memeId: string) =>
++		queryOptions({
++			queryKey: [...imageQueries.all(), "catalog-transform", memeId] as const,
++			queryFn: ({ signal }) =>
++				fetchOptional<ImageTransform>(`/api/admin/memes/${encodeURIComponent(memeId)}/transform`, signal),
++			refetchInterval: (query) => {
++				const status = query.state.data?.status;
++				return status === "PENDING" || status === "RENDERING" ? POLL_INTERVAL_MS : false;
++			}
++		}),
++	catalog: () =>
++		queryOptions({
++			queryKey: [...imageQueries.all(), "catalog"] as const,
++			queryFn: ({ signal }) => http.get<CatalogMeme[]>("/api/admin/memes", { signal })
++		})
++};
+diff --git a/src/features/images/components/CatalogMemeItem.tsx b/src/features/images/components/CatalogMemeItem.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..7871d79e6f6ee6ed89f85e688c9d45c045d98f7e
+--- /dev/null
++++ b/src/features/images/components/CatalogMemeItem.tsx
+@@ -0,0 +1,69 @@
++import { useQuery } from "@tanstack/react-query";
++
++import { Alert } from "@/shared/ui/Alert";
++import { BlobImage } from "@/shared/ui/BlobImage";
++import { Button } from "@/shared/ui/Button";
++
++import { type CatalogMeme, imageQueries } from "../api/images";
++import {
++	useCreateCatalogTransform,
++	useReviewCatalogMeme,
++	useUpdateCatalogMemeActive,
++	useUpdateCatalogMemeVersion
++} from "../hooks/useImageActions";
++
++type CatalogMemeItemProps = { meme: CatalogMeme };
++
++export function CatalogMemeItem({ meme }: CatalogMemeItemProps) {
++	const image = useQuery(imageQueries.catalogContent(meme.id, meme.selectedVersion));
++	const transform = useQuery(imageQueries.catalogTransform(meme.id));
++	const createTransform = useCreateCatalogTransform(meme.id);
++	const version = useUpdateCatalogMemeVersion(meme.id);
++	const review = useReviewCatalogMeme();
++	const updateActive = useUpdateCatalogMemeActive();
++	const isWorking = transform.data?.status === "PENDING" || transform.data?.status === "RENDERING";
++	const isUpdating = review.isPending || updateActive.isPending || version.isPending;
++	const error =
++		image.error ?? transform.error ?? createTransform.error ?? version.error ?? review.error ?? updateActive.error;
++
++	return (
++		<article className="flex flex-col gap-2 border-t border-line pt-4">
++			<h3 className="text-body text-ink">{meme.tag}</h3>
++			{image.data && !image.error && <BlobImage blob={image.data} alt={`${meme.tag} 검수 이미지`} />}
++			<p className="text-chip text-mute">
++				{meme.selectedVersion === "GRAYSCALE" ? "회색조 변환본" : "원본"}, 검수 {meme.approved ? "승인" : "대기"}, 판결
++				선택 {meme.active ? "활성" : "비활성"}
++			</p>
++			{isWorking ? (
++				<p role="status">회색조 변환 중</p>
++			) : transform.data?.status === "READY" ? (
++				<Button
++					variant="secondary"
++					disabled={isUpdating}
++					onClick={() => version.mutate(meme.selectedVersion === "GRAYSCALE" ? "ORIGINAL" : "GRAYSCALE")}
++				>
++					{meme.selectedVersion === "GRAYSCALE" ? "원본 선택하고 다시 검수" : "회색조 선택하고 다시 검수"}
++				</Button>
++			) : (
++				<Button variant="secondary" disabled={createTransform.isPending} onClick={() => createTransform.mutate()}>
++					{transform.data?.status === "FAILED" ? "무료 회색조 변환 재시도" : "무료 회색조로 변환"}
++				</Button>
++			)}
++			<Button
++				variant="secondary"
++				disabled={isUpdating}
++				onClick={() => review.mutate({ id: meme.id, approved: !meme.approved })}
++			>
++				{meme.approved ? "승인 철회" : "검수 승인"}
++			</Button>
++			<Button
++				variant="outline"
++				disabled={isUpdating || !meme.approved}
++				onClick={() => updateActive.mutate({ id: meme.id, active: !meme.active })}
++			>
++				{meme.active ? "선택 비활성화" : "선택 활성화"}
++			</Button>
++			{error && <Alert>{error.message}</Alert>}
++		</article>
++	);
++}
+diff --git a/src/features/images/hooks/useImageActions.ts b/src/features/images/hooks/useImageActions.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..8834e1ecfcb75407ea214750f9cf6a59d347f53d
+--- /dev/null
++++ b/src/features/images/hooks/useImageActions.ts
+@@ -0,0 +1,77 @@
++import { useMutation, useQueryClient } from "@tanstack/react-query";
++
++import {
++	createCatalogTransform,
++	createImageTransform,
++	imageQueries,
++	reviewCatalogMeme,
++	reviewPrivateImage,
++	updateCatalogMemeActive,
++	updateCatalogMemeVersion,
++	uploadCatalogMeme,
++	uploadPrivateImage
++} from "../api/images";
++
++export function useUploadPrivateImage() {
++	const queryClient = useQueryClient();
++	return useMutation({
++		mutationFn: uploadPrivateImage,
++		onSuccess: (data) => queryClient.setQueryData(imageQueries.detail(data.id).queryKey, data)
++	});
++}
++
++export function useCreateImageTransform(imageId: string) {
++	const queryClient = useQueryClient();
++	return useMutation({
++		mutationFn: () => createImageTransform(imageId),
++		onSuccess: (data) => queryClient.setQueryData(imageQueries.transform(imageId).queryKey, data)
++	});
++}
++
++export function useUploadCatalogMeme() {
++	const queryClient = useQueryClient();
++	return useMutation({
++		mutationFn: uploadCatalogMeme,
++		onSuccess: () => queryClient.invalidateQueries({ queryKey: imageQueries.catalog().queryKey })
++	});
++}
++
++export function useReviewCatalogMeme() {
++	const queryClient = useQueryClient();
++	return useMutation({
++		mutationFn: ({ id, approved }: { id: string; approved: boolean }) => reviewCatalogMeme(id, approved),
++		onSuccess: () => queryClient.invalidateQueries({ queryKey: imageQueries.catalog().queryKey })
++	});
++}
++
++export function useUpdateCatalogMemeActive() {
++	const queryClient = useQueryClient();
++	return useMutation({
++		mutationFn: ({ id, active }: { id: string; active: boolean }) => updateCatalogMemeActive(id, active),
++		onSuccess: () => queryClient.invalidateQueries({ queryKey: imageQueries.catalog().queryKey })
++	});
++}
++
++export function useReviewPrivateImage(imageId: string) {
++	const queryClient = useQueryClient();
++	return useMutation({
++		mutationFn: (input: { approved: boolean; version: "ORIGINAL" | "GRAYSCALE" }) => reviewPrivateImage(imageId, input),
++		onSuccess: (data) => queryClient.setQueryData(imageQueries.detail(imageId).queryKey, data)
++	});
++}
++
++export function useCreateCatalogTransform(memeId: string) {
++	const queryClient = useQueryClient();
++	return useMutation({
++		mutationFn: () => createCatalogTransform(memeId),
++		onSuccess: (data) => queryClient.setQueryData(imageQueries.catalogTransform(memeId).queryKey, data)
++	});
++}
++
++export function useUpdateCatalogMemeVersion(memeId: string) {
++	const queryClient = useQueryClient();
++	return useMutation({
++		mutationFn: (version: "ORIGINAL" | "GRAYSCALE") => updateCatalogMemeVersion(memeId, version),
++		onSuccess: () => queryClient.invalidateQueries({ queryKey: imageQueries.catalog().queryKey })
++	});
++}
+diff --git a/src/features/images/index.ts b/src/features/images/index.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..721472c4b4e7ee9bd3d903c0b5e9f6dde714770e
+--- /dev/null
++++ b/src/features/images/index.ts
+@@ -0,0 +1,3 @@
++export { AdminImagesPage } from "./pages/AdminImagesPage";
++export { ImageUploadPage } from "./pages/ImageUploadPage";
++export { PrivateImagePage } from "./pages/PrivateImagePage";
+diff --git a/src/features/images/pages/AdminImagesPage.tsx b/src/features/images/pages/AdminImagesPage.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..7f0f08481a2e6c16c5fa5abbf33b19359d7eb09d
+--- /dev/null
++++ b/src/features/images/pages/AdminImagesPage.tsx
+@@ -0,0 +1,89 @@
++import { useQuery } from "@tanstack/react-query";
++import { useState } from "react";
++import { useNavigate } from "react-router";
++
++import { BackHeader } from "@/shared/components/BackHeader";
++import { Alert } from "@/shared/ui/Alert";
++import { Button } from "@/shared/ui/Button";
++import { TextField } from "@/shared/ui/TextField";
++
++import { imageQueries, MEME_TAGS } from "../api/images";
++import { CatalogMemeItem } from "../components/CatalogMemeItem";
++import { useUploadCatalogMeme } from "../hooks/useImageActions";
++
++export function AdminImagesPage() {
++	const navigate = useNavigate();
++	const catalog = useQuery(imageQueries.catalog());
++	const upload = useUploadCatalogMeme();
++	const [file, setFile] = useState<File | null>(null);
++	const [tag, setTag] = useState<string>(MEME_TAGS[0]);
++	const [strategies, setStrategies] = useState("");
++	const [emotions, setEmotions] = useState("");
++	const [keywords, setKeywords] = useState("");
++	const mutationError = upload.error;
++
++	return (
++		<div className="flex flex-1 flex-col gap-4 px-5 pb-8">
++			<BackHeader title="관리자 짤 카탈로그" onBack={() => void navigate("/")} />
++			{catalog.isPending && <p role="status">관리 권한과 카탈로그를 확인하는 중</p>}
++			{catalog.error && (
++				<Alert>
++					{catalog.error.kind === "forbidden" ? "등록된 관리자만 접근할 수 있습니다." : catalog.error.message}
++				</Alert>
++			)}
++			{catalog.isSuccess && (
++				<>
++					<h1 className="text-title text-ink">짤 등록</h1>
++					<p className="text-body text-mute">
++						실제 판결과 일치하는 태그로 등록하세요. 검수 승인 후 선택 활성화를 켜면 판결에 사용됩니다.
++					</p>
++					<label className="flex flex-col gap-2 text-label text-ink">
++						이미지 파일
++						<input
++							type="file"
++							accept="image/png,image/jpeg,image/webp"
++							disabled={upload.isPending}
++							onChange={(event) => {
++								setFile(event.target.files?.[0] ?? null);
++								upload.reset();
++							}}
++							className="rounded-xl border border-line bg-card p-3 text-body"
++						/>
++					</label>
++					<label className="flex flex-col gap-2 text-label text-ink">
++						판결 태그
++						<select
++							value={tag}
++							onChange={(event) => setTag(event.target.value)}
++							className="rounded-xl border border-line bg-card p-3 text-body"
++						>
++							{MEME_TAGS.map((value) => (
++								<option key={value}>{value}</option>
++							))}
++						</select>
++					</label>
++					<TextField label="전략" hint="선택, 쉼표로 구분" value={strategies} onChange={setStrategies} />
++					<TextField label="감정" hint="선택, 쉼표로 구분" value={emotions} onChange={setEmotions} />
++					<TextField label="키워드" hint="선택, 쉼표로 구분" value={keywords} onChange={setKeywords} />
++					<Button
++						disabled={!file || upload.isPending}
++						onClick={() => {
++							if (file) {
++								upload.mutate({ file, tag, strategies, emotions, keywords });
++							}
++						}}
++					>
++						{upload.isPending ? "등록 중" : "검수 대기로 등록"}
++					</Button>
++					{mutationError && <Alert>{mutationError.message}</Alert>}
++					<section className="flex flex-col gap-4" aria-label="등록된 짤">
++						<h2 className="text-subtitle text-ink">등록된 짤 {catalog.data.length}개</h2>
++						{catalog.data.map((meme) => (
++							<CatalogMemeItem key={meme.id} meme={meme} />
++						))}
++					</section>
++				</>
++			)}
++		</div>
++	);
++}
+diff --git a/src/features/images/pages/ImageUploadPage.tsx b/src/features/images/pages/ImageUploadPage.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..e65410b10cb085835af99f449cf586cdfb1d91a9
+--- /dev/null
++++ b/src/features/images/pages/ImageUploadPage.tsx
+@@ -0,0 +1,49 @@
++import { useState } from "react";
++import { useNavigate } from "react-router";
++
++import { BackHeader } from "@/shared/components/BackHeader";
++import { Alert } from "@/shared/ui/Alert";
++import { Button } from "@/shared/ui/Button";
++
++import { useUploadPrivateImage } from "../hooks/useImageActions";
++
++export function ImageUploadPage() {
++	const [file, setFile] = useState<File | null>(null);
++	const navigate = useNavigate();
++	const upload = useUploadPrivateImage();
++
++	return (
++		<div className="flex flex-1 flex-col gap-4 px-5 pb-8">
++			<BackHeader title="내 이미지" onBack={() => void navigate("/")} />
++			<h1 className="text-title text-ink">이미지를 비공개로 보관해요</h1>
++			<p className="text-body text-mute">
++				원본을 올린 다음 원하는 경우 무료 회색조 변환을 선택하고, 마음에 드는 버전을 확인해 저장하세요.
++			</p>
++			<label className="flex flex-col gap-2 text-label text-ink">
++				이미지 파일
++				<input
++					type="file"
++					accept="image/png,image/jpeg,image/webp"
++					disabled={upload.isPending}
++					onChange={(event) => {
++						setFile(event.target.files?.[0] ?? null);
++						upload.reset();
++					}}
++					className="rounded-xl border border-line bg-card p-3 text-body"
++				/>
++			</label>
++			{file && <p className="text-chip text-mute">{file.name}</p>}
++			{upload.error && <Alert>{upload.error.message}</Alert>}
++			<Button
++				disabled={!file || upload.isPending}
++				onClick={() => {
++					if (file) {
++						upload.mutate(file, { onSuccess: (image) => void navigate(`/images/${encodeURIComponent(image.id)}`) });
++					}
++				}}
++			>
++				{upload.isPending ? "업로드 중" : "비공개 업로드"}
++			</Button>
++		</div>
++	);
++}
+diff --git a/src/features/images/pages/PrivateImagePage.tsx b/src/features/images/pages/PrivateImagePage.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..5028ea721beb86ddba18bcb18879ab4c738f0e2f
+--- /dev/null
++++ b/src/features/images/pages/PrivateImagePage.tsx
+@@ -0,0 +1,92 @@
++import { useQuery } from "@tanstack/react-query";
++import { useNavigate, useParams } from "react-router";
++
++import { BackHeader } from "@/shared/components/BackHeader";
++import { Alert } from "@/shared/ui/Alert";
++import { BlobImage } from "@/shared/ui/BlobImage";
++import { Button } from "@/shared/ui/Button";
++
++import { imageQueries } from "../api/images";
++import { useCreateImageTransform, useReviewPrivateImage } from "../hooks/useImageActions";
++
++export function PrivateImagePage() {
++	const { imageId = "" } = useParams();
++	const navigate = useNavigate();
++	const detail = useQuery(imageQueries.detail(imageId));
++	const transform = useQuery({ ...imageQueries.transform(imageId), enabled: Boolean(detail.data) });
++	const original = useQuery({
++		...imageQueries.content(imageId, false, detail.data?.sha256 ?? null),
++		enabled: Boolean(detail.data)
++	});
++	const transformed = useQuery({
++		...imageQueries.content(imageId, true, transform.data?.sha256 ?? null),
++		enabled: transform.data?.status === "READY"
++	});
++	const createTransform = useCreateImageTransform(imageId);
++	const review = useReviewPrivateImage(imageId);
++	const isWorking = transform.data?.status === "PENDING" || transform.data?.status === "RENDERING";
++	const canTransform = !isWorking && transform.data?.status !== "READY" && !createTransform.isPending;
++	const loadError = detail.error ?? transform.error ?? original.error ?? transformed.error;
++
++	return (
++		<div className="flex flex-1 flex-col gap-4 px-5 pb-8">
++			<BackHeader title="내 이미지 검수" onBack={() => void navigate("/images/new")} />
++			{detail.isPending && <p role="status">이미지를 불러오는 중</p>}
++			{detail.data === null && <Alert>이미지가 없거나 이 계정의 이미지가 아닙니다.</Alert>}
++			{loadError && <Alert>{loadError.message}</Alert>}
++			{detail.data && !detail.error && (
++				<>
++					<p className="text-body text-mute">비공개 원본이 저장되었습니다. 다른 사용자에게 공개되지 않습니다.</p>
++					<h2 className="text-subtitle text-ink">원본</h2>
++					{original.data && !original.error && (
++						<BlobImage blob={original.data} alt="비공개 원본 이미지" sha256={detail.data.sha256} />
++					)}
++					{detail.data.reviewStatus !== "PENDING" && (
++						<p role="status" className="text-body text-mute">
++							{detail.data.reviewStatus === "APPROVED"
++								? `${detail.data.selectedVersion === "GRAYSCALE" ? "회색조 변환본" : "원본"}을 비공개 보관용으로 확정했습니다.`
++								: "검수에서 제외했습니다. 원본은 비공개로 보관됩니다."}
++						</p>
++					)}
++					<Button
++						variant="secondary"
++						disabled={review.isPending}
++						onClick={() => review.mutate({ approved: true, version: "ORIGINAL" })}
++					>
++						원본 확인하고 저장 확정
++					</Button>
++					{canTransform && (
++						<Button variant="secondary" onClick={() => createTransform.mutate()}>
++							{transform.data?.status === "FAILED" ? "무료 회색조 변환 다시 시도" : "무료 회색조로 변환"}
++						</Button>
++					)}
++					{isWorking && (
++						<p role="status">회색조로 변환하고 있습니다. 이 화면에 다시 들어오면 결과를 확인할 수 있습니다.</p>
++					)}
++					{transform.data?.status === "FAILED" && <Alert>변환에 실패했습니다. 원본은 보관되어 있습니다.</Alert>}
++					{transformed.data && !transformed.error && (
++						<>
++							<h2 className="text-subtitle text-ink">회색조 변환본</h2>
++							<BlobImage blob={transformed.data} alt="비공개 회색조 변환본" sha256={transform.data?.sha256} />
++							<Button
++								disabled={review.isPending}
++								onClick={() => review.mutate({ approved: true, version: "GRAYSCALE" })}
++							>
++								변환본 확인하고 저장 확정
++							</Button>
++						</>
++					)}
++					<Button
++						variant="outline"
++						disabled={review.isPending}
++						onClick={() => review.mutate({ approved: false, version: "ORIGINAL" })}
++					>
++						검수에서 제외
++					</Button>
++					{createTransform.error && <Alert>{createTransform.error.message}</Alert>}
++					{review.error && <Alert>{review.error.message}</Alert>}
++				</>
++			)}
++		</div>
++	);
++}
+diff --git a/src/features/post/components/PostMemeImage.tsx b/src/features/post/components/PostMemeImage.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..b260c051c8c95ac83240538eb097132142cb75fe
+--- /dev/null
++++ b/src/features/post/components/PostMemeImage.tsx
+@@ -0,0 +1,37 @@
++import { useQuery } from "@tanstack/react-query";
++import { useState } from "react";
++
++import { type PostMeme, postQueries } from "@/shared/api/posts";
++import { Alert } from "@/shared/ui/Alert";
++import { BlobImage } from "@/shared/ui/BlobImage";
++
++type PostMemeImageProps = { meme: PostMeme | null };
++
++export function PostMemeImage({ meme }: PostMemeImageProps) {
++	const [isFailed, setIsFailed] = useState(false);
++	const isProtected = Boolean(meme?.imageUrl?.startsWith("/api/memes/") && meme.imageId);
++	const image = useQuery({ ...postQueries.meme(meme?.imageId ?? ""), enabled: isProtected });
++	if (!meme?.imageUrl) {
++		return <p className="text-chip text-mute">이 판결에 맞는 등록된 짤이 없습니다.</p>;
++	}
++	if (isProtected) {
++		return (
++			<>
++				{image.isPending && <p role="status">짤을 불러오는 중</p>}
++				{image.error && <Alert>짤을 불러오지 못했습니다.</Alert>}
++				{image.data && !image.error && <BlobImage blob={image.data} alt="판결에 선택된 짤" />}
++			</>
++		);
++	}
++	if (isFailed) {
++		return <p className="text-chip text-mute">짤을 불러오지 못했습니다.</p>;
++	}
++	return (
++		<img
++			src={meme.imageUrl}
++			alt="판결에 선택된 짤"
++			className="w-full rounded-card object-contain"
++			onError={() => setIsFailed(true)}
++		/>
++	);
++}
+diff --git a/src/features/post/components/PostVoteForm.tsx b/src/features/post/components/PostVoteForm.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..2f7b4760d82712966f4e88f1ed722709cead01ea
+--- /dev/null
++++ b/src/features/post/components/PostVoteForm.tsx
+@@ -0,0 +1,53 @@
++import { useState } from "react";
++
++import type { PostDetail } from "@/shared/api/posts";
++import { VERDICT_LABELS, VOTE_VERDICTS } from "@/shared/domain/verdict";
++import { Alert } from "@/shared/ui/Alert";
++import { Button } from "@/shared/ui/Button";
++import { TextField } from "@/shared/ui/TextField";
++
++import { useCreatePostVote } from "../hooks/usePostActions";
++import { VerdictChoice, type VoteSide } from "./VerdictChoice";
++
++const REASON_MAX_LENGTH = 500;
++
++type PostVoteFormProps = { post: PostDetail; roomId: string };
++
++export function PostVoteForm({ post, roomId }: PostVoteFormProps) {
++	const [side, setSide] = useState<VoteSide>("oppose");
++	const [reason, setReason] = useState("");
++	const vote = useCreatePostVote(post.id);
++	const verdict = VOTE_VERDICTS[post.postType][side];
++	const canSubmit = reason.trim().length > 0 && roomId !== "" && !vote.isPending;
++
++	if (post.myVote || vote.isSuccess) {
++		return (
++			<p role="status" className="text-body text-mute">
++				투표를 제출했습니다. 나머지 배심원을 기다려 주세요.
++			</p>
++		);
++	}
++	if (!post.canVote) {
++		return null;
++	}
++
++	return (
++		<section className="flex flex-col gap-3" aria-label="배심원 투표">
++			<h2 className="text-subtitle text-ink">배심원 투표</h2>
++			<VerdictChoice postType={post.postType} value={side} onChange={setSide} />
++			<TextField
++				label="투표 사유"
++				value={reason}
++				onChange={setReason}
++				maxLength={REASON_MAX_LENGTH}
++				required
++				multiline
++			/>
++			<p className="text-chip text-mute">제출한 표는 수정할 수 없습니다. 전원이 투표하면 자동으로 판결합니다.</p>
++			{vote.error && <Alert>{vote.error.message}</Alert>}
++			<Button disabled={!canSubmit} onClick={() => vote.mutate({ verdict, reason: reason.trim(), roomId })}>
++				{vote.isPending ? "제출 중" : `${VERDICT_LABELS[verdict]}로 평결 제출`}
++			</Button>
++		</section>
++	);
++}
+diff --git a/src/features/post/hooks/useDownloadCard.ts b/src/features/post/hooks/useDownloadCard.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..a5dafcf90134b4fa4647f747ecc0bb2fce9c4082
+--- /dev/null
++++ b/src/features/post/hooks/useDownloadCard.ts
+@@ -0,0 +1,21 @@
++import { useMutation } from "@tanstack/react-query";
++
++import { fetchCardDownload } from "@/shared/api/posts";
++
++const URL_RELEASE_MS = 1000;
++
++export function useDownloadCard(postId: string) {
++	return useMutation({
++		mutationFn: () => fetchCardDownload(postId),
++		onSuccess: (blob) => {
++			const url = URL.createObjectURL(blob);
++			const anchor = document.createElement("a");
++			anchor.href = url;
++			anchor.download = `geoji-verdict-${postId}.png`;
++			document.body.append(anchor);
++			anchor.click();
++			anchor.remove();
++			setTimeout(() => URL.revokeObjectURL(url), URL_RELEASE_MS);
++		}
++	});
++}
+diff --git a/src/features/post/hooks/usePostActions.ts b/src/features/post/hooks/usePostActions.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..5b9c47be4ccc101057f01e60c5788dd0d211c628
+--- /dev/null
++++ b/src/features/post/hooks/usePostActions.ts
+@@ -0,0 +1,49 @@
++import { useMutation, useQueryClient } from "@tanstack/react-query";
++
++import {
++	castPostVote,
++	createCardRender,
++	postQueries,
++	type PostVoteInput,
++	removePost,
++	updateCardSharing
++} from "@/shared/api/posts";
++
++export function useCreatePostVote(postId: string) {
++	const queryClient = useQueryClient();
++	return useMutation({
++		mutationFn: (input: PostVoteInput) => castPostVote(postId, input),
++		onSettled: () =>
++			Promise.all([
++				queryClient.invalidateQueries({ queryKey: postQueries.detailKey(postId) }),
++				queryClient.invalidateQueries({ queryKey: postQueries.verdictKey(postId) })
++			])
++	});
++}
++
++export function useCreateCardRender(postId: string) {
++	const queryClient = useQueryClient();
++	return useMutation({
++		mutationFn: (retry: boolean) => createCardRender(postId, retry),
++		onSuccess: (data) => queryClient.setQueryData(postQueries.cardRender(postId).queryKey, data)
++	});
++}
++
++export function useRemovePost(postId: string) {
++	const queryClient = useQueryClient();
++	return useMutation({
++		mutationFn: () => removePost(postId),
++		onSuccess: () => {
++			queryClient.removeQueries({ queryKey: postQueries.all() });
++			queryClient.setQueryData(postQueries.detail(postId).queryKey, null);
++		}
++	});
++}
++
++export function useUpdateCardSharing(postId: string) {
++	const queryClient = useQueryClient();
++	return useMutation({
++		mutationFn: (enabled: boolean) => updateCardSharing(postId, enabled),
++		onSuccess: () => queryClient.invalidateQueries({ queryKey: postQueries.all() })
++	});
++}
+diff --git a/src/features/post/hooks/useSubmitPost.ts b/src/features/post/hooks/useSubmitPost.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..52e8e8c53634abef1f578a112264ad80e1be1030
+--- /dev/null
++++ b/src/features/post/hooks/useSubmitPost.ts
+@@ -0,0 +1,14 @@
++import { useMutation } from "@tanstack/react-query";
++
++import { completePost, type CompletePostInput, submitPost } from "@/shared/api/posts";
++
++export function useSubmitPost() {
++	return useMutation({ mutationFn: submitPost });
++}
++
++export function useCompletePost() {
++	return useMutation({
++		mutationFn: ({ submissionId, input }: { submissionId: string; input: CompletePostInput }) =>
++			completePost(submissionId, input)
++	});
++}
+diff --git a/src/features/post/index.ts b/src/features/post/index.ts
+index 116faa026ba00ba6a60053bf1e3dbf80c38fdcb3..44d74683baba140292bfee2a81f983dcc46d6d28 100644
+--- a/src/features/post/index.ts
++++ b/src/features/post/index.ts
+@@ -1,4 +1,6 @@
+ export { ExpenseCreatePage } from "./pages/ExpenseCreatePage";
++export { PostCardPage } from "./pages/PostCardPage";
++export { PostVerdictPage } from "./pages/PostVerdictPage";
+ export { VerdictCardPage } from "./pages/VerdictCardPage";
+ export { VerdictPage } from "./pages/VerdictPage";
+ export { VotePage } from "./pages/VotePage";
+diff --git a/src/features/post/pages/ExpenseCreatePage.tsx b/src/features/post/pages/ExpenseCreatePage.tsx
+index 9e9d69eea280ce8fc768d3f93655a27ab66326d0..f51658a9911c865841fd133dbd6f713490b9a3d1 100644
+--- a/src/features/post/pages/ExpenseCreatePage.tsx
++++ b/src/features/post/pages/ExpenseCreatePage.tsx
+@@ -1,65 +1,114 @@
+ import { useQuery } from "@tanstack/react-query";
+-import { useState } from "react";
++import { useRef, useState } from "react";
+ import { useNavigate } from "react-router";
+ 
+-import { EXPENSE_SOURCE_BY_POST_TYPE } from "@/shared/api/expenses";
++import type { Submission, SubmitPostInput } from "@/shared/api/posts";
+ import { roomQueries } from "@/shared/api/rooms";
+ import { BackHeader } from "@/shared/components/BackHeader";
+ import { EXPENSE_CATEGORIES } from "@/shared/constants/expense-categories";
++import { postVerdictPath } from "@/shared/constants/routes";
+ import { POST_TYPE_LABELS, type PostType } from "@/shared/domain/post";
+ import { Alert } from "@/shared/ui/Alert";
+ import { AmountField } from "@/shared/ui/AmountField";
+-import { AttachmentField } from "@/shared/ui/AttachmentField";
++import { Button } from "@/shared/ui/Button";
+ import { Chip } from "@/shared/ui/Chip";
+ import { StickyCta } from "@/shared/ui/StickyCta";
+ import { TabSegment } from "@/shared/ui/TabSegment";
+ import { TextField } from "@/shared/ui/TextField";
+ import { parseAmount } from "@/shared/utils/format";
+ 
+-import { useCreateExpense } from "../hooks/useCreateExpense";
++import { useCompletePost, useSubmitPost } from "../hooks/useSubmitPost";
+ 
+ const TITLE_MAX_LENGTH = 30;
++const MAX_AMOUNT_KRW = 2_147_483_647;
+ const PLEA_MAX_LENGTH = 200;
+ const POST_TYPES = ["spent", "considering"] as const satisfies readonly PostType[];
+-const PLEA_PLACEHOLDER: Record<PostType, string> = {
+-	spent: "왜 썼는지 변론하세요",
+-	considering: "왜 사고 싶은지 말해보세요"
+-};
+ 
+ export function ExpenseCreatePage() {
+ 	const navigate = useNavigate();
+ 	const [postType, setPostType] = useState<PostType>("spent");
+ 	const [amount, setAmount] = useState("");
+-	const [title, setTitle] = useState("");
++	const [item, setItem] = useState("");
+ 	const [category, setCategory] = useState("");
+-	const [plea, setPlea] = useState("");
+-	const [evidence, setEvidence] = useState<File | null>(null);
+-	const [capturedAt] = useState(() => new Date());
+-
++	const [reason, setReason] = useState("");
++	const [submission, setSubmission] = useState<Submission | null>(null);
++	const [reviewedInput, setReviewedInput] = useState<SubmitPostInput | null>(null);
++	const requestRef = useRef<{ fingerprint: string; idempotencyKey: string } | null>(null);
+ 	const rooms = useQuery(roomQueries.list());
+-	const createExpense = useCreateExpense();
++	const submitPost = useSubmitPost();
++	const completePost = useCompletePost();
+ 	const parsedAmount = parseAmount(amount);
+-	const trimmedTitle = title.trim();
+-	const draft =
+-		parsedAmount !== null && trimmedTitle.length > 0 && category.length > 0
+-			? { amount: parsedAmount, category, memo: trimmedTitle, source: EXPENSE_SOURCE_BY_POST_TYPE[postType] }
+-			: null;
+-	const canSubmit = draft !== null;
+-	const roomCountLabel = rooms.isSuccess ? `(${rooms.data.length}개)` : "";
++	const roomIds = rooms.isSuccess ? rooms.data.map((room) => room.id) : [];
++	const hasFields =
++		parsedAmount !== null &&
++		parsedAmount > 0 &&
++		parsedAmount <= MAX_AMOUNT_KRW &&
++		item.trim() !== "" &&
++		category !== "" &&
++		roomIds.length > 0;
++	const isSubmitting = submitPost.isPending || completePost.isPending;
++	const canRevise = submission?.intakeResult.mode !== "FINAL_CHECK";
++	const submitError = submitPost.error ?? completePost.error;
++
++	const handleResult = (result: Submission, input: SubmitPostInput) => {
++		setSubmission(result);
++		setReviewedInput(input);
++		if (result.status === "COMPLETED" && result.postId) {
++			void navigate(postVerdictPath(result.postId, input.roomIds[0]), { replace: true });
++		}
++	};
++
++	const handleSubmit = () => {
++		if (!hasFields || parsedAmount === null) {
++			return;
++		}
++		const input: SubmitPostInput = {
++			postType,
++			amountKrw: parsedAmount,
++			item: item.trim(),
++			category,
++			reason: reason.trim() || null,
++			roomIds
++		};
++		if (submission) {
++			completePost.mutate(
++				{ submissionId: submission.submissionId, input: { ...input, action: "REVISE", revision: submission.revision } },
++				{
++					onSuccess: (result) => handleResult(result, input)
++				}
++			);
++		} else {
++			const fingerprint = JSON.stringify(input);
++			if (requestRef.current?.fingerprint !== fingerprint) {
++				requestRef.current = { fingerprint, idempotencyKey: crypto.randomUUID() };
++			}
++			submitPost.mutate(
++				{ input, idempotencyKey: requestRef.current.idempotencyKey },
++				{ onSuccess: (result) => handleResult(result, input) }
++			);
++		}
++	};
+ 
+-	const submit = () => {
+-		if (!draft) {
++	const handleProceed = () => {
++		if (!submission || !reviewedInput) {
+ 			return;
+ 		}
+-		createExpense.mutate(draft, { onSuccess: () => void navigate("/") });
++		completePost.mutate(
++			{
++				submissionId: submission.submissionId,
++				input: { ...reviewedInput, action: "PROCEED", revision: submission.revision }
++			},
++			{
++				onSuccess: (result) => handleResult(result, reviewedInput)
++			}
++		);
+ 	};
+ 
+ 	return (
+ 		<div className="relative flex flex-1 flex-col">
+ 			<div className="px-5">
+-				<BackHeader title="지출 등록" secondaryText="30초 컷" leftIcon="close" onBack={() => void navigate(-1)} />
++				<BackHeader title="지출 등록" leftIcon="close" onBack={() => void navigate(-1)} />
+ 			</div>
+-
+ 			<div className="flex flex-col gap-3 px-5 pt-2 pb-6">
+ 				<TabSegment
+ 					tabs={POST_TYPES}
+@@ -67,11 +116,12 @@ export function ExpenseCreatePage() {
+ 					renderLabel={(key) => POST_TYPE_LABELS[key]}
+ 					onChange={setPostType}
+ 				/>
+-
+-				<AmountField label="얼마 썼어요?" value={amount} onChange={setAmount} />
+-
+-				<TextField label="무엇을?" required value={title} onChange={setTitle} maxLength={TITLE_MAX_LENGTH} />
+-
++				<AmountField
++					label={postType === "spent" ? "얼마 썼어요?" : "얼마인가요?"}
++					value={amount}
++					onChange={setAmount}
++				/>
++				<TextField label="무엇을?" required value={item} onChange={setItem} maxLength={TITLE_MAX_LENGTH} />
+ 				<div className="flex flex-col gap-2">
+ 					<span className="text-label text-mute">어디에?</span>
+ 					<div className="flex flex-wrap gap-1.5">
+@@ -82,35 +132,52 @@ export function ExpenseCreatePage() {
+ 						))}
+ 					</div>
+ 				</div>
+-
+ 				<TextField
+ 					label="변론"
+-					hint="선택, 지금은 저장되지 않습니다"
+-					value={plea}
+-					onChange={setPlea}
++					hint="선택"
++					value={reason}
++					onChange={setReason}
+ 					maxLength={PLEA_MAX_LENGTH}
+-					placeholder={PLEA_PLACEHOLDER[postType]}
++					placeholder="필요했던 이유를 알려주세요"
+ 					multiline
+ 				/>
+-
+-				<AttachmentField label="증거 사진 1장" file={evidence} onSelect={setEvidence} />
+-
+-				<p className="text-chip text-mute">
+-					일시 오늘 {capturedAt.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+-					{postType === "considering" && " (변경 불가)"}
+-				</p>
+-
+-				{createExpense.isError && <Alert>{createExpense.error.message}</Alert>}
++				{rooms.isPending && <p role="status">공유할 방을 불러오는 중</p>}
++				{rooms.isError && <Alert>{rooms.error.message}</Alert>}
++				{rooms.isSuccess && rooms.data.length === 0 && <Alert>재판을 열려면 먼저 거지방에 참여해 주세요.</Alert>}
++				{submission && submission.status !== "COMPLETED" && (
++					<div className="flex flex-col gap-2" role="status">
++						<Alert tone={submission.status === "BLOCKED" ? "red" : "fill"}>{submission.intakeResult.message}</Alert>
++						{submission.intakeResult.itemReview.suggestedItem && (
++							<p className="text-body text-mute">제안: {submission.intakeResult.itemReview.suggestedItem}</p>
++						)}
++						{submission.intakeResult.categoryReview.suggestedCategory && (
++							<p className="text-body text-mute">
++								추천 분류: {submission.intakeResult.categoryReview.suggestedCategory}
++							</p>
++						)}
++						{submission.status === "NEEDS_INPUT" && (
++							<Button variant="secondary" onClick={handleProceed} disabled={isSubmitting}>
++								검토받은 내용 그대로 등록
++							</Button>
++						)}
++						{!canRevise && (
++							<p className="text-body text-mute">최종 검토가 끝났습니다. 새로운 내용은 새 제출로 등록해 주세요.</p>
++						)}
++					</div>
++				)}
++				{submitError && <Alert>{submitError.message}</Alert>}
++				{submitError?.kind === "timeout" && (
++					<Alert tone="fill">응답을 받지 못했습니다. 내용을 바꾸지 않고 다시 누르면 기존 제출을 확인합니다.</Alert>
++				)}
+ 			</div>
+-
+ 			<div className="sticky-cta flex flex-col gap-2.5">
+ 				<p className="rounded-xl border border-line bg-card px-3.5 py-2.5 text-center text-chip text-mute">
+-					이 지출은 내가 속한 <b className="text-ink">모든 방{roomCountLabel}</b>에 공유됩니다
++					내가 속한 모든 방 {rooms.isSuccess ? `(${rooms.data.length}개)` : ""}에 공유됩니다.
+ 				</p>
+ 				<StickyCta
+-					label={createExpense.isPending ? "회부 중" : "재판에 회부하기"}
+-					onClick={submit}
+-					disabled={!canSubmit || createExpense.isPending}
++					label={isSubmitting ? "검토 중" : submission ? "고친 내용으로 다시 검토" : "재판에 회부하기"}
++					onClick={handleSubmit}
++					disabled={!hasFields || isSubmitting || !canRevise}
+ 				/>
+ 			</div>
+ 		</div>
+diff --git a/src/features/post/pages/PostCardPage.tsx b/src/features/post/pages/PostCardPage.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..03c4eec950fb38af33f443a66dc71279099f7129
+--- /dev/null
++++ b/src/features/post/pages/PostCardPage.tsx
+@@ -0,0 +1,95 @@
++import { useQuery } from "@tanstack/react-query";
++import { useNavigate, useParams, useSearchParams } from "react-router";
++
++import { postQueries } from "@/shared/api/posts";
++import { BackHeader } from "@/shared/components/BackHeader";
++import { postVerdictPath } from "@/shared/constants/routes";
++import { Alert } from "@/shared/ui/Alert";
++import { BlobImage } from "@/shared/ui/BlobImage";
++import { Button } from "@/shared/ui/Button";
++
++import { useDownloadCard } from "../hooks/useDownloadCard";
++import { useCreateCardRender } from "../hooks/usePostActions";
++
++const ACCESS_RECHECK_MS = 5000;
++const STATUS_LABELS = {
++	PENDING: "카드 제작을 기다리고 있습니다.",
++	RENDERING: "카드를 만들고 있습니다.",
++	READY: "저장된 카드입니다.",
++	FAILED: "카드를 만들지 못했습니다. 판결문은 그대로 보관됩니다."
++} as const;
++
++export function PostCardPage() {
++	const { postId = "" } = useParams();
++	const [params] = useSearchParams();
++	const roomId = params.get("room") ?? "";
++	const navigate = useNavigate();
++	const card = useQuery({ ...postQueries.shareCard(postId), refetchInterval: ACCESS_RECHECK_MS });
++	const render = useQuery({ ...postQueries.cardRender(postId), enabled: Boolean(card.data) });
++	const createRender = useCreateCardRender(postId);
++	const download = useDownloadCard(postId);
++	const isAvailable = Boolean(card.data) && !card.error && !render.error;
++	const isReady = isAvailable && render.data?.status === "READY";
++	const png = useQuery({ ...postQueries.cardPng(postId, render.data?.pngSha256 ?? null), enabled: isReady });
++	const isWorking = render.data?.status === "PENDING" || render.data?.status === "RENDERING";
++	const canCreate = isAvailable && !isWorking && !isReady && !createRender.isPending;
++	const loadError = card.error ?? render.error;
++	const hasDeniedDownload = download.error?.kind === "notFound" || download.error?.kind === "forbidden";
++
++	return (
++		<div className="flex flex-1 flex-col gap-4 px-5 pb-8">
++			<BackHeader title="판결 카드" onBack={() => void navigate(postVerdictPath(postId, roomId))} />
++			{card.isPending && <p role="status">공개할 판결 문구를 불러오는 중</p>}
++			{loadError && <Alert>{loadError.message}</Alert>}
++			{card.data === null && <Alert>아직 판결이 확정되지 않았거나 삭제 또는 공유 철회로 카드를 볼 수 없습니다.</Alert>}
++			{isAvailable && card.data && (
++				<>
++					{render.data && (
++						<p role="status" className="text-body text-mute">
++							{STATUS_LABELS[render.data.status]}
++						</p>
++					)}
++					{isReady && !hasDeniedDownload ? (
++						<>
++							{png.isPending && <p role="status">저장된 이미지를 불러오는 중</p>}
++							{png.error && <Alert>{png.error.message}</Alert>}
++							{png.data && !png.error && (
++								<BlobImage blob={png.data} alt="서버에 저장된 판결 카드" sha256={render.data?.pngSha256 ?? null} />
++							)}
++							<Button
++								onClick={() => download.mutate()}
++								disabled={!png.data || Boolean(png.error) || download.isPending}
++							>
++								{download.isPending ? "다운로드 중" : "PNG 다운로드"}
++							</Button>
++						</>
++					) : (
++						<section className="flex flex-col gap-3 border-y border-line py-4" aria-label="카드에 공개되는 문구">
++							<h1 className="text-title text-ink">{card.data.headline}</h1>
++							{card.data.statement.map((line, index) => (
++								<p key={index} className="text-body text-text">
++									{line}
++								</p>
++							))}
++							{card.data.sentenceLabel && <p className="text-body text-ink">{card.data.sentenceLabel}</p>}
++							<p className="text-chip text-mute">개인 지출 내역과 비공개 근거는 카드에 담지 않습니다.</p>
++						</section>
++					)}
++					{canCreate && (
++						<Button onClick={() => createRender.mutate(render.data?.status === "FAILED")}>
++							{render.data?.status === "FAILED" ? "카드만 다시 만들기" : "카드 PNG 만들고 서버에 저장"}
++						</Button>
++					)}
++					{createRender.error && (
++						<Alert>
++							{createRender.error.kind === "notFound"
++								? "현재 카드를 만들 수 없습니다. 판결 화면에서 게시물과 공유 설정을 확인해 주세요."
++								: createRender.error.message}
++						</Alert>
++					)}
++					{download.error && <Alert>{download.error.message}</Alert>}
++				</>
++			)}
++		</div>
++	);
++}
+diff --git a/src/features/post/pages/PostVerdictPage.tsx b/src/features/post/pages/PostVerdictPage.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..36dd83574ee9f5635d4585cb498a2a746cd8ba5f
+--- /dev/null
++++ b/src/features/post/pages/PostVerdictPage.tsx
+@@ -0,0 +1,137 @@
++import { useQuery } from "@tanstack/react-query";
++import { useState } from "react";
++import { useNavigate, useParams, useSearchParams } from "react-router";
++
++import { postQueries } from "@/shared/api/posts";
++import { profileQueries } from "@/shared/api/profile";
++import { BackHeader } from "@/shared/components/BackHeader";
++import { VerdictStamp } from "@/shared/components/VerdictStamp";
++import { postCardPath } from "@/shared/constants/routes";
++import { Alert } from "@/shared/ui/Alert";
++import { Button } from "@/shared/ui/Button";
++import { formatRemaining } from "@/shared/utils/date";
++import { formatAmount } from "@/shared/utils/format";
++
++import { PostMemeImage } from "../components/PostMemeImage";
++import { PostVoteForm } from "../components/PostVoteForm";
++import { useRemovePost, useUpdateCardSharing } from "../hooks/usePostActions";
++
++export function PostVerdictPage() {
++	const { postId = "" } = useParams();
++	const [searchParams] = useSearchParams();
++	const navigate = useNavigate();
++	const roomId = searchParams.get("room") ?? "";
++	const [pollStartedAt] = useState(() => Date.now());
++	const detail = useQuery(postQueries.detail(postId));
++	const verdict = useQuery(postQueries.verdict(postId, roomId, pollStartedAt));
++	const { refetch: reloadDetail } = detail;
++	const { refetch: reloadVerdict } = verdict;
++	const profile = useQuery(profileQueries.me());
++	const removePost = useRemovePost(postId);
++	const sharing = useUpdateCardSharing(postId);
++	const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
++	const post = detail.error ? null : detail.data;
++	const result = verdict.error ? null : verdict.data;
++	const view = detail.error ? null : result?.view;
++	const isUnavailable = detail.data === null || verdict.data === null || removePost.isSuccess;
++	const loadError = detail.error ?? verdict.error;
++	const isAuthor = Boolean(post && profile.data && profile.data.id === post.authorId);
++	const voteRoomId = roomId || post?.roomIds[0] || "";
++
++	return (
++		<div className="flex flex-1 flex-col gap-4 px-5 pb-8">
++			<BackHeader title="재판과 판결" onBack={() => void navigate("/")} />
++			{isUnavailable ? (
++				<Alert>삭제되었거나 공유가 철회된 게시물입니다. 이 계정으로 볼 수 없습니다.</Alert>
++			) : (
++				<>
++					{(detail.isPending || verdict.isPending) && <p role="status">재판을 불러오는 중</p>}
++					{loadError && (
++						<div className="flex flex-col gap-2">
++							<Alert>{loadError.message}</Alert>
++							<Button
++								variant="secondary"
++								onClick={() => {
++									void reloadDetail();
++									void reloadVerdict();
++								}}
++							>
++								다시 조회
++							</Button>
++						</div>
++					)}
++					{post && (
++						<section className="flex flex-col gap-2 border-b border-line pb-4">
++							<h1 className="text-title text-ink">{post.item}</h1>
++							<p className="text-body text-mute">
++								{post.category}, {formatAmount(post.amountKrw)}원
++							</p>
++							{post.reason && <p className="text-body text-text">{post.reason}</p>}
++							{!post.juryStatus && !result?.juryStatus && (
++								<p className="text-chip text-mute">투표 {formatRemaining(post.voteDeadlineAt)}</p>
++							)}
++						</section>
++					)}
++					{result && !result.juryStatus && (
++						<p role="status" className="text-body text-mute">
++							배심원의 투표를 기다리고 있습니다.
++						</p>
++					)}
++					{post && !result?.juryStatus && <PostVoteForm post={post} roomId={voteRoomId} />}
++					{result?.juryStatus && <VerdictStamp verdict={result.juryStatus} />}
++					{result?.juryStatus === "dismissed" && <p role="status">배심원이 충분히 모이지 않아 각하되었습니다.</p>}
++					{result?.juryStatus && result.juryStatus !== "dismissed" && !view && !loadError && (
++						<p role="status">판결문을 준비하고 있습니다. 잠시만 기다려 주세요.</p>
++					)}
++					{view && (
++						<section className="flex flex-col gap-3" aria-label="판결문">
++							<p className="text-chip text-mute">{view.source === "AI" ? "AI 판사의 판결문" : "기본 판결문"}</p>
++							<h2 className="text-title text-ink">{view.headline}</h2>
++							{view.statement.map((sentence, index) => (
++								<p key={index} className="text-body text-text">
++									{sentence}
++								</p>
++							))}
++							{view.sentenceLabel && <p className="text-subtitle text-ink">{view.sentenceLabel}</p>}
++							{view.source === "AI" && view.sentencingReason && (
++								<p className="text-body text-mute">{view.sentencingReason}</p>
++							)}
++							<PostMemeImage meme={view.meme} />
++							<Button onClick={() => void navigate(postCardPath(postId, voteRoomId))}>판결 카드 저장하기</Button>
++						</section>
++					)}
++					{isAuthor && (
++						<div className="flex flex-col gap-2 pt-4">
++							<Button variant="outline" disabled={sharing.isPending} onClick={() => sharing.mutate(false)}>
++								카드 공유 중지
++							</Button>
++							<Button variant="outline" disabled={sharing.isPending} onClick={() => sharing.mutate(true)}>
++								카드 공유 허용
++							</Button>
++							{sharing.data && (
++								<p role="status">{sharing.data.enabled ? "카드 공유를 허용했습니다." : "카드 공유를 중지했습니다."}</p>
++							)}
++							{sharing.error && <Alert>{sharing.error.message}</Alert>}
++							{isConfirmingDelete ? (
++								<>
++									<Alert>게시물과 판결 카드에 접근할 수 없게 됩니다. 삭제할까요?</Alert>
++									<Button variant="danger" disabled={removePost.isPending} onClick={() => removePost.mutate()}>
++										게시물 삭제 확인
++									</Button>
++									<Button variant="secondary" onClick={() => setIsConfirmingDelete(false)}>
++										취소
++									</Button>
++								</>
++							) : (
++								<Button variant="outline" onClick={() => setIsConfirmingDelete(true)}>
++									게시물 삭제
++								</Button>
++							)}
++							{removePost.error && <Alert>{removePost.error.message}</Alert>}
++						</div>
++					)}
++				</>
++			)}
++		</div>
++	);
++}
+diff --git a/src/features/room/components/PostFeedItem.tsx b/src/features/room/components/PostFeedItem.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..8237a5359ba131776a27cba56aeefec49487787c
+--- /dev/null
++++ b/src/features/room/components/PostFeedItem.tsx
+@@ -0,0 +1,31 @@
++import { Link } from "react-router";
++
++import type { PostDetail } from "@/shared/api/posts";
++import { postVerdictPath } from "@/shared/constants/routes";
++import { VERDICT_LABELS } from "@/shared/domain/verdict";
++import { formatRemaining } from "@/shared/utils/date";
++import { formatAmount } from "@/shared/utils/format";
++
++type PostFeedItemProps = { post: PostDetail; roomId: string };
++
++export function PostFeedItem({ post, roomId }: PostFeedItemProps) {
++	return (
++		<Link to={postVerdictPath(post.id, roomId)} className="flex flex-col gap-2 rounded-card bg-card p-4 shadow-card">
++			<p className="text-chip text-mute">
++				{post.postType === "spent" ? "썼어요" : "살까요?"}, {post.category}
++			</p>
++			<h2 className="text-subtitle text-ink">{post.item}</h2>
++			<p className="text-body text-ink">{formatAmount(post.amountKrw)}원</p>
++			<p className="text-chip text-mute">
++				{post.juryStatus
++					? `${VERDICT_LABELS[post.juryStatus]} 판결 보기`
++					: post.myVote
++						? "투표 완료, 판결 기다리는 중"
++						: post.canVote
++							? "배심원 투표하기"
++							: "배심원 투표를 기다리는 중"}
++			</p>
++			{!post.juryStatus && <p className="text-chip text-mute">{formatRemaining(post.voteDeadlineAt)}</p>}
++		</Link>
++	);
++}
+diff --git a/src/features/room/pages/RoomFeedPage.tsx b/src/features/room/pages/RoomFeedPage.tsx
+index 74838a87481ac88a7f3fbad3bd51115ae9b82a07..34e96b9d4916318a44cd95d19801b994af876302 100644
+--- a/src/features/room/pages/RoomFeedPage.tsx
++++ b/src/features/room/pages/RoomFeedPage.tsx
+@@ -6,6 +6,7 @@ import type { ApiError } from "@/shared/api/api-error";
+ import { type Comment, commentQueries } from "@/shared/api/comments";
+ import { expenseQueries } from "@/shared/api/expenses";
+ import { memberName, memberQueries, type RoomMember } from "@/shared/api/members";
++import { postQueries } from "@/shared/api/posts";
+ import { profileQueries } from "@/shared/api/profile";
+ import { trialQueries } from "@/shared/api/trials";
+ import { CommentSheet } from "@/shared/components/CommentSheet";
+@@ -18,6 +19,7 @@ import { Fab } from "@/shared/ui/Fab";
+ import { Reveal } from "@/shared/ui/Reveal";
+ import { formatRelativeTime, recentRange } from "@/shared/utils/date";
+ 
++import { PostFeedItem } from "../components/PostFeedItem";
+ import { TrialExpenseCard } from "../components/TrialExpenseCard";
+ 
+ const RECENT_DAYS = 30;
+@@ -51,6 +53,7 @@ export function RoomFeedPage() {
+ 	const [range] = useState(() => recentRange(RECENT_DAYS));
+ 	const [sheet, setSheet] = useState<SheetState | null>(null);
+ 
++	const posts = useQuery(postQueries.listByRoom(roomId));
+ 	const me = useQuery(profileQueries.me());
+ 	const members = useQuery(memberQueries.list(roomId));
+ 	const expenses = useQuery(expenseQueries.listByRoom(roomId, range));
+@@ -76,7 +79,7 @@ export function RoomFeedPage() {
+ 		trials.some((trial) => trial.isPending) ||
+ 		comments.some((comment) => comment.isPending);
+ 	const firstError = firstErrorOf([me, members, expenses]) ?? firstErrorOf(trials) ?? firstErrorOf(comments);
+-	const isEmpty = expenses.isSuccess && expenseList.length === 0;
++	const isEmpty = expenses.isSuccess && posts.isSuccess && expenseList.length === 0 && posts.data.length === 0;
+ 	const sheetComments = sheet ? commentsByExpenseId.get(sheet.expenseId) : undefined;
+ 
+ 	const openSheet = (expenseId: string) => {
+@@ -97,6 +100,11 @@ export function RoomFeedPage() {
+ 					</Card>
+ 				)}
+ 				{firstError && <Alert>{firstError.message}</Alert>}
++				{posts.isPending && <p role="status">재판 목록을 불러오는 중</p>}
++				{posts.error && <Alert>{posts.error.message}</Alert>}
++				{posts.data?.map((post) => (
++					<PostFeedItem key={post.id} post={post} roomId={roomId} />
++				))}
+ 				{isEmpty && <EmptyState title="아직 아무도 돈을 쓰지 않았습니다. 평화롭네요." />}
+ 
+ 				{!isPending &&
+diff --git a/src/shared/api/http.ts b/src/shared/api/http.ts
+index d2560c9b24b10b2f8c67efc6e20b5ede919762a1..117c09a7cb314ecb943fc7a1efadd5f065dfa5ac 100644
+--- a/src/shared/api/http.ts
++++ b/src/shared/api/http.ts
+@@ -10,6 +10,7 @@ export type RequestOptions = {
+ 	signal?: AbortSignal;
+ 	timeoutMs?: number;
+ 	auth?: boolean;
++	idempotencyKey?: string;
+ };
+ 
+ type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+@@ -37,10 +38,13 @@ function buildUrl(path: string, query: QueryParams | undefined) {
+ 	return search === "" ? url : `${url}?${search}`;
+ }
+ 
+-async function buildHeaders(body: unknown, auth: boolean) {
+-	const headers: Record<string, string> = { Accept: "application/json" };
++async function buildHeaders(body: unknown, auth: boolean, idempotencyKey: string | undefined, accept: string) {
++	const headers: Record<string, string> = { Accept: accept };
++	if (idempotencyKey) {
++		headers["Idempotency-Key"] = idempotencyKey;
++	}
+ 
+-	if (body !== undefined) {
++	if (body !== undefined && !(body instanceof FormData)) {
+ 		headers["Content-Type"] = "application/json";
+ 	}
+ 
+@@ -98,10 +102,16 @@ function toRequestError(error: unknown, signal: AbortSignal | undefined) {
+ 	return error;
+ }
+ 
+-async function request<T>(method: HttpMethod, path: string, options: RequestOptions = {}) {
+-	const { query, body, signal, timeoutMs = DEFAULT_TIMEOUT_MS, auth = true } = options;
++async function request<T>(
++	method: HttpMethod,
++	path: string,
++	options: RequestOptions = {},
++	readBody = readSuccessBody<T>,
++	accept = "application/json"
++) {
++	const { query, body, signal, timeoutMs = DEFAULT_TIMEOUT_MS, auth = true, idempotencyKey } = options;
+ 	const url = buildUrl(path, query);
+-	const headers = await buildHeaders(body, auth);
++	const headers = await buildHeaders(body, auth, idempotencyKey, accept);
+ 	const timeoutSignal = AbortSignal.timeout(timeoutMs);
+ 	const requestSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+ 
+@@ -109,7 +119,7 @@ async function request<T>(method: HttpMethod, path: string, options: RequestOpti
+ 		const response = await fetch(url, {
+ 			method,
+ 			headers,
+-			body: body === undefined ? undefined : JSON.stringify(body),
++			body: body instanceof FormData ? body : body === undefined ? undefined : JSON.stringify(body),
+ 			signal: requestSignal
+ 		});
+ 
+@@ -117,13 +127,16 @@ async function request<T>(method: HttpMethod, path: string, options: RequestOpti
+ 			throw ApiError.fromResponse(response.status, await readErrorBody(response));
+ 		}
+ 
+-		return await readSuccessBody<T>(response);
++		return await readBody(response);
+ 	} catch (error) {
+ 		throw toRequestError(error, signal);
+ 	}
+ }
+ 
+ export const http = {
++	getBlob(path: string, options?: Omit<RequestOptions, "body">) {
++		return request<Blob>("GET", path, options, (response) => response.blob(), "image/*, application/octet-stream");
++	},
+ 	get<T>(path: string, options?: Omit<RequestOptions, "body">) {
+ 		return request<T>("GET", path, options);
+ 	},
+diff --git a/src/shared/api/posts.ts b/src/shared/api/posts.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..6dfab86f7183e4bb47770e64e158a2cd1ef460ad
+--- /dev/null
++++ b/src/shared/api/posts.ts
+@@ -0,0 +1,244 @@
++import { queryOptions } from "@tanstack/react-query";
++
++import type { PostType } from "../domain/post";
++import type { Verdict } from "../domain/verdict";
++import { isApiError } from "./api-error";
++import { http } from "./http";
++
++export type SubmitPostInput = {
++	postType: PostType;
++	amountKrw: number;
++	category: string;
++	item: string;
++	reason: string | null;
++	roomIds: string[];
++};
++
++export type Submission = {
++	submissionId: string;
++	status: "COMPLETED" | "NEEDS_INPUT" | "BLOCKED";
++	revision: string;
++	intakeResult: {
++		mode: "INITIAL" | "FINAL_CHECK";
++		message: string | null;
++		intakeSource: "AI" | "FALLBACK";
++		itemReview: { status: string; suggestedItem: string | null };
++		categoryReview: { status: string; suggestedCategory: string | null; confidence: number };
++	};
++	postId: string | null;
++};
++
++export type CompletePostInput = SubmitPostInput & {
++	action: "REVISE" | "PROCEED";
++	revision: string;
++};
++
++export type PostDetail = SubmitPostInput & {
++	id: string;
++	authorId: string;
++	voteDeadlineAt: string;
++	myVote: Verdict | null;
++	canVote: boolean;
++	juryStatus: Verdict | null;
++	textStatus: "PENDING" | "GENERATING" | "TEMPLATE_READY" | "AI_READY";
++};
++
++export type PostMeme = { tag: string; imageId: string | null; imageUrl: string | null };
++
++export type PostVerdict = {
++	schemaVersion: number;
++	postId: string;
++	juryStatus: Verdict | null;
++	sentenceStatus: "PENDING" | "FINAL";
++	textStatus: "PENDING" | "GENERATING" | "TEMPLATE_READY" | "AI_READY";
++	textVersion: number;
++	view: {
++		intensity: string;
++		headline: string;
++		statement: string[];
++		sentence: string | null;
++		sentenceLabel: string | null;
++		sentencingReason: string | null;
++		source: "AI" | "TEMPLATE";
++		meme: PostMeme | null;
++	} | null;
++	pollAfterMs: number;
++};
++
++export type PublicShareCard = {
++	postId: string;
++	postType: PostType;
++	juryStatus: Verdict;
++	intensity: string;
++	headline: string;
++	statement: string[];
++	sentence: string | null;
++	sentenceLabel: string | null;
++	meme: PostMeme | null;
++};
++
++export type CardRender = {
++	id: string;
++	postId: string;
++	status: "PENDING" | "RENDERING" | "READY" | "FAILED";
++	inputHash: string;
++	pngSha256: string | null;
++	pngUrl: string | null;
++	downloadUrl: string | null;
++	errorCode: string | null;
++};
++
++export type PostVoteInput = { verdict: Exclude<Verdict, "dismissed">; reason: string; roomId: string };
++
++const CARD_POLL_MS = 1000;
++const SLOW_POLL_MS = 5000;
++const FAST_POLL_DURATION_MS = 15_000;
++
++function getLatestVerdict(previous: unknown, next: unknown) {
++	const hasVersions = typeof previous === "object" && previous !== null && typeof next === "object" && next !== null;
++	if (
++		hasVersions &&
++		"textVersion" in previous &&
++		"textVersion" in next &&
++		typeof previous.textVersion === "number" &&
++		typeof next.textVersion === "number"
++	) {
++		return previous.textVersion > next.textVersion ? previous : next;
++	}
++	return next;
++}
++
++function postPath(postId: string) {
++	return `/api/posts/${encodeURIComponent(postId)}`;
++}
++
++async function fetchOptional<T>(path: string, signal: AbortSignal) {
++	try {
++		return await http.get<T>(path, { signal });
++	} catch (error) {
++		if (isApiError(error) && error.kind === "notFound") {
++			return null;
++		}
++		throw error;
++	}
++}
++
++export function submitPost(request: { input: SubmitPostInput; idempotencyKey: string }) {
++	return http.post<Submission>("/api/post-submissions", {
++		body: request.input,
++		idempotencyKey: request.idempotencyKey
++	});
++}
++
++export function completePost(submissionId: string, input: CompletePostInput) {
++	return http.post<Submission>(`/api/post-submissions/${encodeURIComponent(submissionId)}/complete`, { body: input });
++}
++
++export function castPostVote(postId: string, input: PostVoteInput) {
++	return http.post<{ id: string; postId: string }>(`${postPath(postId)}/votes`, { body: input });
++}
++
++export function createCardRender(postId: string, retry: boolean) {
++	return http.post<CardRender>(`${postPath(postId)}/share-card/render${retry ? "/retry" : ""}`);
++}
++
++export function updateCardSharing(postId: string, enabled: boolean) {
++	return http.put<{ enabled: boolean }>(`${postPath(postId)}/share-card/sharing`, { body: { enabled } });
++}
++
++export function removePost(postId: string) {
++	return http.delete<void>(postPath(postId));
++}
++
++export function fetchCardDownload(postId: string) {
++	return http.getBlob(`${postPath(postId)}/share-card/download`);
++}
++
++export function fetchCardPng(postId: string, signal?: AbortSignal) {
++	return http.getBlob(`${postPath(postId)}/share-card/png`, { signal });
++}
++
++export const postQueries = {
++	all: () => ["posts"] as const,
++	meme: (imageId: string) =>
++		queryOptions({
++			queryKey: [...postQueries.all(), "meme", imageId] as const,
++			queryFn: ({ signal }) => http.getBlob(`/api/memes/${encodeURIComponent(imageId)}/image`, { signal }),
++			staleTime: 0,
++			gcTime: 0
++		}),
++	listByRoom: (roomId: string) =>
++		queryOptions({
++			queryKey: [...postQueries.all(), "room", roomId] as const,
++			queryFn: ({ signal }) =>
++				http.get<PostDetail[]>(`/api/rooms/${encodeURIComponent(roomId)}/posts`, { query: { limit: 50 }, signal }),
++			refetchInterval: SLOW_POLL_MS
++		}),
++	detailKey: (postId: string) => [...postQueries.all(), "detail", postId] as const,
++	detail: (postId: string) =>
++		queryOptions({
++			queryKey: postQueries.detailKey(postId),
++			queryFn: ({ signal }) => fetchOptional<PostDetail>(postPath(postId), signal),
++			refetchInterval: (query) => (query.state.data === null || query.state.status === "error" ? false : SLOW_POLL_MS)
++		}),
++	verdictKey: (postId: string) => [...postQueries.all(), "verdict", postId] as const,
++	verdict: (postId: string, roomId: string, startedAt: number) =>
++		queryOptions({
++			queryKey: [...postQueries.verdictKey(postId), roomId] as const,
++			structuralSharing: getLatestVerdict,
++			queryFn: async ({ signal }) => {
++				try {
++					return await http.get<PostVerdict>(`${postPath(postId)}/verdict`, {
++						query: { room_id: roomId || null },
++						signal
++					});
++				} catch (error) {
++					if (isApiError(error) && error.kind === "notFound") {
++						return null;
++					}
++					throw error;
++				}
++			},
++			refetchInterval: (query) => {
++				const data = query.state.data;
++				if (query.state.status === "error" || data === null) {
++					return false;
++				}
++				if (data?.juryStatus === "dismissed") {
++					return false;
++				}
++				if (data?.textStatus === "AI_READY" || data?.textStatus === "TEMPLATE_READY") {
++					return SLOW_POLL_MS;
++				}
++				const pollMs = data?.pollAfterMs ?? CARD_POLL_MS;
++				return Date.now() - startedAt >= FAST_POLL_DURATION_MS ? Math.max(pollMs, SLOW_POLL_MS) : pollMs;
++			}
++		}),
++	shareCard: (postId: string) =>
++		queryOptions({
++			queryKey: [...postQueries.all(), "share-card", postId] as const,
++			queryFn: ({ signal }) => fetchOptional<PublicShareCard>(`${postPath(postId)}/share-card`, signal)
++		}),
++	cardRender: (postId: string) =>
++		queryOptions({
++			queryKey: [...postQueries.all(), "card-render", postId] as const,
++			queryFn: ({ signal }) => fetchOptional<CardRender>(`${postPath(postId)}/share-card/render`, signal),
++			refetchInterval: (query) => {
++				if (query.state.status === "error") {
++					return false;
++				}
++				const status = query.state.data?.status;
++				if (status === "READY") {
++					return SLOW_POLL_MS;
++				}
++				return status === "PENDING" || status === "RENDERING" ? CARD_POLL_MS : false;
++			}
++		}),
++	cardPng: (postId: string, pngSha256: string | null) =>
++		queryOptions({
++			queryKey: [...postQueries.all(), "card-png", postId, pngSha256] as const,
++			queryFn: ({ signal }) => fetchCardPng(postId, signal),
++			staleTime: 0,
++			gcTime: 0
++		})
++};
+diff --git a/src/shared/constants/routes.ts b/src/shared/constants/routes.ts
+index e8ef204e9ba47a04e382cb0f24787fea723ac038..c224a66bd88c5813cb548b45910efe2dd5c55be0 100644
+--- a/src/shared/constants/routes.ts
++++ b/src/shared/constants/routes.ts
+@@ -3,11 +3,11 @@ function roomSearch(roomId: string) {
+ }
+ 
+ export function verdictPath(expenseId: string, roomId: string) {
+-	return `/posts/${encodeURIComponent(expenseId)}?${roomSearch(roomId)}`;
++	return `/expenses/${encodeURIComponent(expenseId)}?${roomSearch(roomId)}`;
+ }
+ 
+ export function verdictCardPath(expenseId: string, roomId: string) {
+-	return `/posts/${encodeURIComponent(expenseId)}/card?${roomSearch(roomId)}`;
++	return `/expenses/${encodeURIComponent(expenseId)}/card?${roomSearch(roomId)}`;
+ }
+ 
+ export function invitePath(inviteCode: string) {
+@@ -15,5 +15,13 @@ export function invitePath(inviteCode: string) {
+ }
+ 
+ export function votePath(expenseId: string, roomId: string) {
+-	return `/posts/${encodeURIComponent(expenseId)}/vote?${roomSearch(roomId)}`;
++	return `/expenses/${encodeURIComponent(expenseId)}/vote?${roomSearch(roomId)}`;
++}
++
++export function postVerdictPath(postId: string, roomId?: string) {
++	return `/posts/${encodeURIComponent(postId)}${roomId ? `?${roomSearch(roomId)}` : ""}`;
++}
++
++export function postCardPath(postId: string, roomId?: string) {
++	return `/posts/${encodeURIComponent(postId)}/card${roomId ? `?${roomSearch(roomId)}` : ""}`;
+ }
+diff --git a/src/shared/domain/verdict.ts b/src/shared/domain/verdict.ts
+index 79a958e688be659e796ec73d37cc5d5736c2dbaf..90d920ef2b13ae30ba586cdbfeca5755daa37a0d 100644
+--- a/src/shared/domain/verdict.ts
++++ b/src/shared/domain/verdict.ts
+@@ -25,10 +25,13 @@ export type VoteTally = {
+ 	support: number;
+ };
+ 
+-export const VOTE_VERDICTS: Record<PostType, { oppose: Verdict; support: Verdict }> = {
++export const VOTE_VERDICTS = {
+ 	spent: { oppose: "guilty", support: "notGuilty" },
+ 	considering: { oppose: "disagree", support: "agree" }
+-};
++} as const satisfies Record<
++	PostType,
++	{ oppose: Exclude<Verdict, "dismissed">; support: Exclude<Verdict, "dismissed"> }
++>;
+ 
+ export type Sentence = "probation" | "oneDay" | "life";
+ 
+diff --git a/src/shared/ui/BlobImage.tsx b/src/shared/ui/BlobImage.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..a00c3b4fd1bc355e2abe21f55b0c0a6059cfb51f
+--- /dev/null
++++ b/src/shared/ui/BlobImage.tsx
+@@ -0,0 +1,21 @@
++import { useEffect, useRef } from "react";
++
++type BlobImageProps = { blob: Blob; alt: string; sha256?: string | null };
++
++export function BlobImage({ blob, alt, sha256 }: BlobImageProps) {
++	const imageRef = useRef<HTMLImageElement>(null);
++	useEffect(() => {
++		const url = URL.createObjectURL(blob);
++		const image = imageRef.current;
++		if (image) {
++			image.src = url;
++		}
++		return () => {
++			if (image) {
++				image.removeAttribute("src");
++			}
++			URL.revokeObjectURL(url);
++		};
++	}, [blob]);
++	return <img ref={imageRef} alt={alt} data-sha256={sha256} className="w-full rounded-card object-contain" />;
++}

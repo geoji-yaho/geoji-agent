@@ -29,7 +29,7 @@ from typing import Any, Protocol
 from geoji_ai.application.llm_gateway import ScopedLLM
 from geoji_ai.contracts.jobs import Job, SentencePayload, TextRetryPayload, parse_payload
 from geoji_ai.graphs.sentencing import SentenceDeps, build_sentence_graph, initial_state
-from geoji_ai.ports.backend import BackendPort
+from geoji_ai.ports.backend import BackendPort, SnapshotNotFound
 from geoji_ai.ports.jobs import JobsPort
 from geoji_ai.ports.llm import LLMPort
 
@@ -156,6 +156,11 @@ class SentenceHandler:
             )
             graph = self._graph_factory(deps)
             await graph.ainvoke(initial_state(job, mode, snapshot))
+        except SnapshotNotFound as exc:
+            await ctx.jobs.cancel(
+                job.id, ctx.worker_id, ctx.generation_id, error_code=exc.error_code
+            )
+            return
         except Exception as exc:
             if not await _settle_backend_error(job, ctx, exc):
                 raise
