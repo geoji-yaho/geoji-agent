@@ -12,13 +12,21 @@ Python 3.12 와 [uv](https://docs.astral.sh/uv/) 가 필요하다. 시스템 Pyt
 ```bash
 uv sync && uv run pytest tests/contracts tests/unit -q
 uv run python -c "from geoji_ai.contracts.llm_schemas import writer_schema; import json; print(json.dumps(writer_schema(['spicy'], ['CONVERSION']), ensure_ascii=False)[:400])"
-uv run uvicorn geoji_ai.api.app:app --port 8100 & curl -s localhost:8100/health/live
+uv run uvicorn geoji_ai.api.app:app --host 127.0.0.1 --port 8100 --http h11 & curl -s localhost:8100/health/live
 ```
 
 - `/health/live` 는 프로세스가 살아 있으면 200 이다.
 - `/health/ready` 는 벤더 키나 `DATABASE_URL` 이 없으면 503 과
   `{"status":"not_ready","missing":[...]}` 를 낸다. `DATABASE_URL` 이 있는데 2초 안에 `SELECT 1` 이
   안 되면 503 과 `{"status":"not_ready","db":"unreachable"}` 이다.
+
+Spring 백엔드와 로컬 HTTP로 직접 연결할 때는 `--http h11`을 사용한다. 2026-09-15 실제
+Java 25 클라이언트 연결에서 기본 HTTP 파서가 HTTP/2 업그레이드 요청을 422로 거부했고,
+이 옵션으로 정상 처리되는 것을 확인했다. 백엔드의 HTTP/1.1 명시도 해결 후보다.
+
+백엔드·워커 동시 실행, 전원 투표 시뮬레이션, 짤·카드 저장의 구현 현황과 다음 검증은
+[로컬 전체 흐름 검증 계획](docs/plans/14-local-e2e-validation.md)을 참고한다.
+키 없는 워커의 `TEMPLATE_READY`는 폴백 검증이며 실제 LLM 생성 성공을 뜻하지 않는다.
 
 ### 큐와 워커 (02 §4.3)
 
