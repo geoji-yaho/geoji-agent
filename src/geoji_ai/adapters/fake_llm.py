@@ -38,7 +38,7 @@ FIXTURE_BY_ROLE: dict[str, str] = {
     "context": "context-taxi",
     "banter": "banter-taxi",
     "sentencing": "sentencing-taxi",
-    "writer": "writer-draft-taxi",
+    "writer": "writer-draft-card-taxi",
     "evaluator": "evaluation-taxi-pass",
 }
 
@@ -232,7 +232,7 @@ class FakeLLM:
         return str(allowed[0]) if allowed else None
 
     def _writer_output(self, fixture: dict, schema: dict) -> dict:
-        """`writer-draft-taxi.json`(WriterDraft) 에서 요청 강도의 `TextDraft` 하나를 꺼낸다."""
+        """카드 fixture(WriterDraft) 에서 요청 강도의 `TextDraft` 하나를 꺼낸다."""
         texts = fixture.get("texts") or []
         wanted = self._requested_intensity(schema)
         chosen = None

@@ -377,15 +377,21 @@ async def test_02_prep_없으면_남은시간으로_MINIMAL_또는_INLINE(
         assert llm.roles()["context"] == 0
         assert "resolve-evidence" not in env.paths()
         assert [label for label, _ in labels] == ["F0"]
-        assert env.backend.finalized == []
         if remaining_s <= 10:
             # 검수 30초 예약보다 짧으면 서기를 부르지 않는다.
+            assert env.backend.finalized == []
             assert llm.roles()["writer"] == 0
             assert env.backend.failed == ["DEADLINE_EXCEEDED"]
         else:
-            # 서기 fixture가 F0 밖 라벨을 인용해 서버 검증에서 걸린다.
+            # 짧은 spicy fixture만 F1을 인용한다. F0 기반 hell은 유지하고
+            # 근거가 없는 spicy를 TEMPLATE으로 교체한 최종 문구를 검수·저장한다.
             assert llm.roles()["writer"] > 0
-            assert env.backend.failed == ["EVAL_FAILED"]
+            assert [req.dossier_id for req in env.backend.finalized] == dossier_ids
+            assert {t.intensity: t.source for t in env.backend.finalized[0].draft.texts} == {
+                "spicy": "TEMPLATE",
+                "hell": "AI",
+            }
+            assert env.backend.failed == []
     else:
         assert llm.roles()["context"] == 1
         assert "resolve-evidence" in env.paths()

@@ -1216,3 +1216,113 @@ def test_24_minimal_dossier_is_saved() -> None:
     result = run(preparation=preparation, backend_kwargs={"remaining_s": 8.4})
     assert result.state["dossier_source"] == "MINIMAL"
     assert [d.dossier_id for d in preparation.saved] == [result.state["dossier"].dossier_id]
+
+
+def card_output(*, offset: int = 0, **changes: Any) -> dict[str, Any]:
+    """실제 호출 계약 모양의 짧은 카드. 의도적으로 FakeLLM의 보정에 의존하지 않는다."""
+    return {
+        "intensity": "spicy",
+        "headline": "지갑만 조기 퇴근",
+        "statement": [
+            {"text": "편한 건 몸이고 고생은 지갑 몫이다.", "kind": "opinion", "evidence_labels": []}
+        ],
+        "banter_strategy": "EXCUSE_STRIPPING",
+        "selected_candidate_id": None,
+        "attack_angle": pick(make_snapshot().post_id, offset).value,
+        "meme_tag": "GUILTY_LIGHT",
+        "meme_hints": {"emotion": "DISAPPROVAL", "keywords": ["택시", "지갑"]},
+        **changes,
+    }
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"headline": "가" * 21},
+        {"headline": "제목\n두 줄"},
+        {"headline": "F0"},  # 근거 라벨 제거 뒤 빈 제목이 되는 경우도 재작성한다.
+        {"statement": [{"text": "가" * 31, "kind": "opinion", "evidence_labels": []}]},
+        {"statement": [{"text": "줄\n바꿈", "kind": "opinion", "evidence_labels": []}]},
+        {"statement": [{"text": "   ", "kind": "opinion", "evidence_labels": []}]},
+        {"statement": [{"text": "첫 문장", "kind": "opinion", "evidence_labels": []}] * 2},
+    ],
+)
+def test_card_format_violation_repairs_once_before_evaluation(changes: dict[str, Any]) -> None:
+    llm = ScriptedLLM(sequences={"writer": [card_output(**changes), card_output(offset=1)]})
+    result = run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
+    assert result.roles() == Counter({"sentencing": 1, "writer": 2, "evaluator": 1})
+    assert result.state["repair_count"] == 1
+    req = result.finalize()
+    assert req.draft.texts[0].headline == "지갑만 조기 퇴근"
+    assert len(req.draft.texts[0].statement) == 1
+    assert req.draft.meme_hints.model_dump(mode="json") == card_output()["meme_hints"]
+    assert "SCHEMA_INVALID" in user_payload(result.calls_of("writer")[1])["avoid"]["violations"]
+    assert_finalize_hash_is_last_evaluated(result)
+
+
+def test_card_format_repair_does_not_loop_or_save_invalid_text() -> None:
+    llm = ScriptedLLM(
+        sequences={
+            "writer": [card_output(headline="가" * 21), card_output(offset=1, headline="가" * 21)]
+        }
+    )
+    result = run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
+    assert result.roles()["writer"] == 2
+    assert result.state["repair_count"] == 1
+    assert not result.backend.finalized
+    assert result.backend.failed == ["EVAL_FAILED"]
+    template = result.state["drafts"][Intensity.spicy]
+    assert template.source == "TEMPLATE"
+    assert len(template.headline) <= 20
+    assert len(template.statement) == 1
+    assert len(template.statement[0].text) <= 30
+
+
+def test_card_format_retry_round_does_not_repair() -> None:
+    result = run(
+        ScriptedLLM(outputs={"writer": card_output(headline="가" * 21)}),
+        snapshot=make_snapshot(target_intensities=["spicy"]),
+        kind="TEXT_RETRY",
+        backend_kwargs={"fixed": FIXED},
+    )
+    assert result.roles()["writer"] == 1
+    assert result.state["repair_count"] == 0
+    assert result.backend.failed == ["SCHEMA_INVALID"]
+    assert not result.backend.finalized
+
+
+def test_card_format_invalid_output_is_never_cached() -> None:
+    class RememberingLLM(ScriptedLLM):
+        def __init__(self) -> None:
+            super().__init__(
+                sequences={"writer": [card_output(headline="가" * 21), card_output(offset=1)]}
+            )
+            self.remembered: list[Any] = []
+
+        async def scoped_call(self, scope: Any, **kwargs: Any) -> Any:
+            return SimpleNamespace(scope=scope, result=await self.structured_call(**kwargs))
+
+        async def remember(self, scoped: Any) -> None:
+            self.remembered.append(scoped)
+
+    llm = RememberingLLM()
+    result = run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
+    assert len(result.backend.finalized) == 1
+    remembered = [s for s in llm.remembered if s.scope.node == "writer"]
+    assert len(remembered) == 1
+    assert remembered[0].scope.call_index == 3
+    assert remembered[0].result.output["headline"] == "지갑만 조기 퇴근"
+
+
+def test_card_format_repair_shares_budget_with_evaluator_repair() -> None:
+    llm = ScriptedLLM(
+        sequences={
+            "writer": [card_output(headline="가" * 21), card_output(offset=1)],
+            "evaluator": [report(["spicy"], fail=["spicy"])],
+        }
+    )
+    result = run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
+    assert result.roles()["writer"] == 2
+    assert result.state["repair_count"] == 1
+    assert result.backend.failed == ["EVAL_FAILED"]
+    assert not result.backend.finalized
