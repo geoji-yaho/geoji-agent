@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "017-semojjal.png",
+  "asset_sha256": "1d2af71bdd1fa68fd3eb1b62e5a32b8e860412fcd5200d36b3bb6e00828b7da3",
+  "classification": {
+    "emotions": [],
+    "keywords": [
+      "침대",
+      "손짓",
+      "대화"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "두 인물 모두 얼굴이 뒤쪽으로 향해 표정은 보이지 않음",
+        "pose": "금발 인물이 침대에서 두 손가락을 들고 안경 쓴 남성이 옆에 섬",
+        "captions": []
+      }
+    ],
+    "evidence": "손짓과 두 인물의 배치는 보이지만 표정과 문구가 없어 여섯 감정의 대표값을 확정할 수 없다.",
+    "uncertainties": [
+      "손짓의 뜻과 감정은 시각 정보만으로 불명확함"
+    ]
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": true,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

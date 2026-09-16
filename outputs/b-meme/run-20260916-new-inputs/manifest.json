@@ -1,0 +1,744 @@
+{
+  "entries": [
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/92_55169b475d46c_2834.jpg",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: historical official in red robes and black winged hat, gray beard, eyes squeezed shut, fingers pressing temples.\nScene, framing and panel structure: one close-up, another figure cropped at left, pale indoor backdrop.\nEmotion and source of meme humor: overwhelmed serious distress.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: none.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 0,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "001-92_55169b475d46c_2834.png",
+      "status": "completed",
+      "review_notes": [
+        "관복·모자·수염·양손 관자놀이와 찡그린 눈 유지. 한 컷, 자막 없음. 화풍은 다소 세밀하지만 거친 선·채색 확인."
+      ],
+      "classification": {
+        "emotions": [
+          "RESIGNATION"
+        ],
+        "keywords": [
+          "답답함",
+          "관자놀이",
+          "고뇌"
+        ],
+        "expense_categories": [],
+        "subject": "human",
+        "panels": [
+          {
+            "expression": "눈을 감고 미간을 찌푸림",
+            "pose": "양손으로 관자놀이를 누르는 상반신",
+            "captions": []
+          }
+        ],
+        "evidence": "눈을 감고 관자놀이를 누르는 고뇌가 드러난다. 체념과 고통의 경계가 모호하다.",
+        "uncertainties": [
+          "표정만으로 체념인지 단순 두통인지 단정할 수 없음"
+        ]
+      },
+      "metadata_path": "001-92_55169b475d46c_2834.metadata.json",
+      "classification_needs_review": true
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/Mnet_그의-손에-쥐어지는-합격-목걸이_고전-밈.webp",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: contestant's torso in white shirt and black vest, hands holding a gold chain necklace, number bib partly visible.\nScene, framing and panel structure: one cropped torso shot, dark audition stage.\nEmotion and source of meme humor: moment of receiving a dramatic qualifying necklace.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: small '그리고' above bottom caption '그의 손에 쥐어지는 합격 목걸이', with '합격 목걸이' red; retain visible show marks only if legible.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "002-Mnet-necklace.png",
+      "status": "completed",
+      "review_notes": [
+        "목걸이·손·의상과 한 컷 구도 유지, 주요 자막 정확. 주변 방송 그래픽은 단순화됨."
+      ],
+      "classification": {
+        "emotions": [
+          "CELEBRATION"
+        ],
+        "keywords": [
+          "합격",
+          "목걸이",
+          "인정"
+        ],
+        "expense_categories": [],
+        "subject": "human",
+        "panels": [
+          {
+            "expression": "얼굴은 보이지 않음",
+            "pose": "금빛 목걸이를 손에 쥐고 늘어뜨림",
+            "captions": [
+              "그리고",
+              "그의 손에 쥐어지는 합격 목걸이"
+            ]
+          }
+        ],
+        "evidence": "합격 목걸이를 쥔 장면과 자막이 성취를 나타낸다.",
+        "uncertainties": []
+      },
+      "metadata_path": "002-Mnet-necklace.metadata.json",
+      "classification_needs_review": false
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images (1).jpeg",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: stocky short-haired cartoon man in blue-gray shirt squinting with a self-satisfied smile and a small clenched fist; concerned woman and man behind.\nScene, framing and panel structure: one cartoon scene, waist-up foreground man with two background people.\nEmotion and source of meme humor: smug confidence against their concern.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: none.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "003-images-1.png",
+      "status": "completed",
+      "review_notes": [
+        "세 인물의 배치·표정과 주먹 유지. 자막 없음."
+      ],
+      "classification": {
+        "emotions": [
+          "SMUG"
+        ],
+        "keywords": [
+          "능청",
+          "윙크",
+          "자신감"
+        ],
+        "expense_categories": [],
+        "subject": "human",
+        "panels": [
+          {
+            "expression": "한쪽 눈을 찡긋하며 미소",
+            "pose": "주먹을 쥐고 앞에 섬",
+            "captions": []
+          }
+        ],
+        "evidence": "앞 인물의 윙크와 입꼬리, 뒤 인물들의 우려가 능청스러운 자신감을 만든다.",
+        "uncertainties": []
+      },
+      "metadata_path": "003-images-1.metadata.json",
+      "classification_needs_review": false
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images (10).jpeg",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: purple-haired angular cartoon man with closed eyes and furrowed brow, green shirt.\nScene, framing and panel structure: one close-up against white background, motion marks.\nEmotion and source of meme humor: body visibly trembling with restrained feeling.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: '절레' on the left and '절레' on the right.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "004-images-10.png",
+      "status": "completed",
+      "review_notes": [
+        "보라색 머리·절레 양쪽 자막·동작선 유지."
+      ],
+      "classification": {
+        "emotions": [
+          "DISAPPROVAL"
+        ],
+        "keywords": [
+          "절레",
+          "못마땅함",
+          "고개젓기"
+        ],
+        "expense_categories": [],
+        "subject": "human",
+        "panels": [
+          {
+            "expression": "눈을 감고 미간을 찌푸림",
+            "pose": "고개를 저으며 동작선이 양옆에 있음",
+            "captions": [
+              "절레",
+              "절레"
+            ]
+          }
+        ],
+        "evidence": "찡그린 얼굴과 반복된 절레 자막이 못마땅함을 드러낸다.",
+        "uncertainties": []
+      },
+      "metadata_path": "004-images-10.metadata.json",
+      "classification_needs_review": false
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images (2).jpeg",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: white humanoid robot with articulated hand touching temple, sideways glance, black neck joints.\nScene, framing and panel structure: one upper-body sci-fi shot, bright pale background.\nEmotion and source of meme humor: skeptical disbelief at an absurd statement.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: bottom '미쳤습니까 휴먼?'.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "005-images-2.jpeg.png",
+      "status": "completed",
+      "review_notes": [
+        "로봇의 관자놀이 손동작과 '미쳤습니까 휴먼?' 유지."
+      ],
+      "classification": {
+        "emotions": [
+          "DISAPPROVAL"
+        ],
+        "keywords": [
+          "로봇",
+          "미쳤습니까",
+          "의심"
+        ],
+        "expense_categories": [],
+        "subject": "object",
+        "panels": [
+          {
+            "expression": "옆을 흘겨보는 의심스러운 표정",
+            "pose": "기계 손가락을 관자놀이에 댐",
+            "captions": [
+              "미쳤습니까 휴먼?"
+            ]
+          }
+        ],
+        "evidence": "의심스러운 시선과 질문 자막이 상대의 판단을 못마땅해한다.",
+        "uncertainties": []
+      },
+      "metadata_path": "005-images-2.jpeg.metadata.json",
+      "classification_needs_review": false
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images (2).png",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: two hands pulling open a blue-purple scroll-like frame with the large center word '내', tiny cartoon faces at edges.\nScene, framing and panel structure: one illustrated scene, blue lower area.\nEmotion and source of meme humor: dramatic refusal.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: center '내'; bottom '내 눈에 흙이 들어가기 전엔 안된다'.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "006-images-2-png.png",
+      "status": "completed",
+      "review_notes": [
+        "펼쳐진 두 손과 중앙 '내', 하단 문구 유지. 중앙 글자는 붓글씨처럼 다소 모호함."
+      ],
+      "classification": {
+        "emotions": [
+          "DISAPPROVAL"
+        ],
+        "keywords": [
+          "거절",
+          "고집",
+          "흙"
+        ],
+        "expense_categories": [],
+        "subject": "human",
+        "panels": [
+          {
+            "expression": "얼굴은 보이지 않음",
+            "pose": "두 손으로 펼쳐진 띠를 잡음",
+            "captions": [
+              "내",
+              "내 눈에 흙이 들어가기 전엔 안된다"
+            ]
+          }
+        ],
+        "evidence": "강한 거절 문구가 반대와 못마땅함을 나타낸다.",
+        "uncertainties": [
+          "중앙 '내'의 손글씨 형태가 약간 모호함"
+        ]
+      },
+      "metadata_path": "006-images-2-png.metadata.json",
+      "classification_needs_review": true
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images (3).jpeg",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: black spiky comic burst framing white center.\nScene, framing and panel structure: one graphic text panel, no person.\nEmotion and source of meme humor: shocked exclamation.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: center '미쳤나 봐,'.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "007-images-3.png",
+      "status": "completed",
+      "review_notes": [
+        "검은 방사형 테두리와 '미쳤나 봐,' 문구 유지. 인물 없는 텍스트 컷."
+      ],
+      "classification": {
+        "emotions": [],
+        "keywords": [
+          "미쳤나봐",
+          "충격",
+          "외침"
+        ],
+        "expense_categories": [],
+        "subject": "object",
+        "panels": [
+          {
+            "expression": "인물 없음",
+            "pose": "검은 방사형 테두리의 글자 컷",
+            "captions": [
+              "미쳤나 봐,"
+            ]
+          }
+        ],
+        "evidence": "놀람을 나타내는 한마디만 있고 여섯 감정 중 대표값을 시각적으로 확정하기 어렵다.",
+        "uncertainties": [
+          "해당 감정 enum에 순수한 놀람/충격이 없음"
+        ]
+      },
+      "metadata_path": "007-images-3.metadata.json",
+      "classification_needs_review": true
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images (4).jpeg",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: black-and-white comic, dark-haired man in profile at left and bob-haired woman looking startled at right.\nScene, framing and panel structure: one manga panel with two speech bubbles.\nEmotion and source of meme humor: incredulous reaction.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: left bubble '미친 거 아냐?', right bubble '뭐야'.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "008-images-4.png",
+      "status": "completed",
+      "review_notes": [
+        "흑백 만화가 탁한 색으로 바뀌었으나 두 인물·말풍선 문구와 놀람 유지."
+      ],
+      "classification": {
+        "emotions": [
+          "DISAPPROVAL"
+        ],
+        "keywords": [
+          "황당",
+          "미친거아냐",
+          "당혹"
+        ],
+        "expense_categories": [],
+        "subject": "human",
+        "panels": [
+          {
+            "expression": "남자는 옆얼굴, 여자는 눈이 커지고 입을 벌림",
+            "pose": "두 인물이 군중 앞에 서 있음",
+            "captions": [
+              "미친 거 아냐?",
+              "뭐야"
+            ]
+          }
+        ],
+        "evidence": "못 믿겠다는 질문과 놀란 얼굴이 상황에 대한 부정적 반응을 보인다.",
+        "uncertainties": []
+      },
+      "metadata_path": "008-images-4.metadata.json",
+      "classification_needs_review": false
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images (5).jpeg",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: man in patterned winter earflap knit hat and gray patterned hoodie, holding bottle cap, another bundled person cropped at left.\nScene, framing and panel structure: one seated medium close-up, subdued room.\nEmotion and source of meme humor: weary exasperation in conversational expression.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: bottom '난 너 그런 얘기할 때마다 미쳤나~싶어'; small speaker label '형님'.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "009-images-5.png",
+      "status": "completed",
+      "review_notes": [
+        "귀달이 모자·두 인물·병과 하단 긴 자막 유지. 일부 주변 방송 글자는 원본처럼 작은 장식."
+      ],
+      "classification": {
+        "emotions": [
+          "DISAPPROVAL"
+        ],
+        "keywords": [
+          "질색",
+          "미쳤나",
+          "대화"
+        ],
+        "expense_categories": [],
+        "subject": "human",
+        "panels": [
+          {
+            "expression": "입을 벌리고 지친 눈으로 위를 봄",
+            "pose": "병을 쥔 채 다른 사람 옆에 앉음",
+            "captions": [
+              "형님",
+              "난 너 그런 얘기할 때마다 미쳤나~싶어"
+            ]
+          }
+        ],
+        "evidence": "상대 말을 들을 때마다 미쳤다고 여긴다는 자막과 지친 표정이 못마땅함을 나타낸다.",
+        "uncertainties": []
+      },
+      "metadata_path": "009-images-5.metadata.json",
+      "classification_needs_review": false
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images (6).jpeg",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: peach rabbit character with long ears, dot eyes and red small mouth holding an orange-brown smaller character.\nScene, framing and panel structure: one animated close-up, blurred blue room.\nEmotion and source of meme humor: stern scolding.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: bottom two lines '머리에 총 맞은 자국은 없는데' / '왜 그딴 생각을 하지??'.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "010-images-6.png",
+      "status": "completed",
+      "review_notes": [
+        "토끼의 긴 귀·안은 캐릭터·훈계 표정과 두 줄 자막 유지."
+      ],
+      "classification": {
+        "emotions": [
+          "DISAPPROVAL"
+        ],
+        "keywords": [
+          "핀잔",
+          "토끼",
+          "황당"
+        ],
+        "expense_categories": [],
+        "subject": "animal",
+        "panels": [
+          {
+            "expression": "눈썹을 찌푸리고 입을 동그랗게 엶",
+            "pose": "작은 캐릭터를 안고 가까이 봄",
+            "captions": [
+              "머리에 총 맞은 자국은 없는데",
+              "왜 그딴 생각을 하지??"
+            ]
+          }
+        ],
+        "evidence": "찡그린 얼굴과 상대 생각을 타박하는 자막이 못마땅함을 드러낸다.",
+        "uncertainties": []
+      },
+      "metadata_path": "010-images-6.metadata.json",
+      "classification_needs_review": false
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images (7).jpeg",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/two-panel.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: same gray tabby cat with green eyes in each of two stacked panels.\nScene, framing and panel structure: two panels vertically, cat closer in lower panel, wooden floor.\nEmotion and source of meme humor: money anxiety flips from a warning to greater worry.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: top '돈 걱정 안하고 살고싶어?', bottom '돈은 잘 있으니까 걱정말구' / '너나 걱정해'.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "011-images-7.png",
+      "status": "completed",
+      "review_notes": [
+        "위·아래 두 컷과 같은 고양이, 돈 걱정 반전 자막 유지."
+      ],
+      "classification": {
+        "emotions": [
+          "ABSURD_SERIOUSNESS"
+        ],
+        "keywords": [
+          "돈걱정",
+          "고양이",
+          "반전"
+        ],
+        "expense_categories": [],
+        "subject": "animal",
+        "panels": [
+          {
+            "expression": "녹색 눈으로 정면을 봄",
+            "pose": "나무 바닥 앞 얼굴 클로즈업",
+            "captions": [
+              "돈 걱정 안하고 살고싶어?"
+            ]
+          },
+          {
+            "expression": "더 가까이서 정면을 봄",
+            "pose": "같은 고양이 얼굴 클로즈업",
+            "captions": [
+              "돈은 잘 있으니까 걱정말구",
+              "너나 걱정해"
+            ]
+          }
+        ],
+        "evidence": "진지한 고양이 얼굴과 돈이 사람을 걱정하지 않는다는 듯한 반전 자막이 우스운 대비를 이룬다.",
+        "uncertainties": []
+      },
+      "metadata_path": "011-images-7.metadata.json",
+      "classification_needs_review": false
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images (8).jpeg",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: silver-haired bespectacled man in pale blue shirt and dark vest on phone, pointing forward.\nScene, framing and panel structure: one office medium shot.\nEmotion and source of meme humor: coolly entertained command.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: bottom '재밌네. 진행시켜!'.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "012-images-8.png",
+      "status": "completed",
+      "review_notes": [
+        "안경·백발·전화·손짓과 '재밌네. 진행시켜!' 유지."
+      ],
+      "classification": {
+        "emotions": [
+          "SMUG"
+        ],
+        "keywords": [
+          "진행시켜",
+          "능청",
+          "전화"
+        ],
+        "expense_categories": [],
+        "subject": "human",
+        "panels": [
+          {
+            "expression": "입을 다문 채 눈을 가늘게 뜸",
+            "pose": "전화기를 귀에 대고 다른 손으로 앞을 가리킴",
+            "captions": [
+              "재밌네. 진행시켜!"
+            ]
+          }
+        ],
+        "evidence": "침착하게 흥미를 표하며 지시하는 자막과 자세가 능청스럽다.",
+        "uncertainties": []
+      },
+      "metadata_path": "012-images-8.metadata.json",
+      "classification_needs_review": false
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images (9).jpeg",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: black-and-white manga: small dark-haired shouting man at lower left, spiky-haired calm man at right.\nScene, framing and panel structure: one comic panel with left and right speech bubbles.\nEmotion and source of meme humor: loud surprise versus deadpan understanding.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: left '아아- 납득해 버렸어!', right '그렇군요.'.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "013-images-9.png",
+      "status": "completed",
+      "review_notes": [
+        "두 인물의 놀람/담담함 대비와 각 말풍선 자막 유지."
+      ],
+      "classification": {
+        "emotions": [
+          "ABSURD_SERIOUSNESS"
+        ],
+        "keywords": [
+          "납득",
+          "당황",
+          "담담함"
+        ],
+        "expense_categories": [],
+        "subject": "human",
+        "panels": [
+          {
+            "expression": "눈을 크게 뜨고 입을 벌려 외침",
+            "pose": "왼쪽 아래에서 놀라 고개를 듦",
+            "captions": [
+              "아아- 납득해 버렸어!"
+            ]
+          },
+          {
+            "expression": "반쯤 감은 눈과 작은 미소",
+            "pose": "오른쪽에 크게 서 있음",
+            "captions": [
+              "그렇군요."
+            ]
+          }
+        ],
+        "evidence": "왼쪽의 과장된 외침과 오른쪽의 담담한 반응이 대비된다.",
+        "uncertainties": []
+      },
+      "metadata_path": "013-images-9.metadata.json",
+      "classification_needs_review": false
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images.jpeg",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: black-and-white penguin mascot with round eyes, yellow beak and yellow headphones.\nScene, framing and panel structure: one centered close-up, neutral backdrop.\nEmotion and source of meme humor: pleased acceptance.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: bottom '인정'.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "014-images-jpeg.png",
+      "status": "completed",
+      "review_notes": [
+        "노란 헤드폰 펭귄과 '인정' 자막 유지."
+      ],
+      "classification": {
+        "emotions": [
+          "CELEBRATION"
+        ],
+        "keywords": [
+          "인정",
+          "펭귄",
+          "수긍"
+        ],
+        "expense_categories": [],
+        "subject": "animal",
+        "panels": [
+          {
+            "expression": "눈을 동그랗게 뜨고 부리를 벌림",
+            "pose": "노란 헤드폰을 쓰고 정면을 봄",
+            "captions": [
+              "인정"
+            ]
+          }
+        ],
+        "evidence": "큰 인정 자막과 열린 부리가 긍정적 수긍을 나타낸다.",
+        "uncertainties": [
+          "축하보다는 단순 수긍에 가까워 CELEBRATION과 완전히 일치하지 않을 수 있음"
+        ]
+      },
+      "metadata_path": "014-images-jpeg.metadata.json",
+      "classification_needs_review": true
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/jjalbox_20241231_6773f2c89ff40.jpg",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: pink round beaver-like mascot with tiny ears, small dark eyes, purple nose, narrow pixelated mouth and tail.\nScene, framing and panel structure: one front-facing upper-body portrait on white.\nEmotion and source of meme humor: flat disapproving glare.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: no caption; retain visible creator credit if naturally part of image, do not invent text.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 2,
+      "generation_count": 1,
+      "correction_count": 1,
+      "output_path": "015-jjalbox-corrected.png",
+      "status": "completed",
+      "review_notes": [
+        "최초 결과 015-jjalbox.png는 제작자 표기가 누락되어 보존. 수정본에서 기존 상단 '@zanmang_loopy'를 복원하고 표정·픽셀 입·화풍 유지 확인."
+      ],
+      "correction_prompt": "Use case: precise-object-edit. Image 1 is the generated B-grade doodle to correct; Image 2 is the original source ONLY for verifying existing attribution. Keep Image 1 absolutely unchanged in subject, pose, colors, pixelated mouth and rough style. Restore only the original small light-gray creator handle '@zanmang_loopy' near the upper-right white background, fully readable and unobtrusive. It is an existing attribution, not a new watermark. No other text or changes.",
+      "classification": {
+        "emotions": [
+          "DISAPPROVAL"
+        ],
+        "keywords": [
+          "째려봄",
+          "분홍캐릭터",
+          "못마땅함"
+        ],
+        "expense_categories": [],
+        "subject": "animal",
+        "panels": [
+          {
+            "expression": "눈을 가늘게 떠 째려보고 입은 픽셀 처리됨",
+            "pose": "정면 상반신",
+            "captions": []
+          }
+        ],
+        "evidence": "좁혀진 눈매와 정면 응시가 못마땅한 표정이다.",
+        "uncertainties": []
+      },
+      "metadata_path": "015-jjalbox-corrected.metadata.json",
+      "classification_needs_review": false
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/images (1).png",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: simple black-and-white loose doodle face with a hand repeatedly smacking the top of its head; half-lidded eyes, tiny mouth, motion lines.\nScene, framing and panel structure: one small hand-drawn panel on blank white background.\nEmotion and source of meme humor: frustrated repeated self-tapping.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: handwritten '팍!' repeated around the head, preserve positions and count from source; do not invent speech.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "016-images-1-png.png",
+      "status": "completed",
+      "review_notes": [
+        "반쯤 감은 눈·머리 때리는 손·동작선과 반복 '팍!' 유지. 원본은 매우 단순한 검은 선화이며 생성본은 피부색을 추가함."
+      ],
+      "classification": {
+        "emotions": [
+          "DISAPPROVAL"
+        ],
+        "keywords": [
+          "팍",
+          "자기머리",
+          "짜증"
+        ],
+        "expense_categories": [],
+        "subject": "human",
+        "panels": [
+          {
+            "expression": "눈을 반쯤 감고 입을 다문 표정",
+            "pose": "손으로 머리를 반복해서 때림",
+            "captions": [
+              "팍!",
+              "팍!",
+              "팍!",
+              "팍!",
+              "팍!"
+            ]
+          }
+        ],
+        "evidence": "반복해서 머리를 때리는 동작과 짧은 팍 자막이 짜증 섞인 반응을 보인다.",
+        "uncertainties": [
+          "원본의 작은 손글씨 반복 횟수는 경계가 모호함"
+        ]
+      },
+      "metadata_path": "016-images-1-png.metadata.json",
+      "classification_needs_review": true
+    },
+    {
+      "input_path": "/Users/hyun/dev/geoji/inputs/semojjal_20260913_7061c9684148a0.jpg",
+      "style_reference_paths": [
+        "/Users/hyun/.codex/skills/b-meme/references/portrait.png"
+      ],
+      "prompt": "Use case: style-transfer.\nImage 1: edit target; preserve its subject identity, expression, pose, composition, panel count, emotional contrast and caption content.\nImage 2: drawing style reference ONLY; do not copy its identity, clothes, scene, captions, or panel layout into the target.\nObserved subject and identifying features: bespectacled dark-haired cartoon man in white shirt beside a blond boy in green shirt lying in bed under purple blanket; boy raises two fingers.\nScene, framing and panel structure: one bedroom cartoon shot, man left seen from back, boy reclined at right.\nEmotion and source of meme humor: quiet dismissive gesture in a serious bedside scene.\nCrude B-grade Korean internet meme doodle: shaky uneven black contours, slightly asymmetric oversized head, awkward simplified anatomy, muted flat colors with rough hand coloring, minimal background.\nKeep the source emotion; do not invent a new joke or dialogue.\nText verbatim, with panel placement and emphasis: none.\nKeep Korean letters readable and complete; no clipped captions.\nAvoid polished vector art, glossy kawaii mascots, anime, 3D, elaborate shading, new watermarks and unrelated decorative elements.\nUser overrides: none.",
+      "tool": "image_gen",
+      "model": null,
+      "attempts": 1,
+      "generation_count": 1,
+      "correction_count": 0,
+      "output_path": "017-semojjal.png",
+      "status": "completed",
+      "review_notes": [
+        "안경 쓴 남성, 침대에 누운 금발 인물의 두 손가락 제스처, 보라 이불과 방 구도 유지. 자막 없음."
+      ],
+      "classification": {
+        "emotions": [],
+        "keywords": [
+          "침대",
+          "손짓",
+          "대화"
+        ],
+        "expense_categories": [],
+        "subject": "human",
+        "panels": [
+          {
+            "expression": "두 인물 모두 얼굴이 뒤쪽으로 향해 표정은 보이지 않음",
+            "pose": "금발 인물이 침대에서 두 손가락을 들고 안경 쓴 남성이 옆에 섬",
+            "captions": []
+          }
+        ],
+        "evidence": "손짓과 두 인물의 배치는 보이지만 표정과 문구가 없어 여섯 감정의 대표값을 확정할 수 없다.",
+        "uncertainties": [
+          "손짓의 뜻과 감정은 시각 정보만으로 불명확함"
+        ]
+      },
+      "metadata_path": "017-semojjal.metadata.json",
+      "classification_needs_review": true
+    }
+  ]
+}

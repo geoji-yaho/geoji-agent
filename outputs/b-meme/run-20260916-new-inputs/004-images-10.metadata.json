@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "004-images-10.png",
+  "asset_sha256": "704da807fcaffad6da95c8c23cf54bfbafa7c0292ae365dc97908e402419ad0a",
+  "classification": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "절레",
+      "못마땅함",
+      "고개젓기"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "눈을 감고 미간을 찌푸림",
+        "pose": "고개를 저으며 동작선이 양옆에 있음",
+        "captions": [
+          "절레",
+          "절레"
+        ]
+      }
+    ],
+    "evidence": "찡그린 얼굴과 반복된 절레 자막이 못마땅함을 드러낸다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

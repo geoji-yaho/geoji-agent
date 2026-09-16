@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "008-images-4.png",
+  "asset_sha256": "8d742ef60fe3109ddb8efe59111b0661f07f30c6804d03f060a68c62cc63df4a",
+  "classification": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "황당",
+      "미친거아냐",
+      "당혹"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "남자는 옆얼굴, 여자는 눈이 커지고 입을 벌림",
+        "pose": "두 인물이 군중 앞에 서 있음",
+        "captions": [
+          "미친 거 아냐?",
+          "뭐야"
+        ]
+      }
+    ],
+    "evidence": "못 믿겠다는 질문과 놀란 얼굴이 상황에 대한 부정적 반응을 보인다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

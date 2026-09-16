@@ -1,0 +1,418 @@
+{
+  "001-92_55169b475d46c_2834.png": {
+    "emotions": [
+      "RESIGNATION"
+    ],
+    "keywords": [
+      "답답함",
+      "관자놀이",
+      "고뇌"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "눈을 감고 미간을 찌푸림",
+        "pose": "양손으로 관자놀이를 누르는 상반신",
+        "captions": []
+      }
+    ],
+    "evidence": "눈을 감고 관자놀이를 누르는 고뇌가 드러난다. 체념과 고통의 경계가 모호하다.",
+    "uncertainties": [
+      "표정만으로 체념인지 단순 두통인지 단정할 수 없음"
+    ]
+  },
+  "002-Mnet-necklace.png": {
+    "emotions": [
+      "CELEBRATION"
+    ],
+    "keywords": [
+      "합격",
+      "목걸이",
+      "인정"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "얼굴은 보이지 않음",
+        "pose": "금빛 목걸이를 손에 쥐고 늘어뜨림",
+        "captions": [
+          "그리고",
+          "그의 손에 쥐어지는 합격 목걸이"
+        ]
+      }
+    ],
+    "evidence": "합격 목걸이를 쥔 장면과 자막이 성취를 나타낸다.",
+    "uncertainties": []
+  },
+  "003-images-1.png": {
+    "emotions": [
+      "SMUG"
+    ],
+    "keywords": [
+      "능청",
+      "윙크",
+      "자신감"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "한쪽 눈을 찡긋하며 미소",
+        "pose": "주먹을 쥐고 앞에 섬",
+        "captions": []
+      }
+    ],
+    "evidence": "앞 인물의 윙크와 입꼬리, 뒤 인물들의 우려가 능청스러운 자신감을 만든다.",
+    "uncertainties": []
+  },
+  "004-images-10.png": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "절레",
+      "못마땅함",
+      "고개젓기"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "눈을 감고 미간을 찌푸림",
+        "pose": "고개를 저으며 동작선이 양옆에 있음",
+        "captions": [
+          "절레",
+          "절레"
+        ]
+      }
+    ],
+    "evidence": "찡그린 얼굴과 반복된 절레 자막이 못마땅함을 드러낸다.",
+    "uncertainties": []
+  },
+  "005-images-2.jpeg.png": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "로봇",
+      "미쳤습니까",
+      "의심"
+    ],
+    "expense_categories": [],
+    "subject": "object",
+    "panels": [
+      {
+        "expression": "옆을 흘겨보는 의심스러운 표정",
+        "pose": "기계 손가락을 관자놀이에 댐",
+        "captions": [
+          "미쳤습니까 휴먼?"
+        ]
+      }
+    ],
+    "evidence": "의심스러운 시선과 질문 자막이 상대의 판단을 못마땅해한다.",
+    "uncertainties": []
+  },
+  "006-images-2-png.png": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "거절",
+      "고집",
+      "흙"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "얼굴은 보이지 않음",
+        "pose": "두 손으로 펼쳐진 띠를 잡음",
+        "captions": [
+          "내",
+          "내 눈에 흙이 들어가기 전엔 안된다"
+        ]
+      }
+    ],
+    "evidence": "강한 거절 문구가 반대와 못마땅함을 나타낸다.",
+    "uncertainties": [
+      "중앙 '내'의 손글씨 형태가 약간 모호함"
+    ]
+  },
+  "007-images-3.png": {
+    "emotions": [],
+    "keywords": [
+      "미쳤나봐",
+      "충격",
+      "외침"
+    ],
+    "expense_categories": [],
+    "subject": "object",
+    "panels": [
+      {
+        "expression": "인물 없음",
+        "pose": "검은 방사형 테두리의 글자 컷",
+        "captions": [
+          "미쳤나 봐,"
+        ]
+      }
+    ],
+    "evidence": "놀람을 나타내는 한마디만 있고 여섯 감정 중 대표값을 시각적으로 확정하기 어렵다.",
+    "uncertainties": [
+      "해당 감정 enum에 순수한 놀람/충격이 없음"
+    ]
+  },
+  "008-images-4.png": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "황당",
+      "미친거아냐",
+      "당혹"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "남자는 옆얼굴, 여자는 눈이 커지고 입을 벌림",
+        "pose": "두 인물이 군중 앞에 서 있음",
+        "captions": [
+          "미친 거 아냐?",
+          "뭐야"
+        ]
+      }
+    ],
+    "evidence": "못 믿겠다는 질문과 놀란 얼굴이 상황에 대한 부정적 반응을 보인다.",
+    "uncertainties": []
+  },
+  "009-images-5.png": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "질색",
+      "미쳤나",
+      "대화"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "입을 벌리고 지친 눈으로 위를 봄",
+        "pose": "병을 쥔 채 다른 사람 옆에 앉음",
+        "captions": [
+          "형님",
+          "난 너 그런 얘기할 때마다 미쳤나~싶어"
+        ]
+      }
+    ],
+    "evidence": "상대 말을 들을 때마다 미쳤다고 여긴다는 자막과 지친 표정이 못마땅함을 나타낸다.",
+    "uncertainties": []
+  },
+  "010-images-6.png": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "핀잔",
+      "토끼",
+      "황당"
+    ],
+    "expense_categories": [],
+    "subject": "animal",
+    "panels": [
+      {
+        "expression": "눈썹을 찌푸리고 입을 동그랗게 엶",
+        "pose": "작은 캐릭터를 안고 가까이 봄",
+        "captions": [
+          "머리에 총 맞은 자국은 없는데",
+          "왜 그딴 생각을 하지??"
+        ]
+      }
+    ],
+    "evidence": "찡그린 얼굴과 상대 생각을 타박하는 자막이 못마땅함을 드러낸다.",
+    "uncertainties": []
+  },
+  "011-images-7.png": {
+    "emotions": [
+      "ABSURD_SERIOUSNESS"
+    ],
+    "keywords": [
+      "돈걱정",
+      "고양이",
+      "반전"
+    ],
+    "expense_categories": [],
+    "subject": "animal",
+    "panels": [
+      {
+        "expression": "녹색 눈으로 정면을 봄",
+        "pose": "나무 바닥 앞 얼굴 클로즈업",
+        "captions": [
+          "돈 걱정 안하고 살고싶어?"
+        ]
+      },
+      {
+        "expression": "더 가까이서 정면을 봄",
+        "pose": "같은 고양이 얼굴 클로즈업",
+        "captions": [
+          "돈은 잘 있으니까 걱정말구",
+          "너나 걱정해"
+        ]
+      }
+    ],
+    "evidence": "진지한 고양이 얼굴과 돈이 사람을 걱정하지 않는다는 듯한 반전 자막이 우스운 대비를 이룬다.",
+    "uncertainties": []
+  },
+  "012-images-8.png": {
+    "emotions": [
+      "SMUG"
+    ],
+    "keywords": [
+      "진행시켜",
+      "능청",
+      "전화"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "입을 다문 채 눈을 가늘게 뜸",
+        "pose": "전화기를 귀에 대고 다른 손으로 앞을 가리킴",
+        "captions": [
+          "재밌네. 진행시켜!"
+        ]
+      }
+    ],
+    "evidence": "침착하게 흥미를 표하며 지시하는 자막과 자세가 능청스럽다.",
+    "uncertainties": []
+  },
+  "013-images-9.png": {
+    "emotions": [
+      "ABSURD_SERIOUSNESS"
+    ],
+    "keywords": [
+      "납득",
+      "당황",
+      "담담함"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "눈을 크게 뜨고 입을 벌려 외침",
+        "pose": "왼쪽 아래에서 놀라 고개를 듦",
+        "captions": [
+          "아아- 납득해 버렸어!"
+        ]
+      },
+      {
+        "expression": "반쯤 감은 눈과 작은 미소",
+        "pose": "오른쪽에 크게 서 있음",
+        "captions": [
+          "그렇군요."
+        ]
+      }
+    ],
+    "evidence": "왼쪽의 과장된 외침과 오른쪽의 담담한 반응이 대비된다.",
+    "uncertainties": []
+  },
+  "014-images-jpeg.png": {
+    "emotions": [
+      "CELEBRATION"
+    ],
+    "keywords": [
+      "인정",
+      "펭귄",
+      "수긍"
+    ],
+    "expense_categories": [],
+    "subject": "animal",
+    "panels": [
+      {
+        "expression": "눈을 동그랗게 뜨고 부리를 벌림",
+        "pose": "노란 헤드폰을 쓰고 정면을 봄",
+        "captions": [
+          "인정"
+        ]
+      }
+    ],
+    "evidence": "큰 인정 자막과 열린 부리가 긍정적 수긍을 나타낸다.",
+    "uncertainties": [
+      "축하보다는 단순 수긍에 가까워 CELEBRATION과 완전히 일치하지 않을 수 있음"
+    ]
+  },
+  "015-jjalbox-corrected.png": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "째려봄",
+      "분홍캐릭터",
+      "못마땅함"
+    ],
+    "expense_categories": [],
+    "subject": "animal",
+    "panels": [
+      {
+        "expression": "눈을 가늘게 떠 째려보고 입은 픽셀 처리됨",
+        "pose": "정면 상반신",
+        "captions": []
+      }
+    ],
+    "evidence": "좁혀진 눈매와 정면 응시가 못마땅한 표정이다.",
+    "uncertainties": []
+  },
+  "016-images-1-png.png": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "팍",
+      "자기머리",
+      "짜증"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "눈을 반쯤 감고 입을 다문 표정",
+        "pose": "손으로 머리를 반복해서 때림",
+        "captions": [
+          "팍!",
+          "팍!",
+          "팍!",
+          "팍!",
+          "팍!"
+        ]
+      }
+    ],
+    "evidence": "반복해서 머리를 때리는 동작과 짧은 팍 자막이 짜증 섞인 반응을 보인다.",
+    "uncertainties": [
+      "원본의 작은 손글씨 반복 횟수는 경계가 모호함"
+    ]
+  },
+  "017-semojjal.png": {
+    "emotions": [],
+    "keywords": [
+      "침대",
+      "손짓",
+      "대화"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "두 인물 모두 얼굴이 뒤쪽으로 향해 표정은 보이지 않음",
+        "pose": "금발 인물이 침대에서 두 손가락을 들고 안경 쓴 남성이 옆에 섬",
+        "captions": []
+      }
+    ],
+    "evidence": "손짓과 두 인물의 배치는 보이지만 표정과 문구가 없어 여섯 감정의 대표값을 확정할 수 없다.",
+    "uncertainties": [
+      "손짓의 뜻과 감정은 시각 정보만으로 불명확함"
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "012-images-8.png",
+  "asset_sha256": "0c46205b3f266353e659b38aab15154ef813c19b634151cf8b8654631ca94c32",
+  "classification": {
+    "emotions": [
+      "SMUG"
+    ],
+    "keywords": [
+      "진행시켜",
+      "능청",
+      "전화"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "입을 다문 채 눈을 가늘게 뜸",
+        "pose": "전화기를 귀에 대고 다른 손으로 앞을 가리킴",
+        "captions": [
+          "재밌네. 진행시켜!"
+        ]
+      }
+    ],
+    "evidence": "침착하게 흥미를 표하며 지시하는 자막과 자세가 능청스럽다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

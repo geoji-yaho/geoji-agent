@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "001-92_55169b475d46c_2834.png",
+  "asset_sha256": "cf2856e1a68dada24cdf9e9710803d2b231398b1cde0faba490b068b5d0ee82f",
+  "classification": {
+    "emotions": [
+      "RESIGNATION"
+    ],
+    "keywords": [
+      "답답함",
+      "관자놀이",
+      "고뇌"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "눈을 감고 미간을 찌푸림",
+        "pose": "양손으로 관자놀이를 누르는 상반신",
+        "captions": []
+      }
+    ],
+    "evidence": "눈을 감고 관자놀이를 누르는 고뇌가 드러난다. 체념과 고통의 경계가 모호하다.",
+    "uncertainties": [
+      "표정만으로 체념인지 단순 두통인지 단정할 수 없음"
+    ]
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": true,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

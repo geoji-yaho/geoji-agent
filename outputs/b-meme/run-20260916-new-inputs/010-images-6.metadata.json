@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "010-images-6.png",
+  "asset_sha256": "cad7f4c0054ac0f20bd2c5945bc277ad1f94f32936ab6bd0f445312a9414472e",
+  "classification": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "핀잔",
+      "토끼",
+      "황당"
+    ],
+    "expense_categories": [],
+    "subject": "animal",
+    "panels": [
+      {
+        "expression": "눈썹을 찌푸리고 입을 동그랗게 엶",
+        "pose": "작은 캐릭터를 안고 가까이 봄",
+        "captions": [
+          "머리에 총 맞은 자국은 없는데",
+          "왜 그딴 생각을 하지??"
+        ]
+      }
+    ],
+    "evidence": "찡그린 얼굴과 상대 생각을 타박하는 자막이 못마땅함을 드러낸다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

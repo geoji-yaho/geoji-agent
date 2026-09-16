@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "007-images-3.png",
+  "asset_sha256": "83c5f2d97fea5c8d92990ffbe0a3e40c36ea830b28129616e5657d8482710072",
+  "classification": {
+    "emotions": [],
+    "keywords": [
+      "미쳤나봐",
+      "충격",
+      "외침"
+    ],
+    "expense_categories": [],
+    "subject": "object",
+    "panels": [
+      {
+        "expression": "인물 없음",
+        "pose": "검은 방사형 테두리의 글자 컷",
+        "captions": [
+          "미쳤나 봐,"
+        ]
+      }
+    ],
+    "evidence": "놀람을 나타내는 한마디만 있고 여섯 감정 중 대표값을 시각적으로 확정하기 어렵다.",
+    "uncertainties": [
+      "해당 감정 enum에 순수한 놀람/충격이 없음"
+    ]
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": true,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}
