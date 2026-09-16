@@ -429,6 +429,67 @@ def _avoid(entry: Mapping[str, Any]) -> dict[str, list[str]]:
     return {"violations": list(dict.fromkeys(codes)), "problem_sentences": sentences}
 
 
+def _merge_same_intensity(entries: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """같은 강도 항목이 여러 개면 하나로 합친다(9/16).
+
+    검수관이 강도마다 한 항목을 내야 하는데, 실측에서 luna 가 지옥맛 하나를 위반별로 쪼개
+    같은 강도를 여러 번 냈다. 그러면 `validate_evaluation` 이 `DUPLICATE_INTENSITY` 를 내고
+    그 코드는 강도별 코드가 아니라 전역 실패라 판결문이 통째로 사라졌다(15 §6 6회차).
+    합치는 규칙은 `_merge_reports` 와 같다. `pass` 는 AND(하나라도 false 면 false, 하나라도
+    불리언이 아니면 미완), 위반과 문제 문장은 순서를 지켜 이어 붙이고 중복만 뺀다.
+    """
+    merged: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    extras: list[dict[str, Any]] = []
+    for entry in entries:
+        key = _key(entry.get("intensity"))
+        if key is None:
+            # 모르는 강도는 합치지 않는다. `validate_evaluation` 이 그대로 잡아야 한다.
+            extras.append(dict(entry))
+            continue
+        if key not in merged:
+            merged[key] = dict(entry)
+            order.append(key)
+            continue
+        target = merged[key]
+        first, second = target.get("pass"), entry.get("pass")
+        if isinstance(first, bool) and isinstance(second, bool):
+            target["pass"] = first and second
+        elif not isinstance(first, bool):
+            target["pass"] = first
+        else:
+            target["pass"] = second
+        target["violations"] = _dedup_dicts(
+            [*(target.get("violations") or []), *(entry.get("violations") or [])]
+        )
+        target["problem_sentences"] = list(
+            dict.fromkeys(
+                str(s)
+                for s in [
+                    *(target.get("problem_sentences") or []),
+                    *(entry.get("problem_sentences") or []),
+                ]
+            )
+        )
+    return [merged[key] for key in order] + extras
+
+
+def _dedup_dicts(items: Sequence[Any]) -> list[Any]:
+    """순서를 지키면서 같은 내용을 한 번만 남긴다(dict 는 정렬한 items 로 비교)."""
+    seen: set[Any] = set()
+    out: list[Any] = []
+    for item in items:
+        mark = tuple(sorted(item.items())) if isinstance(item, Mapping) else item
+        try:
+            if mark in seen:
+                continue
+            seen.add(mark)
+        except TypeError:
+            pass
+        out.append(item)
+    return out
+
+
 def _merge_reports(outputs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """검수 호출이 둘로 나뉘었을 때 보고서를 합친다. 검사 필드는 AND, 위반은 이어 붙인다."""
     if len(outputs) == 1:
@@ -1433,7 +1494,9 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 logger.warning("검수관 오류 %s → 전 강도 TEMPLATE", code)
                 return failed(code, why=kinds)
 
-            fresh = [e for e in output.get("texts") or [] if isinstance(e, Mapping)]
+            fresh = _merge_same_intensity(
+                [e for e in output.get("texts") or [] if isinstance(e, Mapping)]
+            )
             _observe_violations(output, fresh)
             fresh_keys = {_key(e.get("intensity")) for e in fresh}
             entries_list = fresh + [e for k, e in reused.items() if k not in fresh_keys]

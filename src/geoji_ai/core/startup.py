@@ -26,7 +26,7 @@ __all__ = [
 REASONING_WRITER_MODELS: frozenset[str] = frozenset({"grok-4.6", "grok-4.5", "grok-4.3"})
 
 #: 가드레일 정책 버전 허용 목록.
-ALLOWED_POLICY_VERSIONS: tuple[str, ...] = ("guardrail-v1", "guardrail-v2", "guardrail-v3")
+ALLOWED_POLICY_VERSIONS: tuple[str, ...] = ("guardrail-v1", "guardrail-v2")
 
 #: 없으면 모델을 부를 수 없는 키. readiness 가 본다.
 REQUIRED_API_KEYS: tuple[str, ...] = ("OPENAI_API_KEY", "XAI_API_KEY")

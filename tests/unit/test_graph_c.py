@@ -775,6 +775,35 @@ def report(intensities: Iterable[str], fail: Iterable[str] = ()) -> dict[str, An
     return base
 
 
+def test_31_evaluator_splits_one_intensity_into_two_entries() -> None:
+    """검수관이 같은 강도를 위반별로 쪼개 내도 하나로 합쳐 판정한다(9/16).
+
+    옛 동작: `validate_evaluation` 이 `DUPLICATE_INTENSITY` 를 내고, 그 코드는 강도별이 아니라
+    전역이라 재검수 없이 `EVAL_FAILED` 였다(15 §6 6회차).
+    """
+    split = report(["spicy", "hell"])
+    hell = split["texts"][1]
+    split["texts"] = [split["texts"][0], dict(hell), dict(hell)]
+    result = run(ScriptedLLM(sequences={"evaluator": [split, None]}))
+
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [("spicy", "AI"), ("hell", "AI")]
+    assert [t.intensity for t in req.evaluation.texts] == ["spicy", "hell"]
+    assert result.backend.failed == []
+
+
+def test_31b_splitted_entries_fail_if_any_says_false() -> None:
+    """쪼개진 항목 중 하나라도 `pass=false` 면 그 강도는 검수 실패로 본다."""
+    split = report(["spicy", "hell"])
+    failed_hell = report(["spicy", "hell"], fail=["hell"])["texts"][1]
+    split["texts"] = [split["texts"][0], dict(split["texts"][1]), failed_hell]
+    result = run(ScriptedLLM(sequences={"evaluator": [split, report(["hell"]), None]}))
+
+    # hell 만 재작성 대상이 된다.
+    assert result.state["repair_count"] == 1
+    assert [writer_intensity(c) for c in result.calls_of("writer")] == ["spicy", "hell", "hell"]
+
+
 def writer_angle(call: FakeCall) -> str:
     return call.schema["properties"]["attack_angle"]["enum"][0]
 

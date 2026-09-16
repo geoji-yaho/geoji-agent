@@ -136,7 +136,7 @@ class Stack:
             "BACKEND_INTERNAL_URL": self.helper_url,
             "GEOJI_E2E_REAL_BACKEND": self.base,
             "SERVICE_AUTH_TOKEN": self.token,
-            "GUARDRAIL_POLICY_VERSION": "guardrail-v3",
+            "GUARDRAIL_POLICY_VERSION": "guardrail-v2",
             "APP_ENV": "development",
             "OPENAI_API_KEY": "",
             "XAI_API_KEY": "",

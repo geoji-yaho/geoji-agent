@@ -1,7 +1,7 @@
 """골든셋 judge(06 §3.4). 프롬프트 조립·출력 스키마·파싱·축 평균·기준.
 
 judge 프롬프트 본문은 `judge.md` 다. 검수관 검사표는 복제하지 않고
-`prompts/evaluator/guardrail-v3.md` 에서 절을 잘라 **인용**하고,
+`prompts/evaluator/guardrail-v2.md` 에서 절을 잘라 **인용**하고,
 강도 정의는 서기 프롬프트의 그 강도 섹션을 인용한다.
 judge 만으로 통과하지 않는다 — 판정은 `report.judge_regression` 이 자동 위반과 같이 본다.
 
@@ -38,7 +38,7 @@ __all__ = [
 ]
 
 JUDGE_PROMPT_PATH = Path(__file__).resolve().with_name("judge.md")
-GUARDRAIL_SOURCE = "evaluator/guardrail-v3.md"
+GUARDRAIL_SOURCE = "evaluator/guardrail-v2.md"
 #: 인용할 검수관 프롬프트 절 제목(접두어).
 QUOTED_SECTIONS: tuple[str, ...] = ("## 검사표", "## 강도별 적용 표")
 SCORE_VALUES: tuple[int, ...] = (1, 2, 3, 4, 5)

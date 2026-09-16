@@ -152,7 +152,7 @@ uv run python tools/gen_contracts.py
 | `MODEL_WRITER` | `grok-4.20-0309-non-reasoning` | 서기·드립. 추론 모델(`grok-4.6`·`4.5`·`4.3`)이면 기동 실패 |
 | `MODEL_EVALUATOR_HELL` | `gpt-5.6-luna` | 지옥맛 검수관 |
 | `PROMPT_BUNDLE_VERSION` | `bundle-v1` | `prompts/` 파일 해시로 만든다 |
-| `GUARDRAIL_POLICY_VERSION` | `guardrail-v3` | `guardrail-v1` \| `guardrail-v2` \| `guardrail-v3`(D-07, 9/16 지옥맛 비속어 제한 해제로 v3). **production 에서는 환경변수에 직접 적어야 한다.** 안 적고 기본값에 기대면 기동 실패 |
+| `GUARDRAIL_POLICY_VERSION` | `guardrail-v2` | `guardrail-v1` \| `guardrail-v2`(D-07). 검사표 내용은 9/16 개정(지옥맛 비속어 제한 해제). **production 에서는 환경변수에 직접 적어야 한다.** 안 적고 기본값에 기대면 기동 실패 |
 | `INTAKE_TIMEOUT_SECONDS` | `4` | 심문관 |
 | `FIRST_RESULT_TARGET_SECONDS` | `90` | 첫 결과 목표. 9/16 백엔드 SENTENCE 마감 90초에 맞춤(옛 10) |
 | `REPAIR_PATH_BUDGET_SECONDS` | `15` | 복구 경로 예산 |
@@ -207,7 +207,7 @@ AI API와 worker 프로세스에 아래 이름으로 주입한다.
 | `DATABASE_URL` | AI API와 worker. `postgresql+asyncpg://...` 연결 |
 | `SERVICE_AUTH_TOKEN` | AI API·worker·백엔드에 같은 내부 인증 토큰 |
 | `BACKEND_INTERNAL_URL` | AI 프로세스에서 접근할 백엔드 호스트 루트. `/internal/v1`을 붙이지 않음 |
-| `APP_ENV=production`, `GUARDRAIL_POLICY_VERSION=guardrail-v3` | AI API와 worker의 운영 기동 검사 |
+| `APP_ENV=production`, `GUARDRAIL_POLICY_VERSION=guardrail-v2` | AI API와 worker의 운영 기동 검사 |
 
 키 설정 여부만 확인하며 실제 값이나 모델 호출 없이 검사할 수 있다:
 

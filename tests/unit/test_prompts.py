@@ -86,7 +86,6 @@ def test_spicy_system_has_no_hell_section() -> None:
         "sentencing-v1.md",
         "context-v1.md",
         "banter-v1.md",
-        "evaluator/guardrail-v3.md",
         "evaluator/guardrail-v2.md",
         "evaluator/guardrail-v1.md",
     ],
@@ -163,7 +162,6 @@ WORN_PHRASE_DECLARATIONS = {
     ("writer/common-v5.4.md", "금지어"),
     ("writer/common-v5.5.md", "금지어"),
     ("evaluator/guardrail-v2.md", "| 금지 | 금지 | 금지 |"),
-    ("evaluator/guardrail-v3.md", "| 금지 | 금지 | 금지 |"),
 }
 
 
@@ -193,28 +191,22 @@ def _after(text: str, marker: str) -> str:
 
 
 def test_hell_profanity_list_equals_lexicon() -> None:
-    """v5.4·guardrail-v2 까지의 hell 허용 목록 = `lexicon`(옛 버전 고정)."""
+    """v5.4 서기 섹션의 hell 허용 목록 = `lexicon`(옛 버전 고정)."""
     hell = load_prompt("writer/hell-v5.4.md")
     listed = _after(hell, "**이 목록 안에서만**:").strip().rstrip(".")
     assert tuple(word.strip() for word in listed.split(",")) == lexicon.HELL_ALLOWED_PROFANITY
-
-    guardrail = load_prompt("evaluator/guardrail-v2.md")
-    allowed = _after(guardrail, "hell 허용 목록(").split(")")[0]
-    assert tuple(allowed.split("·")) == lexicon.HELL_ALLOWED_PROFANITY
-    profanity = _after(guardrail, "| 비속어(").split(")")[0]
-    assert tuple(profanity.split("·")) == lexicon.PROFANITY
 
 
 def test_현행_프롬프트에는_지옥맛_허용_목록이_없다() -> None:
     """9/16 결정: 지옥맛은 비속어를 제한하지 않는다(`lexicon._RULE_INTENSITIES`).
 
-    서기 v5.5·검수관 v3 에 허용 목록이 남아 있으면 모델이 없는 규칙을 지키려 한다.
+    서기 v5.5·검수관 guardrail-v2(9/16 개정)에 허용 목록이 남아 있으면 모델이 없는 규칙을 지킨다.
     """
     hell = load_prompt(f"writer/hell-{WRITER_VERSION}.md")
     assert "이 목록 안에서만" not in hell
     assert "허용 목록은 없다" in hell
 
-    guardrail = load_prompt("evaluator/guardrail-v3.md")
+    guardrail = load_prompt("evaluator/guardrail-v2.md")
     assert "hell 허용 목록(" not in guardrail
     assert "판결당 최대 1회" not in guardrail
     # 비속어 목록 자체는 mild·spicy 판정에 쓰이므로 그대로다.

@@ -24,7 +24,6 @@ FIXTURE_NAMES = (
     "taxi-hell-requested-output",
     "taxi-hell-expected-evaluation.guardrail-v1",
     "taxi-hell-expected-evaluation.guardrail-v2",
-    "taxi-hell-expected-evaluation.guardrail-v3",
     "case-snapshot-taxi",
     "jury-guilty-75",
     "jury-rejected",
@@ -77,7 +76,7 @@ def validator_for(schema_name: str, defs_name: str) -> Draft202012Validator:
 def test_twelve_fixtures_exist() -> None:
     missing = [name for name in FIXTURE_NAMES if not (FIXTURES_DIR / f"{name}.json").exists()]
     assert not missing, f"없는 fixture: {missing}"
-    assert len(FIXTURE_NAMES) == 13  # 9/16 guardrail-v3 기대값 추가
+    assert len(FIXTURE_NAMES) == 12
 
 
 @pytest.mark.parametrize("path", fixture_files(), ids=lambda p: p.stem)
@@ -136,11 +135,11 @@ def test_guardrail_v1_expectation() -> None:
 
 
 def test_guardrail_v2_expectation_is_open() -> None:
-    payload = load_fixture("taxi-hell-expected-evaluation.guardrail-v3")
+    payload = load_fixture("taxi-hell-expected-evaluation.guardrail-v2")
     report = payload["expected"]
     text = report["texts"][0]
 
-    assert report["policy_version"] == "guardrail-v3"
+    assert report["policy_version"] == "guardrail-v2"
     assert text["pass"] is True
     assert text["violations"] == []
     assert payload["open_questions"], "PROFANITY_OUT_OF_LIST 미확정은 열어 둔다"

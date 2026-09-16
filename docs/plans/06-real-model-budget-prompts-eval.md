@@ -92,7 +92,7 @@ prompts/** 변경 ─▶ tests/evaluations/run_regression.py (골든 50사건 ×
 | 관측 | `case_cost_micro_usd`, `unknown_calls`, `llm_duration_seconds` by node·vendor(작업 8) |
 
 ### 3.3 프롬프트 (`prompts/`, proposal2 §12·§13)
-강도 정의(단일 정의 — 프롬프트·검수관·judge 공유, **9/16 부터 `guardrail-v3`**):
+강도 정의(단일 정의 — 프롬프트·검수관·judge 공유, `guardrail-v2` **9/16 개정**):
 | | `mild` | `spicy` | `hell` |
 |---|---|---|---|
 | 말투 | 존댓말 | 반말 허용 | 반말, "너" 직접 조준 |
@@ -114,8 +114,8 @@ prompts/** 변경 ─▶ tests/evaluations/run_regression.py (골든 50사건 ×
 | `banter-v2.md` | 원칙 체크리스트 적용, 승인 예시 3개 참고·복사 금지 |
 | `sentencing-v1.md` | 가중·감경은 반드시 라벨, 예시 2개(다른 사건) |
 | `context-v1.md` | 유지 + 인젝션 의심 예시 |
-| `evaluator/guardrail-v3.md` | (9/16) v2 에서: 지옥맛 허용 목록 행·"새끼/ㅋㅋ 판결당 1회" 행 삭제(hell 비속어 **제한 없음**), 정체성 비하·성적 표현 행 추가, `PROFANITY_OUT_OF_LIST` 는 mild·spicy 전용으로, `UNGROUNDED_CLAIM` 은 "조서에 없는 과거 사실 단정" 으로 좁힘. 코드 집합과 `EvaluationReport` 모양은 v2 와 같다. **현행 기본값**(`GUARDRAIL_POLICY_VERSION`) |
-| `evaluator/guardrail-v2.md`·`guardrail-v1.md` | 검사표·강도별 적용 표·코드 정의·위반 예시(다른 사건) 코드마다 1개. 파일은 남긴다 |
+| `evaluator/guardrail-v2.md` | **(9/16 개정, 버전 문자열은 그대로)**: 지옥맛 허용 목록 행·"새끼/ㅋㅋ 판결당 1회" 행 삭제(hell 비속어 **제한 없음**), 정체성 비하·성적 표현 행 추가, `PROFANITY_OUT_OF_LIST` 는 mild·spicy 전용으로, `UNGROUNDED_CLAIM` 은 "조서에 없는 과거 사실 단정" 으로 좁힘. 코드 집합과 `EvaluationReport` 모양은 그대로라 `guardrail-v3` 으로 올리지 않았다 — 백엔드 finalize 파서가 허용하는 문자열이 `guardrail-v1|v2` 뿐이고(9/16 실측에서 v3 은 422 INVALID_DRAFT), 마감 전에 백엔드를 바꾸면 그 사이 판결이 전부 막힌다. v3 승격은 백엔드 허용 목록이 늘어난 뒤(10 §0.1) |
+| `evaluator/guardrail-v1.md` | 검사표·강도별 적용 표·코드 정의·위반 예시(다른 사건) 코드마다 1개 |
 프롬프트 원칙(실측 근거, proposal2 §13): 예시는 다른 사건 / 각도는 서버 지정 / F0 / 닳은 표현 금지어 / 강도별 시스템 프롬프트 분리 / 문장 안 ID 는 서버 처리 / Claude 기준 가드레일을 Grok·OpenAI 에 맞춰 재튜닝. `PROMPT_BUNDLE_VERSION = bundle-v2+<sha8>`.
 
 ### 3.4 골든셋 · 회귀 평가기 (`tests/evaluations/`, proposal2 §18)

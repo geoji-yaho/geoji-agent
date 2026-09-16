@@ -55,9 +55,7 @@ class Settings(BaseSettings):
 
     # 프롬프트·정책 버전
     PROMPT_BUNDLE_VERSION: str = "bundle-v1"
-    GUARDRAIL_POLICY_VERSION: Literal["guardrail-v1", "guardrail-v2", "guardrail-v3"] = (
-        "guardrail-v3"
-    )
+    GUARDRAIL_POLICY_VERSION: Literal["guardrail-v1", "guardrail-v2"] = "guardrail-v2"
 
     # 시간 예산
     # 노드 timeout 은 float 다. 예산 초과 리허설이 0.1 을 준다(08 §3.5).
