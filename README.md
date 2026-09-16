@@ -135,11 +135,11 @@ uv run python tools/gen_contracts.py
 | `PROMPT_BUNDLE_VERSION` | `bundle-v1` | `prompts/` 파일 해시로 만든다 |
 | `GUARDRAIL_POLICY_VERSION` | `guardrail-v2` | `guardrail-v1` \| `guardrail-v2`(D-07). **production 에서는 환경변수에 직접 적어야 한다.** 안 적고 기본값에 기대면 기동 실패 |
 | `INTAKE_TIMEOUT_SECONDS` | `4` | 심문관 |
-| `FIRST_RESULT_TARGET_SECONDS` | `10` | 첫 결과 목표 |
+| `FIRST_RESULT_TARGET_SECONDS` | `90` | 첫 결과 목표. 9/16 백엔드 SENTENCE 마감 90초에 맞춤(옛 10) |
 | `REPAIR_PATH_BUDGET_SECONDS` | `15` | 복구 경로 예산 |
-| `SENTENCING_NODE_TIMEOUT_SECONDS` | `3` | 작업 3 실측 후 조정 |
-| `WRITER_NODE_TIMEOUT_SECONDS` | `6` | |
-| `EVALUATOR_NODE_TIMEOUT_SECONDS` | `4` | 작업 3 실측 후 조정 |
+| `SENTENCING_NODE_TIMEOUT_SECONDS` | `12` | 9/16 luna 실측 p90 5.7초·백엔드 관측 8.6초(옛 3) |
+| `WRITER_NODE_TIMEOUT_SECONDS` | `10` | grok 실측 p90 5.8초 + repair 여유(옛 6) |
+| `EVALUATOR_NODE_TIMEOUT_SECONDS` | `30` | 9/16 luna 실측 13.9~17.3초, reasoning 900~1,400 토큰(옛 4 — 늘 TIMEOUT 이었다) |
 | `WORKER_POLL_MS` | `250` | 작업 2 |
 | `JOB_LEASE_SECONDS` | `15` | 작업 2 |
 | `HEARTBEAT_SECONDS` | `5` | 작업 2 |
@@ -150,7 +150,7 @@ uv run python tools/gen_contracts.py
 | `INLINE_CONTEXT_MIN_REMAINING_MS` | `8500` | 작업 5 |
 | `IMMEDIATE_REPAIR_MAX` | `1` | |
 | `TEXT_RETRY_ROUNDS` | `3` | |
-| `TEXT_RETRY_TIMEOUT_SECONDS` | `20` | |
+| `TEXT_RETRY_TIMEOUT_SECONDS` | `60` | 서기 10 + 검수 30 + finalize. 백엔드 TEXT_RETRY 마감도 60 이어야 한다(옛 20) |
 | `RECALL_CANDIDATE_LIMIT` | `20` | 작업 4 |
 | `EVIDENCE_PACK_LIMIT` | `12` | 작업 4 |
 | `STYLE_EXAMPLE_LIMIT` | `3` | 작업 4 |
@@ -164,7 +164,7 @@ uv run python tools/gen_contracts.py
 | `BANTER_MAX_OUTPUT_TOKENS` | `1200` | |
 | `SENTENCING_MAX_OUTPUT_TOKENS` | `400` | |
 | `WRITER_MAX_OUTPUT_TOKENS` | `700` | 강도 1개당 |
-| `EVALUATOR_MAX_OUTPUT_TOKENS` | `800` | |
+| `EVALUATOR_MAX_OUTPUT_TOKENS` | `3000` | OpenAI 는 reasoning 토큰을 포함해 센다(옛 800 이면 잘림) |
 | `ROOM_COMMENT_STYLE_ENABLED` | `false` | |
 | `PUBLIC_HISTORY_CALLBACK_ENABLED` | `false` | |
 | `REFLECT_ENABLED` | `false` | |

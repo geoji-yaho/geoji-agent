@@ -1,0 +1,130 @@
+{
+ "role": "sentencing",
+ "model": "gpt-5.6-luna",
+ "provider": "openai",
+ "n": 3,
+ "parallel": 1,
+ "split": false,
+ "prompt_version": "sentencing-probe-draft",
+ "intensities": [],
+ "strict": true,
+ "temperature": null,
+ "reasoning_effort": null,
+ "max_tokens": null,
+ "inputs": [
+  "taxi-guilty-75"
+ ],
+ "summary": {
+  "latency_mean": 4.26870213333071,
+  "latency_median": 4.22586980000051,
+  "latency_p50": 4.22586980000051,
+  "latency_p90": 5.656996999998228,
+  "latency_max": 5.656996999998228,
+  "validated_ok": 3,
+  "total_cost_usd": 0.0020196,
+  "cached_tokens_total": 2734
+ },
+ "results": [
+  {
+   "idx": 0,
+   "ok": true,
+   "latency_s": 5.656996999998228,
+   "prompt_tokens": 1370,
+   "completion_tokens": 232,
+   "reasoning_tokens": 116,
+   "cached_tokens": 0,
+   "cost_usd": 0.0006915999999999999,
+   "cost_source": "table",
+   "problems": [],
+   "output": {
+    "sentence": "oneDay",
+    "sentencing_reason": "유죄율 75%에 택시 이용과 늦잠 사유가 반복되고 방 규칙도 위반해 하루형으로 정한다.",
+    "evidence_labels": [
+     "F0",
+     "F1",
+     "F2",
+     "F3",
+     "F4",
+     "F6"
+    ],
+    "aggravating": [
+     "최근 택시 이용 반복",
+     "늦잠 사유 반복",
+     "방 규칙 위반",
+     "참작할 사정 없음"
+    ],
+    "mitigating": [],
+    "_input": "taxi-guilty-75"
+   },
+   "error": null,
+   "parts": 1
+  },
+  {
+   "idx": 1,
+   "ok": true,
+   "latency_s": 4.22586980000051,
+   "prompt_tokens": 1370,
+   "completion_tokens": 224,
+   "reasoning_tokens": 111,
+   "cached_tokens": 1367,
+   "cost_usd": 0.000676,
+   "cost_source": "table",
+   "problems": [],
+   "output": {
+    "sentence": "oneDay",
+    "sentencing_reason": "유죄율 75%이고 늦잠 택시의 반복과 월 1회 규칙 위반이 있어 하루 형으로 정한다.",
+    "evidence_labels": [
+     "F1",
+     "F2",
+     "F3",
+     "F4",
+     "F6"
+    ],
+    "aggravating": [
+     "최근 택시 이용 반복",
+     "같은 사유 유죄 반복",
+     "월 1회 규칙 위반",
+     "편의 목적"
+    ],
+    "mitigating": [],
+    "_input": "taxi-guilty-75"
+   },
+   "error": null,
+   "parts": 1
+  },
+  {
+   "idx": 2,
+   "ok": true,
+   "latency_s": 2.9232395999933942,
+   "prompt_tokens": 1370,
+   "completion_tokens": 223,
+   "reasoning_tokens": 92,
+   "cached_tokens": 1367,
+   "cost_usd": 0.000652,
+   "cost_source": "table",
+   "problems": [],
+   "output": {
+    "sentence": "oneDay",
+    "sentencing_reason": "유죄율 75%에 늦잠 택시 반복과 월 4회 규칙 위반, 참작할 사정 없는 편의 지출이라 하루 형으로 정한다.",
+    "evidence_labels": [
+     "F0",
+     "F1",
+     "F2",
+     "F3",
+     "F4",
+     "F6"
+    ],
+    "aggravating": [
+     "택시 이용 반복",
+     "같은 사유 유죄 전력",
+     "월 4회 규칙 위반",
+     "참작할 사정 없는 편의 지출"
+    ],
+    "mitigating": [],
+    "_input": "taxi-guilty-75"
+   },
+   "error": null,
+   "parts": 1
+  }
+ ]
+}

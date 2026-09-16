@@ -15,7 +15,7 @@ import pytest
 from geoji_ai.adapters.fake_llm import FakeLLM
 from geoji_ai.core.config import Settings
 from geoji_ai.domain.budget import FINALIZE_RESERVE_SECONDS, inline_context_reserve
-from tests.unit.test_graph_c import FakeClock, run
+from tests.unit.test_graph_c import SPEC_CAPS, FakeClock, run
 
 #: 서기 2초·검수 2초로 낮춘 설정(스펙 단위 케이스). 제품 값이 아니다.
 LOW_CAPS: dict[str, float] = {"WRITER_NODE_TIMEOUT_SECONDS": 2, "EVALUATOR_NODE_TIMEOUT_SECONDS": 2}
@@ -40,11 +40,14 @@ class SlowContextLLM(FakeLLM):
 
 
 def test_즉석_조서_예약은_서기_상한_검수_상한_finalize_예약의_합():
-    assert inline_context_reserve(_settings()) == 6.0 + 4.0 + FINALIZE_RESERVE_SECONDS
+    assert inline_context_reserve(_settings(**SPEC_CAPS)) == 6.0 + 4.0 + FINALIZE_RESERVE_SECONDS
     assert inline_context_reserve(_settings(**LOW_CAPS)) == 2.0 + 2.0 + FINALIZE_RESERVE_SECONDS
+    # 9/16 제품 기본값(서기 10·검수 30)에서는 40.5초. 90초 마감이면 즉석 조서가 켜진다.
+    assert inline_context_reserve(_settings()) == 10.0 + 30.0 + FINALIZE_RESERVE_SECONDS
 
 
 def test_기본_상한에서_남은_10s_면_즉석_조서_호출_0_MINIMAL():
+    # 스펙 상한(3·6·4) 기준 케이스. `run` 이 SPEC_CAPS 를 기본으로 넣는다.
     result = run(prep=None, backend_kwargs={"remaining_s": 10.0})
 
     assert result.state["dossier_source"] == "MINIMAL"

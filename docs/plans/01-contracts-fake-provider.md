@@ -191,8 +191,8 @@ class LedgerPort(Protocol):
 | `MODEL_JUDGMENT` · `MODEL_WRITER` · `MODEL_EVALUATOR_HELL` | `gpt-5.6-luna` · `grok-4.20-0309-non-reasoning` · `gpt-5.6-luna` | 서기·드립에 추론 모델(`grok-4.6`·`4.5`·`4.3`) 금지 — startup 오류 |
 | `PROMPT_BUNDLE_VERSION` · `GUARDRAIL_POLICY_VERSION` | `bundle-v1` · `guardrail-v2`(제안) | 정책은 프롬프트·검수관·finalize·fixture 에 동시에 걸린다 |
 | `INTAKE_TIMEOUT_SECONDS` | 4 | |
-| `FIRST_RESULT_TARGET_SECONDS` · `REPAIR_PATH_BUDGET_SECONDS` | 10 · 15 | |
-| `SENTENCING_NODE_TIMEOUT_SECONDS` · `WRITER_NODE_TIMEOUT_SECONDS` · `EVALUATOR_NODE_TIMEOUT_SECONDS` | 3 · 6 · 4 | 양형관·검수관은 작업 3 실측 후 조정 |
+| `FIRST_RESULT_TARGET_SECONDS` · `REPAIR_PATH_BUDGET_SECONDS` | 90 · 15 | (9/16 코드 대조) 백엔드 SENTENCE 마감 90초. (원문) 10 |
+| `SENTENCING_NODE_TIMEOUT_SECONDS` · `WRITER_NODE_TIMEOUT_SECONDS` · `EVALUATOR_NODE_TIMEOUT_SECONDS` | 12 · 10 · 30 | (9/16 코드 대조) luna 실측(03 §3.6) 뒤 조정. `TEXT_RETRY_TIMEOUT_SECONDS` 60. (원문) 3 · 6 · 4, TEXT_RETRY 20 — "첫 결과 10초" 역산값이라 검수관이 늘 TIMEOUT |
 | `WORKER_POLL_MS` · `JOB_LEASE_SECONDS` · `HEARTBEAT_SECONDS` | 250 · 15 · 5 | 작업 2 |
 | `FINALIZE_RESERVE_MS` · `INLINE_CONTEXT_MIN_REMAINING_MS` | 500 · 8500 | 작업 5. 9/14 D-25 로 즉석 조서 조건은 "서기·검수·finalize 시간을 남기고 남는 시간" 이 되어 `INLINE_CONTEXT_MIN_REMAINING_MS` 는 하한 보조값으로만 남는다(05 §3.3) |
 | `IMMEDIATE_REPAIR_MAX` · `TEXT_RETRY_ROUNDS` · `TEXT_RETRY_TIMEOUT_SECONDS` | 1 · 3 · 20 | |
@@ -200,7 +200,7 @@ class LedgerPort(Protocol):
 | `MODEL_CONCURRENCY_LIMIT` | 8 | D-22(9/8 확정) |
 | `ALERT_DISCORD_WEBHOOK_URL` · `COST_ALERT_KRW_PER_DAY` | — · 5000 | 9/8 확정. 알림 규칙은 08 §3.3, 평가 실행(`GEOJI_EVAL=1`)분은 별도 집계 |
 | `MAX_TOTAL_PROMPT_TOKENS` · `WRITER_MAX_PROMPT_TOKENS` | 6000 · 8000 | |
-| 출력 토큰 상한 `{INTAKE,CONTEXT,BANTER,SENTENCING,WRITER,EVALUATOR}_MAX_OUTPUT_TOKENS` | intake 300 · context 700 · banter 1200 · sentencing 400 · writer 700/강도 · evaluator 800 | 잘리면 스키마 실패로 처리하고 사용량 기록. 키 이름은 9/11 확정 |
+| 출력 토큰 상한 `{INTAKE,CONTEXT,BANTER,SENTENCING,WRITER,EVALUATOR}_MAX_OUTPUT_TOKENS` | intake 300 · context 700 · banter 1200 · sentencing 400 · writer 700/강도 · evaluator 3000 (9/16 코드 대조, OpenAI 는 reasoning 포함. 원문 800) | 잘리면 스키마 실패로 처리하고 사용량 기록. 키 이름은 9/11 확정 |
 | 기능 플래그 | `ROOM_COMMENT_STYLE_ENABLED=false` · `PUBLIC_HISTORY_CALLBACK_ENABLED=false` · `REFLECT_ENABLED=false` · `HINDSIGHT_ENABLED=false` | hell 을 끄는 플래그는 없다 — 정책 버전으로 통제 |
 | `WORKER_SLOTS` | `{"SENTENCE": 2, "PREPARE": 1, "BACKGROUND": 1}` | 작업 2. 환경변수는 JSON 문자열(9/11) |
 

@@ -496,3 +496,143 @@ def test_gateway_without_tracker_is_unchanged() -> None:
     gateway = LLMGateway(FakeInner(), FakeLedger(), RecordingHealth(), PRICES.get)
     scoped = gateway_call(gateway)
     assert scoped.result.cost.micro_usd == 12
+
+
+# ---------------------------------------------------------------------------
+# 단계별·역할별 기록(9/16): sentence_call · sentence_fallback · sentence_summary
+# ---------------------------------------------------------------------------
+
+
+def _events(logs: list[dict[str, Any]], name: str) -> list[dict[str, Any]]:
+    return [e for e in logs if e.get("event") == name]
+
+
+def test_sentence_call_logs_every_model_call_with_role_timeout_and_latency(
+    registry: metrics.MetricsRegistry,
+) -> None:
+    """모델 호출 1회마다 역할·강도·받은 timeout·남은 마감·지연·모델을 남긴다. 원문 없음."""
+    with structlog.testing.capture_logs() as logs:
+        result = gc.run()
+    assert result.jobs.completed == ["job-1"]
+
+    calls = _events(logs, "sentence_call")
+    assert [c["role"] for c in calls] == ["sentencing", "writer", "writer", "evaluator"]
+    assert {c["intensity"] for c in calls if c["role"] == "writer"} == {"spicy", "hell"}
+    for call in calls:
+        assert call["trace_id"] == "trace-1"
+        assert call["job_id"] == "job-1"
+        assert call["graph_name"] == "sentencing"
+        assert call["node"] in {"sentencing", "writer", "evaluator"}
+        assert call["ok"] is True
+        assert call["fallback_reason"] is None
+        assert isinstance(call["timeout_s"], float) and call["timeout_s"] > 0
+        assert isinstance(call["remaining_s"], float)
+        assert isinstance(call["latency_ms"], int)
+        assert isinstance(call["call_index"], int)
+        assert call["model_id"]
+        assert "dropped_fields" not in call
+    # 받은 timeout 은 산식 그대로(SPEC_CAPS: 양형 3, 서기 min(6, 남은 − 4.5), 검수 4).
+    assert calls[0]["timeout_s"] == 3.0
+    assert calls[3]["timeout_s"] == 4.0
+    # 검수 호출은 하나(hell 별도 모델이 아니면 한 묶음)라 강도가 없다.
+    assert calls[3]["intensity"] is None
+
+
+def test_sentence_call_and_fallback_record_where_a_role_broke(
+    registry: metrics.MetricsRegistry,
+) -> None:
+    """양형관 TIMEOUT → `sentence_call` ok=False·kind, `sentence_fallback` RULE.
+
+    운영 화면이 템플릿일 때 "어느 역할이 어디서 왜" 를 이 두 이벤트로 되짚는다.
+    """
+    llm = gc.ScriptedLLM(errors={"sentencing": LLMError("TIMEOUT")})
+    with structlog.testing.capture_logs() as logs:
+        result = gc.run(llm)
+    assert result.state["sentencing_source"] == "RULE"
+
+    [broken] = [c for c in _events(logs, "sentence_call") if c["ok"] is False]
+    assert broken["role"] == "sentencing"
+    assert broken["fallback_reason"] == "TIMEOUT"
+    assert broken["timeout_s"] == 3.0
+
+    fallbacks = _events(logs, "sentence_fallback")
+    assert [(f["node"], f["role"], f["outcome"], f["fallback_reason"]) for f in fallbacks] == [
+        ("sentencing", "sentencing", "RULE", "TIMEOUT")
+    ]
+    assert all(f["trace_id"] == "trace-1" and "dropped_fields" not in f for f in fallbacks)
+
+
+def test_evaluator_failure_logs_fallback_to_generation_failed_with_kind(
+    registry: metrics.MetricsRegistry,
+) -> None:
+    """검수관 TIMEOUT(9/16 운영 증상) → 전 강도 TEMPLATE·`EVAL_FAILED:TIMEOUT` 기록."""
+    llm = gc.ScriptedLLM(errors={"evaluator": LLMError("TIMEOUT")})
+    with structlog.testing.capture_logs() as logs:
+        result = gc.run(llm)
+    assert result.backend.failed == ["EVAL_FAILED"]
+
+    [broken] = [c for c in _events(logs, "sentence_call") if c["ok"] is False]
+    assert (broken["role"], broken["fallback_reason"]) == ("evaluator", "TIMEOUT")
+    fallbacks = _events(logs, "sentence_fallback")
+    assert [(f["role"], f["outcome"], f["fallback_reason"]) for f in fallbacks] == [
+        ("evaluator", "generation_failed", "EVAL_FAILED:TIMEOUT")
+    ]
+
+
+def test_writer_failure_logs_template_per_intensity(
+    registry: metrics.MetricsRegistry,
+) -> None:
+    """서기 오류 → 강도마다 `sentence_fallback` TEMPLATE(이유 = 오류 kind)."""
+    llm = gc.ScriptedLLM(errors={"writer": LLMError("SERVER")})
+    with structlog.testing.capture_logs() as logs:
+        gc.run(llm)
+    fallbacks = _events(logs, "sentence_fallback")
+    writer = [f for f in fallbacks if f["role"] == "writer" and f["outcome"] == "TEMPLATE"]
+    assert {f["intensity"] for f in writer} == {"spicy", "hell"}
+    assert {f["fallback_reason"] for f in writer} == {"SERVER"}
+    assert {f["node"] for f in writer} == {"writer"}
+
+
+def test_no_budget_call_is_logged_before_any_vendor_request(
+    registry: metrics.MetricsRegistry,
+) -> None:
+    """마감이 모자라 시작하지 않은 호출도 `sentence_call`(NO_BUDGET, timeout_s null) 로 남는다."""
+    with structlog.testing.capture_logs() as logs:
+        result = gc.run(backend_kwargs={"remaining_s": 3.0})
+    assert result.roles()["writer"] == 0
+    skipped = [c for c in _events(logs, "sentence_call") if c["fallback_reason"] == "NO_BUDGET"]
+    assert {c["role"] for c in skipped} == {"writer"}
+    assert all(c["timeout_s"] is None and c["ok"] is False for c in skipped)
+
+
+def test_sentence_summary_one_line_per_run(registry: metrics.MetricsRegistry) -> None:
+    """실행 1회에 `sentence_summary` 한 줄: 결과·조서/양형/문구 출처·역할별 오류."""
+    with structlog.testing.capture_logs() as logs:
+        gc.run()
+    [summary] = _events(logs, "sentence_summary")
+    assert summary["mode"] == "INITIAL"
+    assert summary["outcome"] == "SAVED"
+    assert summary["ok"] is True
+    assert summary["fallback_reason"] is None
+    assert summary["source"] == "PREP|AI|spicy=AI,hell=AI"
+    assert summary["result_count"] == 4
+    assert "dropped_fields" not in summary
+
+    llm = gc.ScriptedLLM(errors={"evaluator": LLMError("TIMEOUT")})
+    with structlog.testing.capture_logs() as logs:
+        gc.run(llm)
+    [failed] = _events(logs, "sentence_summary")
+    assert failed["outcome"] == "EVAL_FAILED"
+    assert failed["ok"] is False
+    assert failed["fallback_reason"] == "evaluator:-:TIMEOUT"
+    assert failed["source"] == "PREP|AI|spicy=TEMPLATE,hell=TEMPLATE"
+
+
+def test_sentence_node_log_carries_outcome_route(registry: metrics.MetricsRegistry) -> None:
+    """노드 로그에 그 노드가 고른 길이 남는다(prep/AI/SAVED)."""
+    with structlog.testing.capture_logs() as logs:
+        gc.run()
+    by_node = {e["node"]: e for e in logs if e.get("event") == "sentence_node"}
+    assert by_node["load_valid_prep"]["outcome"] == "prep"
+    assert by_node["sentencing"]["outcome"] == "AI"
+    assert by_node["finalize"]["outcome"] == "SAVED"

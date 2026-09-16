@@ -63,6 +63,17 @@ class Rejected(Exception):
         self.code = code
 
 
+#: 05 §3.1 스펙 단위 케이스가 쓴 "첫 결과 10초" 시절 노드 상한(3·6·4)과 TEXT_RETRY 20초.
+#: 9/16 luna 실측으로 제품 기본값은 12·10·30·60 이 됐다(01 §3.7). 여기 케이스는 timeout
+#: 산식(`min(상한, 남은 − 예약)`)을 고정하는 것이라 옛 상한을 명시해 두고 돈다.
+SPEC_CAPS: dict[str, Any] = {
+    "SENTENCING_NODE_TIMEOUT_SECONDS": 3,
+    "WRITER_NODE_TIMEOUT_SECONDS": 6,
+    "EVALUATOR_NODE_TIMEOUT_SECONDS": 4,
+    "TEXT_RETRY_TIMEOUT_SECONDS": 20,
+}
+
+
 class FakeClock:
     def __init__(self) -> None:
         self.now = 1000.0
@@ -355,7 +366,7 @@ def run(
         llm=llm,
         preparation=preparation or FakePreparation(make_prep() if prep == "default" else prep),
         semaphore=asyncio.Semaphore(8),
-        settings=settings or Settings(_env_file=None),
+        settings=settings or Settings(_env_file=None, **SPEC_CAPS),
         generation_id=GENERATION_ID,
         worker_id=WORKER_ID,
         notifier=notifier,
@@ -930,7 +941,9 @@ def test_29_regenerate_budget_is_text_retry_timeout(
         backend_kwargs={"fixed": FIXED, "remaining_s": 60.0},
         kind="TEXT_RETRY",
         clock=clock,
-        settings=Settings(_env_file=None, TEXT_RETRY_TIMEOUT_SECONDS=retry_timeout_s),
+        settings=Settings(
+            _env_file=None, **{**SPEC_CAPS, "TEXT_RETRY_TIMEOUT_SECONDS": retry_timeout_s}
+        ),
     )
     assert result.backend.failed == failed
     if failed:

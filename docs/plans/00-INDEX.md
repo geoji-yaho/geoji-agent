@@ -122,7 +122,7 @@
 - [ ] Phase 1 + 백엔드 begin-generation·generation-failed·watchdog·job INSERT 2지점 + submissions 최소(10 §12 표)
 ### Phase 2 완료 판정 기준
 - [ ] **AI 호출 없이 등록 → 투표 → 템플릿 노출, 형량 1회 확정.** 백엔드가 계약대로 이벤트를 쏨
-- [ ] luna 3역할 실측·타임아웃 조정·D-23 판정 기록(§8.4)
+- [x] luna 3역할 실측·타임아웃 조정·D-23 판정 기록(§8.4) — 9/16 양형·검수 실측(03 §3.6), intake 미측정
 
 ### Phase 3 — 9/12 (작업 4) 완료 판정 기준
 - [ ] 허용된 30일 이력만 집계, 삭제 직후 조회 차단·finalize 거부, 방 누출 0, 늦은 retain 0
@@ -272,7 +272,7 @@ flowchart LR
 - [x] **D-07** — 9/8 확정: `guardrail-v2` 로 시작(10 §15.3). 팀 비준은 M3 검수 시, 미비준이면 `guardrail-v1`
 - [x] **D-19** — 9/8 확정으로 닫음(팀 확인 불필요)
 - [x] **D-22** — 9/8 확정: 8 로 시작, 429 시 하향
-- [ ] **D-23 양형관 실측 > 2초 대응** — 작업 3 실측 결과 기록 자리: sentencing p90 ____초 → 유지 / 밴드별 사전 후보(09 G-8)
+- [x] **D-23 양형관 실측 > 2초 대응** — 9/16 실측: sentencing p90 5.7초(백엔드 관측 8.6초), evaluator 13.9~17.3초 → **상한 조정**(양형 12·서기 10·검수 30, TEXT_RETRY 60, 01 §3.7). 밴드별 사전 후보(09 G-8)는 하지 않는다. "첫 결과 10초" 는 백엔드 마감 90초로 대체(10 §3·§6)
 - [x] **D-04** — 9/8 확정: P0 제외, `ROOM_COMMENT_STYLE_ENABLED=false` 유지, retain 은 한다(09 C)
 - [ ] **검수관 모델** — 작업 6 재현율 기록 자리: 지옥맛 recall ____ → luna / terra
 - [ ] `generation-failed` 오류 코드 표·`reason_source`·`texts[].source`·`intensities[]`·매핑 통지·trace 프록시(백엔드 채택, 10 §14)

@@ -1,0 +1,252 @@
+{
+ "role": "evaluator",
+ "model": "gpt-5.6-luna",
+ "provider": "openai",
+ "n": 3,
+ "parallel": 1,
+ "split": false,
+ "prompt_version": "evaluator-probe-draft",
+ "intensities": [
+  "spicy",
+  "hell"
+ ],
+ "strict": true,
+ "temperature": null,
+ "reasoning_effort": null,
+ "max_tokens": null,
+ "inputs": [
+  "taxi-spicy-hell"
+ ],
+ "summary": {
+  "latency_mean": 16.124804566667688,
+  "latency_median": 17.21518990000186,
+  "latency_p50": 17.21518990000186,
+  "latency_p90": 17.265058999997564,
+  "latency_max": 17.265058999997564,
+  "validated_ok": 3,
+  "total_cost_usd": 0.0110922,
+  "cached_tokens_total": 3816
+ },
+ "results": [
+  {
+   "idx": 0,
+   "ok": true,
+   "latency_s": 13.894164800003637,
+   "prompt_tokens": 1911,
+   "completion_tokens": 1395,
+   "reasoning_tokens": 866,
+   "cached_tokens": 0,
+   "cost_usd": 0.0030953999999999995,
+   "cost_source": "table",
+   "problems": [],
+   "output": {
+    "sentence_check": {
+     "pass": true,
+     "violations": []
+    },
+    "sentencing_reason_check": {
+     "pass": false,
+     "violations": [
+      {
+       "code": "UNGROUNDED_CLAIM",
+       "path": "sentencing.sentencing_reason",
+       "evidence_labels": [
+        "F1",
+        "F5"
+       ],
+       "explanation": "F1은 최근 7일 택시 이용 3회라는 사실만 뒷받침하고, F5는 예산 소진율 41%만 뒷받침한다. 유죄율 75%가 실형 범위라는 정책 근거나 무기징역과의 비교 근거는 조서에 없다."
+      },
+      {
+       "code": "SENTENCE_REASON_MISMATCH",
+       "path": "sentencing.sentencing_reason",
+       "evidence_labels": [
+        "F1",
+        "F5"
+       ],
+       "explanation": "선고된 형은 oneDay인데 사유는 '실형 범위' 및 '무기징역'이라는 조서·허용 형량표에 없는 기준으로 형량을 설명하고 있다."
+      }
+     ]
+    },
+    "texts": [
+     {
+      "intensity": "spicy",
+      "pass": false,
+      "violations": [
+       {
+        "code": "UNGROUNDED_CLAIM",
+        "path": "texts[0].statement[1]",
+        "evidence_labels": [
+         "F2",
+         "F3"
+        ],
+        "explanation": "'지난주에도'와 '이번 주도'라는 주간별 반복은 F2·F3의 기록만으로 확인되지 않는다. F2는 9/2의 과거 택시 이용 1건, F3은 최근 30일 유죄 2회라는 사실만 제시한다."
+       }
+      ],
+      "problem_sentences": [
+       "지난주에도 늦잠, 이번 주도 늦잠. 택시가 아니라 이불이 문제입니다."
+      ]
+     },
+     {
+      "intensity": "hell",
+      "pass": false,
+      "violations": [
+       {
+        "code": "UNGROUNDED_CLAIM",
+        "path": "texts[1]",
+        "evidence_labels": [
+         "F0",
+         "F1",
+         "F2",
+         "F3"
+        ],
+        "explanation": "조서는 늦잠 사유의 반복과 택시 이용 사실은 뒷받침하지만, 양심·의지가 '눈곱만큼도 없다'는 단정은 근거가 없다."
+       }
+      ],
+      "problem_sentences": [
+       "어휴 이새X어쩌지; 생체리듬이고 양심이고 의지라곤 눈꼽만큼도 없는 노답. 내가 더 어떻게 해야 들어쳐먹을래?"
+      ]
+     }
+    ],
+    "_input": "taxi-spicy-hell"
+   },
+   "error": null,
+   "parts": 1
+  },
+  {
+   "idx": 1,
+   "ok": true,
+   "latency_s": 17.265058999997564,
+   "prompt_tokens": 1911,
+   "completion_tokens": 1705,
+   "reasoning_tokens": 1363,
+   "cached_tokens": 1908,
+   "cost_usd": 0.0040638,
+   "cost_source": "table",
+   "problems": [],
+   "output": {
+    "sentence_check": {
+     "pass": true,
+     "violations": []
+    },
+    "sentencing_reason_check": {
+     "pass": false,
+     "violations": [
+      {
+       "code": "UNGROUNDED_CLAIM",
+       "path": "sentencing.sentencing_reason",
+       "evidence_labels": [
+        "F5"
+       ],
+       "explanation": "조서에는 예산 소진율 41%만 있을 뿐, 이를 근거로 '무기징역까지는 가지 않는다'고 판단할 근거가 없습니다."
+      },
+      {
+       "code": "SENTENCE_REASON_MISMATCH",
+       "path": "sentencing.sentencing_reason",
+       "evidence_labels": [
+        "F5"
+       ],
+       "explanation": "허용 형량은 probation과 oneDay뿐인데, 양형 이유가 조서나 정책에 없는 '무기징역'을 기준으로 현재 형량을 설명하고 있습니다."
+      }
+     ]
+    },
+    "texts": [
+     {
+      "intensity": "spicy",
+      "pass": false,
+      "violations": [
+       {
+        "code": "UNGROUNDED_CLAIM",
+        "path": "texts[0].statement[1]",
+        "evidence_labels": [
+         "F2",
+         "F3"
+        ],
+        "explanation": "조서는 9/2의 이전 택시 이용과 최근 30일 유죄 2회를 뒷받침하지만, 이를 '지난주에도'와 '이번 주도'로 특정할 근거는 없습니다."
+       }
+      ],
+      "problem_sentences": [
+       "지난주에도 늦잠, 이번 주도 늦잠. 택시가 아니라 이불이 문제입니다."
+      ]
+     },
+     {
+      "intensity": "hell",
+      "pass": true,
+      "violations": [],
+      "problem_sentences": []
+     }
+    ],
+    "_input": "taxi-spicy-hell"
+   },
+   "error": null,
+   "parts": 1
+  },
+  {
+   "idx": 2,
+   "ok": true,
+   "latency_s": 17.21518990000186,
+   "prompt_tokens": 1911,
+   "completion_tokens": 1647,
+   "reasoning_tokens": 1312,
+   "cached_tokens": 1908,
+   "cost_usd": 0.003933,
+   "cost_source": "table",
+   "problems": [],
+   "output": {
+    "sentence_check": {
+     "pass": true,
+     "violations": []
+    },
+    "sentencing_reason_check": {
+     "pass": false,
+     "violations": [
+      {
+       "code": "UNGROUNDED_CLAIM",
+       "path": "sentencing.sentencing_reason",
+       "evidence_labels": [
+        "F5"
+       ],
+       "explanation": "예산 소진율 41%만으로 '실형 범위' 또는 무기징역 여부를 판단할 근거가 조서와 정책에 없다."
+      },
+      {
+       "code": "SENTENCE_REASON_MISMATCH",
+       "path": "sentencing.sentencing_reason",
+       "evidence_labels": [
+        "F5"
+       ],
+       "explanation": "선고된 oneDay를 예산 소진율과 무기징역 배제만으로 정당화하지만, 허용 형량의 선택 기준이나 해당 형량과의 연결이 제시되지 않았다."
+      }
+     ]
+    },
+    "texts": [
+     {
+      "intensity": "spicy",
+      "pass": false,
+      "violations": [
+       {
+        "code": "UNGROUNDED_CLAIM",
+        "path": "texts[0]",
+        "evidence_labels": [
+         "F2",
+         "F3"
+        ],
+        "explanation": "조서에는 9/2의 이전 늦잠 택시와 최근 30일 유죄 2회만 있으며, 해당 사례가 '지난주'였다는 근거는 없다."
+       }
+      ],
+      "problem_sentences": [
+       "지난주에도 늦잠, 이번 주도 늦잠. 택시가 아니라 이불이 문제입니다."
+      ]
+     },
+     {
+      "intensity": "hell",
+      "pass": true,
+      "violations": [],
+      "problem_sentences": []
+     }
+    ],
+    "_input": "taxi-spicy-hell"
+   },
+   "error": null,
+   "parts": 1
+  }
+ ]
+}

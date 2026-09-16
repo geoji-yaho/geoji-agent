@@ -18,8 +18,8 @@
 flowchart TD
     A["claim SENTENCE (02)"] --> B["begin-generation → 고정 형량·text_version·deadline"]
     B --> C["load_valid_prep (input_hash·prompt_version·epoch 일치)"]
-    C -->|없음 ∧ 남은 ≥ 8.5s| C1["inline_context: build_evidence + analyze_reason 1회"]
-    C -->|없음 ∧ 남은 < 8.5s| C2["minimal_dossier: 코드 Evidence 만"]
+    C -->|없음 ∧ 남은 − (서기 + 검수 + 0.5) > 0| C1["inline_context: build_evidence + analyze_reason 1회"]
+    C -->|없음 ∧ 그 외| C2["minimal_dossier: 코드 Evidence 만"]
     C --> D{"spent ∧ guilty ∧ 고정 형량 없음?"}
     C1 --> D
     C2 --> D
@@ -39,7 +39,7 @@ flowchart TD
     J -->|422 INVALID_DRAFT ∧ repair 남음| I
 ```
 - `disagree`(살까 말까 부결)는 정상 생성 경로에서 양형관만 건너뛴다. `dismissed`(정족수 미달)는 job 자체가 없다(§3 #9)
-- `TEXT_RETRY` 는 같은 그래프를 `mode=REGENERATE` 로: `begin-generation` 이 준 고정 형량·이유, 예산 20초, **round 안 보정 없음**, 실패는 다음 round(백엔드)
+- `TEXT_RETRY` 는 같은 그래프를 `mode=REGENERATE` 로: `begin-generation` 이 준 고정 형량·이유, 예산 60초(9/16 코드 대조, 원문 20초), **round 안 보정 없음**, 실패는 다음 round(백엔드)
 
 ### 현상태
 - 작업 1~4 산출물(계약·큐·가짜 백엔드·근거 발급) 위에서 fake provider 로 돈다. 서기 v5.3 프롬프트는 실측 통과분을 그대로 옮긴다
@@ -92,7 +92,7 @@ class SentenceState(TypedDict):
     repair_count: int; draft_hash: str | None; calls: list[CallRecord]; failure: str | None
 ```
 - `Deadline.from_db(deadline_at, db_now)`: DB 시간과 로컬 monotonic 의 차이로 남은 시간을 만든다. 호스트 clock 을 신뢰하지 않는다(§14.1)
-- `node_timeout(name)` = `min(NODE_TIMEOUT[name], remaining − reserve_after(name))`. `reserve_after`: writer 뒤 evaluator 4s + finalize 0.5s, evaluator 뒤 finalize 0.5s. 계산 결과 ≤ 0 이면 그 노드를 **시작하지 않고** 폴백. sentencing 뒤 예약은 두지 않는다(9/14 리뷰 수정, PR #33). **9/14 D-25:** 즉석 조서(`inline_context`)는 서기 상한 + 검수 상한 + finalize 0.5s 를 남긴 나머지 시간만 쓰고, 남는 시간이 없으면 시작하지 않고 `minimal_dossier`
+- `node_timeout(name)` = `min(NODE_TIMEOUT[name], remaining − reserve_after(name))`. `reserve_after`: writer 뒤 evaluator 상한 + finalize 0.5s, evaluator 뒤 finalize 0.5s. **9/16 상한(01 §3.7): 양형 12·서기 10·검수 30**(원문 3·6·4 — luna 검수가 14~17초라 4초에서는 늘 TIMEOUT → 전 강도 TEMPLATE 이었다. 03 §3.6 실측). 계산 결과 ≤ 0 이면 그 노드를 **시작하지 않고** 폴백. sentencing 뒤 예약은 두지 않는다(9/14 리뷰 수정, PR #33). **9/14 D-25:** 즉석 조서(`inline_context`)는 서기 상한 + 검수 상한 + finalize 0.5s 를 남긴 나머지 시간만 쓰고, 남는 시간이 없으면 시작하지 않고 `minimal_dossier`
 - 429 백오프가 남은 시간을 넘으면 즉시 폴백(작업 6 `retries.py` 가 결정, 작업 5 는 훅만)
 
 ### 3.2 그래프 B (`graphs/preparation.py`, proposal2 §5.2)
