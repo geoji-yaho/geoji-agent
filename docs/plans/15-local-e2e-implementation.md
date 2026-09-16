@@ -75,6 +75,7 @@ PYTHONPATH=src .venv/bin/python scripts/run_local_e2e.py \
 
 이 명령은 기존 DB를 사용하지 않고 새 컨테이너를 만든다. 테스트용 업무 DDL을 파일명 순으로
 새 DB에만 적용한다. 운영 마이그레이션 실행기로 사용하지 않는다. `--keep`을 빼면 자동 정리한다.
+`--keep`이어도 부팅 중 실패해 정리용 `state.json`을 저장하지 못한 경우에는 자동 정리한다.
 
 실행이 끝난 뒤 출력된 `geoji-e2e-*` 디렉터리로 웹을 띄운다:
 
@@ -131,6 +132,8 @@ PYTHONPATH=src .venv/bin/python scripts/run_local_live_e2e.py --execute-approved
   임시 PostgreSQL16의 별도 DB에서 실행했으며 테스트 컨테이너는 종료했다.
 - 최종 Ruff lint·format 및 로컬 실행기 lint 통과. 기존 Starlette/anyio deprecation 경고1건은 남아 있다.
 - 기존 카탈로그 검증기로 완성 이미지 **10장**의 등록 자료 생성 성공. 모델·네트워크·DB 호출 없음.
+- 메인 병합 전 독립 리뷰에서 `--keep` 부팅 실패 자원 잔류를 수정했다. 실패 시 종료·정상 기동 후 유지·
+  일반 종료3건을 실제 자식 프로세스로 검증했고, 전체 pytest **1,378 통과**(71.13초), Ruff207파일 통과.
 - 최초 AI Ruff lint는 통과했고 기존 테스트의 포맷1건 불일치가 있었다. 후속 커밋 준비에서
   `tests/unit/test_build_meme_release.py`의 표현식 줄바꿈만 정리해 전체 format 검사도 통과했다.
 - 백엔드 최종 `./gradlew build`: **512 테스트, 실패/오류/skip0**, 54클래스, 37초.

@@ -823,7 +823,8 @@ class Stack:
             await self.client.aclose()
         if self.db:
             await self.db.close()
-        if self.args.keep:
+        # 부팅 실패로 정리용 state를 못 남겼다면 --keep이어도 자원을 회수한다.
+        if self.args.keep and (self.directory / "state.json").is_file():
             return
         for _, proc in reversed(self.processes):
             if proc.poll() is None:
