@@ -27,7 +27,7 @@ AI 파트(`geoji-agent`)에 전할 내용을 한곳에 모은다. 백엔드가 1
 | - | ----- | ----- | ---- |
 | A1 | 워커·AI API 의 `SERVICE_AUTH_TOKEN` 과 백엔드 EB 환경변수 `SERVICE_AUTH_TOKEN` 에 **같은 값**을 넣는다(양방향 같은 토큰). 값 전달 경로는 사람 | §4.7·§16.1 | W1 infra |
 | A2 | 백엔드가 AI API 를 부를 주소 `AI_API_BASE_URL` 을 백엔드에 알려 준다 | §16.1 | W1 infra |
-| A3 | 워커 설정 `BACKEND_INTERNAL_URL` = 백엔드 EB 주소 + `/internal/v1` | §16.1 | 플랜 |
+| A3 | 워커 설정 `BACKEND_INTERNAL_URL` = 백엔드 EB 주소 + `/internal/v1` — **9/16 정정(AI 파트): 호스트 루트만 적는다. `/internal/v1` 은 `adapters/backend_http.py` 가 붙인다(10 §16.1·§16.6)** | §16.1 | 플랜 |
 | A4 | 템플릿을 바꾸면 `templates-v2` 로 올리고 백엔드에 알린다(백엔드는 `templates-v1.json` 을 geoji-agent `995c7fb` 바이트 그대로 고정 복사) | §10·§16 | W2 pure |
 | A5 | `workers/dispatch.py` 모듈 docstring 정리 — "`intensities[]`·RETAIN `verdict_version` 은 백엔드 미채택이라 넣지 않는다"가 낡았다. 백엔드는 둘 다 넣는다 | §3 | W2 jobs |
 | A6 | 워커가 **PREPARE·SENTENCE·TEXT_RETRY snapshot 404 와 resolve-evidence 404** 도 skip 으로 받는지 확인(백엔드는 원본 게시물이 삭제되면 kind 와 무관하게 404) | §4.1·§4.2 | W3 internal-read |
