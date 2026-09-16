@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "postId": "00000000-0000-4000-8000-000000000001",
+  "juryStatus": "notGuilty",
+  "sentenceStatus": "FINAL",
+  "textStatus": "AI_READY",
+  "textVersion": 1,
+  "view": {
+    "intensity": "mild",
+    "headline": "합리적인 소비입니다",
+    "statement": [
+      "이번 지출은 배심원의 동의를 받았습니다."
+    ],
+    "sentence": null,
+    "sentenceLabel": null,
+    "sentencingReason": null,
+    "source": "AI",
+    "meme": null
+  },
+  "pollAfterMs": 0
+}

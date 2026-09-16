@@ -137,13 +137,10 @@ def test_every_object_forbids_extra_properties(schema_name: str) -> None:
 @pytest.mark.parametrize("schema_name", SCHEMA_NAMES)
 def test_schema_version_is_const_one(schema_name: str) -> None:
     document = load_schema(schema_name)
-    tops = [
-        body
-        for body in document["$defs"].values()
-        if "schema_version" in body.get("properties", {})
-    ]
+    key = "schemaVersion" if schema_name == "verdict-view" else "schema_version"
+    tops = [body for body in document["$defs"].values() if key in body.get("properties", {})]
 
     assert tops, f"{schema_name}: schema_version 을 가진 최상위 객체가 없다"
     for body in tops:
-        assert body["properties"]["schema_version"]["const"] == 1
-        assert "schema_version" in body["required"]
+        assert body["properties"][key]["const"] == 1
+        assert key in body["required"]

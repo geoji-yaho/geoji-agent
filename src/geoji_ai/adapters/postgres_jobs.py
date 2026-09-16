@@ -61,6 +61,13 @@ HEARTBEAT_SQL = (
 
 COMPLETE_SQL = "UPDATE ai.jobs SET " + _TOUCH + "status='SUCCEEDED'" + OWNERSHIP_WHERE
 
+# 사라진 snapshot은 재시도할 대상이 없다. 삭제 트랜잭션이 먼저 취소했거나
+# lease를 잃었다면 소유 CAS가 0행으로 끝나 기존 terminal 상태를 보존한다.
+CANCEL_SQL = (
+    "UPDATE ai.jobs SET " + _TOUCH + "status='CANCELLED', last_error_code=:error_code, "
+    "owner_id=NULL, generation_id=NULL, lease_until=NULL" + OWNERSHIP_WHERE
+)
+
 # 재시도 시각이 기한 이후인 SENTENCE 는 claim(`deadline_at > now()`)이 다시 집지 않고
 # reaper 는 RUNNING 만 보므로 QUEUED 로 되돌리면 영원히 남는다. reaper(02 §3.5)와
 # 같은 규칙으로 CANCELLED 로 끝낸다.
@@ -183,6 +190,13 @@ class PostgresJobs:
 
     async def complete(self, job_id: str, worker_id: str, generation_id: str) -> bool:
         return await self._own(COMPLETE_SQL, self._owner_params(job_id, worker_id, generation_id))
+
+    async def cancel(
+        self, job_id: str, worker_id: str, generation_id: str, *, error_code: str
+    ) -> bool:
+        params = self._owner_params(job_id, worker_id, generation_id)
+        params["error_code"] = error_code
+        return await self._own(CANCEL_SQL, params)
 
     async def fail(
         self,

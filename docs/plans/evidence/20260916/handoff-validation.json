@@ -1,0 +1,48 @@
+{
+  "date": "2026-09-16",
+  "scope": "agent changes and handoff documents; backend/frontend patches are review-only",
+  "previous_stack_evidence": "summary.json",
+  "ai_pytest": {
+    "command": "PYTHONPATH=src TEST_DATABASE_URL=<ephemeral-local-postgres> OPENAI_API_KEY='' XAI_API_KEY='' .venv/bin/python -m pytest -q",
+    "passed": 1375,
+    "warnings": 1,
+    "seconds": 70.68,
+    "warning": "Starlette uses deprecated anyio.abc.BlockingPortal alias",
+    "database": "dedicated PostgreSQL 16 tmpfs container on loopback port 55439",
+    "test_container_removed": true
+  },
+  "ruff_check": "PASS",
+  "ruff_format_check": {
+    "result": "PASS",
+    "files": 206
+  },
+  "local_runner_ruff_check": "PASS",
+  "staged_whitespace_validation": {
+    "agent_source_and_documents": "PASS: git diff --cached --check, excluding reference *.patch files",
+    "reference_patches": "PASS: git apply --cached --check --whitespace=error-all against each recorded base in temporary indexes",
+    "note": "Unified patch context prefixes intentionally contain spaces and must be preserved"
+  },
+  "deployment_environment_regressions": [
+    "production settings load secrets from process environment without .env",
+    "process environment overrides .env, missing values fall back to .env",
+    "cached settings retain previous keys until recreated; secret representations remain redacted"
+  ],
+  "meme_release_validation": {
+    "result": "PASS",
+    "catalog": "outputs/b-meme/catalog-v1.json",
+    "assets": 10,
+    "model_network_or_database_calls": 0
+  },
+  "admin_upload_decision": {
+    "owner": "backend",
+    "request": "../../10-backend-contract.md, section 16.5",
+    "frontend_request": "../../16-frontend-handoff.md",
+    "requires_llm_keys": false,
+    "requires_admin_authentication": true,
+    "agent_upload_api_added": false,
+    "production_api_applied": false
+  },
+  "paid_vendor_calls": 0,
+  "live_llm_status": "not executed; prior one-post approval retained, deployment environment configuration documented",
+  "backend_frontend_committed_or_pushed": false
+}

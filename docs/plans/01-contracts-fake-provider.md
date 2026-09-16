@@ -94,7 +94,9 @@ ports/{llm,backend,memory,jobs,ledger}.py ─ 작업 2~6 이 구현할 인터페
 | (enum) `Violation.code` | | `PERSONAL_ATTACK` `IDENTITY_DEGRADATION` `SELF_HARM_LEXICON` `UNGROUNDED_CLAIM` `VERDICT_CONTRADICTION` `INJECTION_FOLLOWED` `UNSAFE_CONTENT` `INTENSITY_MISMATCH` `PROFANITY_OUT_OF_LIST` `SENTENCE_REASON_MISMATCH` `SCHEMA_INVALID` |
 | `finalize-v1` | `FinalizeRequest` | `schema_version`, `job_id`, `generation_id`, `verdict_version`, `expected_text_version`, `dossier_id`, `privacy_versions[]`, `draft_hash`(canonical draft sha256), `sentencing | null`, `draft: WriterDraft`, `evaluation: EvaluationReport`, `evaluation_draft_hash`, `prompt_bundle_version`, `guardrail_policy_version`, `model_ids{sentencing, writer, evaluator}` |
 | `intake-v1` | `IntakeRequest` / `IntakeResult` | 요청 `submission_id`, `payload_hash`, `mode ∈ INITIAL|FINAL_CHECK`, `post_type`, `amount_krw`, `category`, `item`, `reason | null`. 결과 `mode`(요청의 `mode` 를 그대로 — **9/11 추가**, `if/then` 이 이 필드를 본다), `status ∈ PASS|NEEDS_CLARIFICATION|BLOCKED`, `item_review{status ∈ OK|VAGUE|EXAGGERATED, suggested_item ≤ 30 | null}`, `message ≤ 60 | null`(참고용 — 프론트 솔직 팝업은 고정 문구), `category_review{status ∈ OK|MISMATCH, suggested_category | null, confidence 0..1}`, `injection_detected`, `intake_source ∈ AI|FALLBACK`. **`FINAL_CHECK` 는 `NEEDS_CLARIFICATION` 을 낼 수 없다**(스키마 `if/then`) |
-| `verdict-view-v1` | `VerdictView` | `post_id`, `jury_status`, `sentence_status ∈ PENDING|FINAL`, `text_status ∈ PENDING|GENERATING|TEMPLATE_READY|AI_READY`, `text_version ≥ 0`, `view | null {intensity, headline, statement(문장 배열), sentence, sentence_label, sentencing_reason | null, source ∈ AI|TEMPLATE, meme{tag, image_id, image_url}}`, `poll_after_ms` |
+| `verdict-view-v1` | `VerdictView` | 공개 응답: `schemaVersion:1`, `postId`, `juryStatus|null`, `sentenceStatus ∈ PENDING|FINAL`, `textStatus ∈ PENDING|GENERATING|TEMPLATE_READY|AI_READY`, `textVersion ≥ 0`, `view|null {intensity, headline, statement(문장 배열), sentence|null, sentenceLabel|null, sentencingReason|null, source ∈ AI|TEMPLATE, meme|null {tag, imageId, imageUrl}}`, `pollAfterMs` |
+
+9/16 공개 계약 정정: 실제 Spring DTO가 이미 반환하는 camelCase·nullable에 `verdict-view-v1`을 맞췄다. 기존 snake_case 정본 소비자에게는 **호환되지 않는 정정**이므로 재생성한 스키마·프론트 타입을 함께 갱신해야 한다. 실제 백엔드 응답의 `schemaVersion=1`을 유지한다. 위 공통 `schema_version` 규칙은 내부 계약에 적용하고 이 공개 계약만 `schemaVersion`이다. null을 허용하는 키도 응답에 필수로 존재한다. Python 모델은 내부 속성을 snake_case로 유지하며 공개 직렬화·검증은 camelCase alias를 사용한다.
 
 전략 8종: `CHEAPER_ALTERNATIVE` `FREE_ALTERNATIVE` `DIY_REPLACEMENT` `PREMISE_REJECTION` `EXCUSE_STRIPPING` `NECESSITY_APPROVAL` `REPEAT_OFFENSE` `ROOM_RULE_CALLBACK`. 짤 태그 5종: `GUILTY_HEAVY` `GUILTY_LIGHT` `NOT_GUILTY` `APPROVED` `REJECTED`(기획서 값 그대로 — 평결 enum 과 별개, 대문자 유지). 공격 각도 6종: `CONVERSION`(환산) `REPETITION`(반복) `EXCUSE_DISSECTION`(변명 해부) `FUTURE_PROPHECY`(미래 예언) `RULE_PERSONIFICATION`(규칙 의인화) `ALTERNATIVE_MOCKERY`(대안 조롱).
 
@@ -128,7 +130,22 @@ strict 규칙: 모든 키 `required`, `additionalProperties=false`. enum 주입 
 | 모듈 | 내용 |
 |---|---|
 | `intensity.py` | `Intensity` enum(`mild`·`spicy`·`hell`, 9/8 확정 프론트 값) ↔ 표시명(순한맛·매운맛·지옥맛) 매핑 **단일 지점**(D-21). 다른 곳에서 한글 문자열을 쓰지 않는다 |
-| `lexicon.py` | `DEATH_WORDS`(자살·자해·죽어·죽고 싶·죽여·뒤져·뒤지·목을 매·손목·극단적 선택), `PROFANITY`(순한맛·매운맛 0개 검사용 — 미친·미쳤·돌았·지랄·새끼·처먹·처타·처박·처발·개같·개무시·씨발·씨빨·ㅅㅂ·병신·ㅂㅅ·존나·ㅈㄴ·좆·꺼져·닥쳐·또라이·등신·멍청), `HELL_ALLOWED_PROFANITY`(미친·돌았냐·정신 나갔냐·실화냐·어이없네·개같은 선택·지랄·꼴·처타다·헛소리·레전드·새끼), `HELL_ONCE_PER_VERDICT`(새끼·ㅋㅋ), `WORN_PHRASES`(정신 차리십시오. **"등" 의 나머지는 미정 — 9/11 현재 1개**), `ID_IN_TEXT = r"\bF\d+"`. 강도별 적용 표를 함수로(`applies(intensity, rule)`) |
+| `lexicon.py` | `DEATH_WORDS`(자살·자해·죽어·죽고 싶·죽여·뒤져·뒤지·목을 매·손목·극단적 선택), `PROFANITY`(순한맛·매운맛 0개 검사용 — 미친·미쳤·돌았·지랄·새끼·처먹·처타·처박·처발·개같·개무시·씨발·씨빨·ㅅㅂ·병신·ㅂㅅ·존나·ㅈㄴ·좆·꺼져·닥쳐·또라이·등신·멍청), ~~`HELL_ALLOWED_PROFANITY`(미친·돌았냐·…·레전드·새끼), `HELL_ONCE_PER_VERDICT`(새끼·ㅋㅋ)~~ **→ 9/16 검사에서 뺌**(아래 지옥맛 결정), `WORN_PHRASES`(정신 차리십시오. **"등" 의 나머지는 미정 — 9/11 현재 1개**), `ID_IN_TEXT = r"\bF\d+"`. 강도별 적용 표를 함수로(`applies(intensity, rule)`) |
+
+**9/16 결정 — 지옥맛은 비속어를 차단하지 않는다.** `applies()` 표에서 `HELL_ALLOWED_PROFANITY`·
+`HELL_ONCE_PER_VERDICT` 를 어느 강도에도 켜지 않는다. `PROFANITY` 는 mild·spicy 만, `DEATH_WORDS`·
+`WORN_PHRASES`·`ID_IN_TEXT` 는 전 강도 그대로다. 목록 상수와 `_hell_out_of_list()` 는 되살릴 때를 위해
+남기되 불리지 않는다. 검수관 검사표도 같이 바뀐다(`guardrail-v2` 9/16 개정, 06 §3.3).
+
+(원문) hell 은 허용 목록 12개 안에서만 욕을 쓰고 `새끼`·`ㅋㅋ` 는 판결당 1회였다. **이유**: 두 목록의
+층위가 달랐다. `PROFANITY` 는 어간(`처먹`·`돌았`·`개같`)이고 허용 목록은 표층형(`처타다`·`돌았냐`·
+`개같은 선택`)인데, 판정이 "어간 매치가 허용 표층형 범위 안에 드는가" 라서 허용 단어의 활용형까지
+막혔다(`미쳤네`·`돌았어`·`개같은 판단`). `처타다` 는 사전형이라 문장에 나올 수 없었다. 9/16 실측에서
+서기가 쓴 `처먹네` 가 막혀 판결문 전체가 템플릿이 됐다(15 §6 5회차). 지옥맛 방은 "봐주지 마라"에
+동의한 방이므로 목록을 넓히는 대신 검사를 없앴다. 남는 금지는 자해·죽음(안전), 정체성 비하와
+성적 표현(검수관 `IDENTITY_DEGRADATION`·`UNSAFE_CONTENT`), 닳은 문구다. 댓글 규칙(04 §3.5)도
+같은 표를 쓰므로 지옥맛 방 댓글의 비속어 필터가 함께 풀린다.
+
 | `attack_angles.py` | 6종 + 마무리 방식 문장(스크립트 `:235-242`). `pick(post_id, offset) = ANGLE_ORDER[(crc32(post_id) % 6 + offset) % 6]`(바깥 `% 6` 은 9/11 정정 — 6종 순환). 모델이 고르지 않는다 |
 | `validation.py` (구조) | `validate_writer_draft(draft, target_intensities, label_map)`: 강도 집합 정확히 일치·중복 없음·길이·라벨 ∈ `label_map`·문장 수 2~4·`kind` enum. `validate_evaluation(report, intensities, policy_version)`: 강도 완전성·검사 필드 완전성·`pass` 불리언·정책 버전 일치. **`false`·누락·파싱 실패는 모두 검수 실패**(proposal2 §5.3 ⑥) |
 
@@ -189,8 +206,8 @@ class LedgerPort(Protocol):
 | `MODEL_JUDGMENT` · `MODEL_WRITER` · `MODEL_EVALUATOR_HELL` | `gpt-5.6-luna` · `grok-4.20-0309-non-reasoning` · `gpt-5.6-luna` | 서기·드립에 추론 모델(`grok-4.6`·`4.5`·`4.3`) 금지 — startup 오류 |
 | `PROMPT_BUNDLE_VERSION` · `GUARDRAIL_POLICY_VERSION` | `bundle-v1` · `guardrail-v2`(제안) | 정책은 프롬프트·검수관·finalize·fixture 에 동시에 걸린다 |
 | `INTAKE_TIMEOUT_SECONDS` | 4 | |
-| `FIRST_RESULT_TARGET_SECONDS` · `REPAIR_PATH_BUDGET_SECONDS` | 10 · 15 | |
-| `SENTENCING_NODE_TIMEOUT_SECONDS` · `WRITER_NODE_TIMEOUT_SECONDS` · `EVALUATOR_NODE_TIMEOUT_SECONDS` | 3 · 6 · 4 | 양형관·검수관은 작업 3 실측 후 조정 |
+| `FIRST_RESULT_TARGET_SECONDS` · `REPAIR_PATH_BUDGET_SECONDS` | 90 · 15 | (9/16 코드 대조) 백엔드 SENTENCE 마감 90초. (원문) 10 |
+| `SENTENCING_NODE_TIMEOUT_SECONDS` · `WRITER_NODE_TIMEOUT_SECONDS` · `EVALUATOR_NODE_TIMEOUT_SECONDS` | 12 · 10 · 30 | (9/16 코드 대조) luna 실측(03 §3.6) 뒤 조정. `TEXT_RETRY_TIMEOUT_SECONDS` 60. (원문) 3 · 6 · 4, TEXT_RETRY 20 — "첫 결과 10초" 역산값이라 검수관이 늘 TIMEOUT |
 | `WORKER_POLL_MS` · `JOB_LEASE_SECONDS` · `HEARTBEAT_SECONDS` | 250 · 15 · 5 | 작업 2 |
 | `FINALIZE_RESERVE_MS` · `INLINE_CONTEXT_MIN_REMAINING_MS` | 500 · 8500 | 작업 5. 9/14 D-25 로 즉석 조서 조건은 "서기·검수·finalize 시간을 남기고 남는 시간" 이 되어 `INLINE_CONTEXT_MIN_REMAINING_MS` 는 하한 보조값으로만 남는다(05 §3.3) |
 | `IMMEDIATE_REPAIR_MAX` · `TEXT_RETRY_ROUNDS` · `TEXT_RETRY_TIMEOUT_SECONDS` | 1 · 3 · 20 | |
@@ -198,7 +215,7 @@ class LedgerPort(Protocol):
 | `MODEL_CONCURRENCY_LIMIT` | 8 | D-22(9/8 확정) |
 | `ALERT_DISCORD_WEBHOOK_URL` · `COST_ALERT_KRW_PER_DAY` | — · 5000 | 9/8 확정. 알림 규칙은 08 §3.3, 평가 실행(`GEOJI_EVAL=1`)분은 별도 집계 |
 | `MAX_TOTAL_PROMPT_TOKENS` · `WRITER_MAX_PROMPT_TOKENS` | 6000 · 8000 | |
-| 출력 토큰 상한 `{INTAKE,CONTEXT,BANTER,SENTENCING,WRITER,EVALUATOR}_MAX_OUTPUT_TOKENS` | intake 300 · context 700 · banter 1200 · sentencing 400 · writer 700/강도 · evaluator 800 | 잘리면 스키마 실패로 처리하고 사용량 기록. 키 이름은 9/11 확정 |
+| 출력 토큰 상한 `{INTAKE,CONTEXT,BANTER,SENTENCING,WRITER,EVALUATOR}_MAX_OUTPUT_TOKENS` | intake 300 · context 1500 · banter 1200 · sentencing 2000 · writer 700/강도 · evaluator 3000 (9/16 코드 대조, OpenAI 는 reasoning 을 이 상한에 포함한다. 실측 reasoning: 조서 200·양형 92~400·검수 866~1,363. 원문 context 700 · sentencing 400 · evaluator 800) | 잘리면 스키마 실패로 처리하고 사용량 기록. 키 이름은 9/11 확정 |
 | 기능 플래그 | `ROOM_COMMENT_STYLE_ENABLED=false` · `PUBLIC_HISTORY_CALLBACK_ENABLED=false` · `REFLECT_ENABLED=false` · `HINDSIGHT_ENABLED=false` | hell 을 끄는 플래그는 없다 — 정책 버전으로 통제 |
 | `WORKER_SLOTS` | `{"SENTENCE": 2, "PREPARE": 1, "BACKGROUND": 1}` | 작업 2. 환경변수는 JSON 문자열(9/11) |
 

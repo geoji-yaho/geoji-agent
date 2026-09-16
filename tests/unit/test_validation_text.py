@@ -311,11 +311,6 @@ def _with_sentence(intensity: str, sentence: str) -> dict[str, Any]:
     [
         ("spicy", "미친 선택입니다.", PROFANITY_OUT_OF_LIST),
         ("mild", "지랄 같은 출근길이었겠어요.", PROFANITY_OUT_OF_LIST),
-        ("hell", "씨발 택시 또 탔냐", PROFANITY_OUT_OF_LIST),
-        ("hell", "너 돌았어 진짜", PROFANITY_OUT_OF_LIST),
-        ("hell", "미친 선택이고 미친 변명이다", PROFANITY_OUT_OF_LIST),
-        ("hell", "이 새끼 택시 기사 새끼랑 친구냐", PROFANITY_OUT_OF_LIST),
-        ("hell", "ㅋㅋ 또 탔네 ㅋㅋ", PROFANITY_OUT_OF_LIST),
         ("mild", "통장이 죽어가고 있어요.", SELF_HARM_LEXICON),
         ("spicy", "지갑이 뒤져버렸습니다.", SELF_HARM_LEXICON),
         ("hell", "이러다 자살각이다", SELF_HARM_LEXICON),
@@ -333,6 +328,16 @@ def test_rule6_positive(intensity: str, sentence: str, code: str) -> None:
         ("hell", "개같은 선택 레전드 찍었네"),
         ("hell", "통장 사망 선고 나왔다"),
         ("spicy", "통장 장례식은 다음 주입니다."),
+        # 9/16 결정: 지옥맛은 비속어를 차단하지 않는다.
+        # 옛 허용 목록 밖·활용형·2회 반복 모두 통과한다.
+        ("hell", "씨발 택시 또 탔냐"),
+        ("hell", "너 돌았어 진짜"),
+        ("hell", "미친 선택이고 미친 변명이다"),
+        ("hell", "이 새끼 택시 기사 새끼랑 친구냐"),
+        ("hell", "ㅋㅋ 또 탔네 ㅋㅋ"),
+        # 9/16 실측에서 판결문을 통째로 템플릿으로 만든 문장(15 §6).
+        ("hell", "지하철 8번 탈 돈을 택시로 처먹네"),
+        ("hell", "존나 어이없는 판단이다"),
     ],
 )
 def test_rule6_negative(intensity: str, sentence: str) -> None:

@@ -243,4 +243,13 @@ def evaluator_schema(intensities: Sequence[str]) -> dict[str, Any]:
     """검수관. `policy_version` 은 서버가 채운다. 강도 집합을 주입한다."""
     schema = _derive(EvaluationReport)
     _drop(schema, "policy_version")
-    return with_enums(schema, **{"texts[].intensity": list(intensities)})
+    schema = with_enums(schema, **{"texts[].intensity": list(intensities)})
+    # strict json_schema 는 minItems·maxItems 를 받지 않는다. 개수는 말로 적는다(9/16 실측:
+    # 위반이 여러 개일 때 같은 강도를 여러 항목으로 쪼개 낸 적이 있다).
+    texts = schema.get("properties", {}).get("texts")
+    if isinstance(texts, dict):
+        texts["description"] = (
+            f"강도마다 정확히 한 항목. 항목 수는 {len(intensities)} 개다. "
+            "위반이 여러 개여도 그 강도의 violations 배열에 모두 넣는다."
+        )
+    return schema

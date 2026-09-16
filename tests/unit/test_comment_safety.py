@@ -110,15 +110,25 @@ def test_5_hell은_허용_목록_욕을_통과():
     assert Reason.PROFANITY not in _check(_comment(text), Intensity.hell)
 
 
-def test_5_hell은_허용_목록_밖_욕을_제외():
+def test_5_hell은_옛_허용_목록_밖_욕도_통과():
+    """9/16 결정: 지옥맛 방은 비속어를 막지 않는다.
+
+    (원문) 허용 목록 12개 밖이면 `PROFANITY` 로 걸렀다.
+    """
     text = "씨발 이걸 또 샀다고 진짜 실화냐 지갑 괜찮은 거 맞냐"
-    assert Reason.PROFANITY in _check(_comment(text), Intensity.hell)
+    assert Reason.PROFANITY not in _check(_comment(text), Intensity.hell)
 
 
-def test_5_hell은_허용_구절_일부만_맞는_욕을_제외():
-    """허용 구절 "개같은 선택" 과 달리 "개같" 단독은 목록 밖이다."""
+def test_5_hell은_허용_구절_일부만_맞는_욕도_통과():
+    """(원문) 허용 구절 "개같은 선택" 과 달리 "개같" 단독은 목록 밖이라 걸렀다."""
     text = "이런 개같은 소비를 또 하다니 지갑이 불쌍해 보인다 진짜"
-    assert Reason.PROFANITY in _check(_comment(text), Intensity.hell)
+    assert Reason.PROFANITY not in _check(_comment(text), Intensity.hell)
+
+
+def test_5_hell도_자해_어휘는_그대로_막는다():
+    """비속어만 푼 것이다. 안전 규칙은 강도와 무관하다."""
+    text = "이 돈 쓸 바에는 그냥 손목 긋는 게 낫겠다 정신 좀 차려라"
+    assert Reason.DEATH_WORD in _check(_comment(text), Intensity.hell)
 
 
 @pytest.mark.parametrize("intensity", [Intensity.mild, "spicy"])

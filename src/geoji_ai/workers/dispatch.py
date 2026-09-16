@@ -76,7 +76,8 @@ JOB_ROUTES: dict[str, JobRoute] = {
         kind="SENTENCE",
         priority=100,
         max_attempts=2,
-        deadline_after_s=10,
+        # 9/16: 백엔드 `JobKind.SENTENCE` 와 같은 90초(10 §3). 옛 10초는 D-24 원문.
+        deadline_after_s=90,
         dedupe_template="sentence:{verdict_id}:{verdict_version}",
         aggregate_fields=("verdict_id", "verdict_version"),
     ),
@@ -94,7 +95,8 @@ JOB_ROUTES: dict[str, JobRoute] = {
         kind="TEXT_RETRY",
         priority=50,
         max_attempts=1,
-        deadline_after_s=20,
+        # 9/16: `TEXT_RETRY_TIMEOUT_SECONDS` 와 같은 60초. 백엔드 회신 대기(10 §0.1).
+        deadline_after_s=60,
         dedupe_template="text-retry:{verdict_id}:{verdict_version}:{round}",
         aggregate_fields=("verdict_id", "verdict_version"),
     ),

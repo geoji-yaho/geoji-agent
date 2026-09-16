@@ -65,7 +65,8 @@ PROFANITY: tuple[str, ...] = (
     "멍청",
 )
 
-#: hell 에서만 허용하는 목록. 이 밖의 비속어는 PROFANITY_OUT_OF_LIST.
+#: (9/16 결정으로 검사에서 뺐다 — 아래 `_RULE_INTENSITIES` 참고) hell 허용 목록.
+#: 목록 자체는 프롬프트·문서 참조용으로 남긴다. 검사를 되살리려면 표에서 강도를 돌려주면 된다.
 HELL_ALLOWED_PROFANITY: tuple[str, ...] = (
     "미친",
     "돌았냐",
@@ -81,7 +82,7 @@ HELL_ALLOWED_PROFANITY: tuple[str, ...] = (
     "새끼",
 )
 
-#: hell 에서 판결문당 한 번까지만 쓰는 어휘.
+#: (9/16 결정으로 검사에서 뺐다) hell 에서 판결문당 한 번까지만 쓰던 어휘.
 HELL_ONCE_PER_VERDICT: tuple[str, ...] = ("새끼", "ㅋㅋ")
 
 #: 닳은 문구. 01 §3.5 는 "정신 차리십시오 등"으로 끝나고 나머지 항목을 주지 않았다.
@@ -101,11 +102,22 @@ class LexiconRule(StrEnum):
 
 
 # 강도별 적용 표. 값은 그 검사를 켜는 강도 집합이다.
+#
+# **9/16 사용자 결정 — 지옥맛은 비속어를 차단하지 않는다.**
+# (원문) hell 은 `HELL_ALLOWED_PROFANITY` 12개 안에서만 허용하고 `새끼`·`ㅋㅋ` 는 1회까지였다.
+# 그 구조에 버그가 있었다. `PROFANITY` 는 어간 목록(`처먹`·`돌았`·`개같`)인데 허용 목록은 표층형
+# (`처타다`·`돌았냐`·`개같은 선택`)이라, 판정이 "어간 매치가 허용 표층형 범위 안에 드는가" 였다.
+# 그래서 허용 목록에 있는 단어도 활용하면 막혔다(`미쳤네`·`돌았어`·`개같은 판단`). `처타다` 는
+# 사전형이라 실제 문장에 나올 수 없어 사실상 쓸 수 없는 항목이었다. 9/16 실측에서 서기가 쓴
+# `처먹네` 가 막혀 판결문이 통째로 템플릿이 됐다(15 §6).
+# 지옥맛 방은 "봐주지 마라"에 동의한 방이므로 비속어 검사(PROFANITY·허용 목록·1회 제한)를 전부 끈다.
+# **자해·죽음 어휘(`DEATH_WORDS`)는 비속어가 아니라 안전 규칙이라 전 강도에서 그대로 막는다.**
+# 정체성 비하·성적 표현은 검수관(guardrail)의 `IDENTITY_DEGRADATION`·`UNSAFE_CONTENT` 가 본다.
 _RULE_INTENSITIES: dict[LexiconRule, frozenset[Intensity]] = {
     LexiconRule.DEATH_WORDS: frozenset({Intensity.mild, Intensity.spicy, Intensity.hell}),
     LexiconRule.PROFANITY: frozenset({Intensity.mild, Intensity.spicy}),
-    LexiconRule.HELL_ALLOWED_PROFANITY: frozenset({Intensity.hell}),
-    LexiconRule.HELL_ONCE_PER_VERDICT: frozenset({Intensity.hell}),
+    LexiconRule.HELL_ALLOWED_PROFANITY: frozenset(),
+    LexiconRule.HELL_ONCE_PER_VERDICT: frozenset(),
     LexiconRule.WORN_PHRASES: frozenset({Intensity.mild, Intensity.spicy, Intensity.hell}),
     LexiconRule.ID_IN_TEXT: frozenset({Intensity.mild, Intensity.spicy, Intensity.hell}),
 }

@@ -49,6 +49,15 @@ LOG_FIELDS: frozenset[str] = frozenset(
         "prompt_tokens",
         "completion_tokens",
         "micro_usd",
+        # 9/16 단계별·역할별 실패 지점 기록(`sentence_call`·`sentence_fallback`·`sentence_summary`).
+        "role",
+        "intensity",
+        "outcome",
+        "mode",
+        "source",
+        "timeout_s",
+        "remaining_s",
+        "call_index",
     }
 )
 
