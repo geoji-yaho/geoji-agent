@@ -102,6 +102,29 @@ def verdict(post_id: str, judged_at: str, *, room: str = ROOM_A) -> dict[str, An
     }
 
 
+def test_non_guilty_recent_verdict_accepts_null_sentence_without_rendering_none():
+    snapshot = load_snapshot()
+    prior = verdict("prior-post", snapshot.created_at.isoformat())
+    prior.update(result="notGuilty", sentence=None)
+    resolved = make_resolved(snapshot, recent_verdicts=[prior])
+    dossier = build_evidence(snapshot, resolved, pack_limit=12)
+    fact = next(f for f in dossier.facts if f.fact_type == "VERDICT")
+    assert "결과 notGuilty." in fact.text
+    assert "형량" not in fact.text
+    assert "None" not in fact.text
+
+
+def test_ambiguous_room_rule_indices_are_not_enabled_by_default():
+    """Q5: source tuple에 room_id가 없으므로 현재 default matcher는 RULE을 발급하지 않는다."""
+    snapshot = load_snapshot()
+    resolved = make_resolved(
+        snapshot,
+        room_rules=[rule(ROOM_A, "0", "택시 금지"), rule(ROOM_B, "0", "택시 허용")],
+    )
+    dossier = build_evidence(snapshot, resolved, pack_limit=12)
+    assert all(f.fact_type != "RULE" for f in dossier.facts)
+
+
 def source(source_type: str, source_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "source_type": source_type,

@@ -41,10 +41,7 @@ def _png(width: int = 2, height: int = 3) -> bytes:
     ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
     raw = b"".join(b"\x00" + b"\x00\x00\x00" * width for _ in range(height))
     return (
-        header
-        + _chunk(b"IHDR", ihdr)
-        + _chunk(b"IDAT", zlib.compress(raw))
-        + _chunk(b"IEND", b"")
+        header + _chunk(b"IHDR", ihdr) + _chunk(b"IDAT", zlib.compress(raw)) + _chunk(b"IEND", b"")
     )
 
 

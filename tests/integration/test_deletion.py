@@ -406,3 +406,24 @@ async def test_delete_post_뒤_그_post_기억_0(engine: AsyncEngine):  # ⑫
     assert await memory.recall_user("u1", _CATEGORY, _before(), 20) == []
     after = await memory.recall_room("r1", _CATEGORY)
     assert (after.rules_hit, after.style_example_refs, after.strictness) == ([], [], None)
+
+
+async def test_backend_POST_무효화_SQL도_파생_기억을_전부_지운다(engine: AsyncEngine):
+    """Q2: source_id가 verdict/comment/rule ID여도 payload.post_id로 삭제 범위에 포함한다."""
+    await _seed_bank(engine, "u1", "r1", "p1")
+    await _seed_bank(engine, "u2", "r2", "p2")
+    memory = _flag_on_memory(engine)
+
+    async with engine.begin() as conn:
+        await conn.execute(text("SET LOCAL ROLE backend"))
+        await invalidate_scope(conn, source_type="POST", source_id="p1", scope_key="post:p1")
+
+    assert await memory.recall_user("u1", _CATEGORY, _before(), 20) == []
+    after = await memory.recall_room("r1", _CATEGORY)
+    assert (after.rules_hit, after.style_example_refs, after.strictness) == ([], [], None)
+    assert len(await memory.recall_user("u2", _CATEGORY, _before(), 20)) == 2
+    async with engine.connect() as conn:
+        deleted = await conn.execute(
+            text("SELECT count(*) FROM ai.memory_facts WHERE deleted_at IS NOT NULL")
+        )
+        assert deleted.scalar_one() == 5

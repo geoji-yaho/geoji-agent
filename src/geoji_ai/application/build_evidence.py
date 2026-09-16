@@ -192,9 +192,10 @@ def _prior(snapshot: CaseSnapshot, verdicts: Iterable[RecentVerdict]) -> list[_D
     others.sort(key=lambda v: v.judged_at, reverse=True)
     drafts: list[_Draft] = []
     for v in others:
+        sentence = f", 형량 {v.sentence}" if v.sentence is not None else ""
         text = (
             f"지난 판결({v.judged_at.month}/{v.judged_at.day}): {v.category} {_won(v.amount_krw)}, "
-            f"{_quote(v.reason)}, 결과 {v.result}, 형량 {v.sentence}."
+            f"{_quote(v.reason)}, 결과 {v.result}{sentence}."
         )
         drafts.append(
             _Draft(
