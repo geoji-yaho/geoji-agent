@@ -76,7 +76,7 @@ def finalize_request() -> dict[str, Any]:
         "evaluation": evaluation_report(),
         "evaluation_draft_hash": "a" * 64,
         "prompt_bundle_version": "bundle-v1",
-        "guardrail_policy_version": "guardrail-v2",
+        "guardrail_policy_version": "guardrail-v3",
         "model_ids": {
             "sentencing": "gpt-5.6-luna",
             "writer": "grok-4.20-0309-non-reasoning",
@@ -178,8 +178,9 @@ def test_case_7_pass_not_boolean_rejected() -> None:
 
 # ⑧ 설정은 guardrail-v2 인데 요청이 guardrail-v1
 def test_case_8_policy_version_mismatch_rejected() -> None:
+    # 9/16 부터 현행 정책은 guardrail-v3 다.
     settings = Settings(_env_file=None)
-    assert settings.GUARDRAIL_POLICY_VERSION == "guardrail-v2"
+    assert settings.GUARDRAIL_POLICY_VERSION == "guardrail-v3"
 
     payload = finalize_request()
     payload["guardrail_policy_version"] = "guardrail-v1"

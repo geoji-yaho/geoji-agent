@@ -56,7 +56,7 @@ def finalize_request(
             "evaluation": load_fixture("evaluation-taxi-pass"),
             "evaluation_draft_hash": draft_hash,
             "prompt_bundle_version": "bundle-v1",
-            "guardrail_policy_version": "guardrail-v2",
+            "guardrail_policy_version": "guardrail-v3",
             "model_ids": {
                 "sentencing": "gpt-5.6-luna",
                 "writer": "grok-4.20-0309-non-reasoning",

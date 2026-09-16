@@ -180,6 +180,7 @@ _ROUTE_PREP = "prep"
 _ROUTE_INLINE = "inline_context"
 _ROUTE_MINIMAL = "minimal_dossier"
 _ROUTE_REPAIR = "writer_repair"
+_ROUTE_EVALUATOR = "evaluator"
 _ROUTE_FINALIZE = "finalize"
 _ROUTE_END = "end"
 
@@ -409,6 +410,18 @@ def _key(value: Any) -> str | None:
         return None
 
 
+def _rule_avoid(codes: Sequence[str], messages: Sequence[str]) -> dict[str, list[str]]:
+    """서버 검증 ⑤ 위반 → 서기에게 줄 "피할 것"(9/16).
+
+    검수관 경로(`_avoid`)와 달리 문제 문장 원문이 없다. 규칙 메시지에 걸린 단어가 들어 있어
+    그대로 준다(예: "hell 에 비속어 ['씨발']").
+    """
+    return {
+        "violations": list(dict.fromkeys(str(code) for code in codes)),
+        "rule_messages": list(dict.fromkeys(str(message) for message in messages)),
+    }
+
+
 def _avoid(entry: Mapping[str, Any]) -> dict[str, list[str]]:
     """검수 항목 → 서기에게 줄 "피할 것"."""
     codes = [str(v.get("code")) for v in entry.get("violations") or [] if isinstance(v, Mapping)]
@@ -635,13 +648,33 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             logger.warning("강도 %s 템플릿을 만들 수 없다: %s", intensity, exc)
             return None
 
+    def can_repair(state: Mapping[str, Any], targets: Iterable[Intensity]) -> bool:
+        """지금 `writer_repair` 를 한 번 더 태울 수 있는가(05 §3.3 조건, 검수 실패와 같은 표)."""
+        sources = state.get("draft_sources") or {}
+        return (
+            state["mode"] == "INITIAL"
+            and state.get("repair_count", 0) < settings.IMMEDIATE_REPAIR_MAX
+            and state["deadline"].remaining_s() >= REPAIR_MIN_REMAINING_S
+            and all(sources.get(i) == "AI" for i in targets)
+        )
+
     def assemble(
         state: Mapping[str, Any],
         drafts: dict[Intensity, TextDraft],
         sources: dict[Intensity, str],
         sentencing: SentencingDecision | None,
+        *,
+        allow_repair: bool = False,
     ) -> dict[str, Any]:
-        """서버 검증 ⑤. 걸린 AI 강도는 TEMPLATE 로 바꾸고 다시 검사한다."""
+        """서버 검증 ⑤. 걸린 AI 강도는 다시 쓰게 하고, 안 되면 TEMPLATE 로 바꾼다.
+
+        `allow_repair`(9/16): 규칙 위반은 "허용 목록 밖 단어를 썼다" 처럼 기계적으로 고칠 수 있는
+        것이라 검수 실패와 같은 조건에서 `writer_repair` 를 한 번 태운다. 옛 동작은 곧바로
+        TEMPLATE 치환이었는데, 대상 강도가 하나(= 공유 방이 하나인 보통 경우)면 그 하나가
+        TEMPLATE 이 되는 순간 `all(TEMPLATE)` 이라 검수관을 부르지도 못하고 `EVAL_FAILED` 로 끝났다.
+        같은 위반인데 방 개수에 따라 결과가 갈렸다(15 §6).
+        검수 실패 경로와 예산(`IMMEDIATE_REPAIR_MAX`)을 나눠 쓰므로 한 판결에서 재작성은 최대 1회다.
+        """
         jury = _jury(state)
         snapshot = state["snapshot"]
         dossier: Dossier = state["dossier"]
@@ -664,6 +697,8 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             }
             rules = apply_text_rules(body, dossier.label_map, sentencing, rule_jury)
             bad: dict[Intensity, list[str]] = {}
+            #: 강도별 위반 설명(재작성 때 "피할 것" 으로 준다). 원문 문장이 아니라 규칙 메시지다.
+            messages: dict[Intensity, list[str]] = {}
             for issue in rules.issues:
                 index = _text_index(issue.path)
                 if index is None or index >= len(targets):
@@ -677,6 +712,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     )
                     return {"failure": SCHEMA_INVALID}
                 bad.setdefault(targets[index], []).append(issue.code)
+                messages.setdefault(targets[index], []).append(issue.message)
             if not bad:
                 try:
                     writer_draft = WriterDraft.model_validate(rules.draft)
@@ -717,6 +753,24 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     reason=f"{EVAL_FAILED}:REGENERATE",
                 )
                 return {"failure": EVAL_FAILED}
+            if allow_repair and can_repair(state, bad):
+                logger.info("서버 검증 실패 %s → writer_repair", sorted(i.value for i in bad))
+                for intensity in bad:
+                    fallback_log(
+                        state,
+                        node="deterministic_validate",
+                        role="server_rules",
+                        intensity=intensity,
+                        outcome=_ROUTE_REPAIR,
+                        reason=",".join(bad[intensity]),
+                    )
+                return {
+                    "failure": None,
+                    "route": _ROUTE_REPAIR,
+                    "repair_targets": list(bad),
+                    "repair_avoid": {i: _rule_avoid(bad[i], messages[i]) for i in bad},
+                    "eval_kept": {},
+                }
             for intensity, codes in bad.items():
                 logger.info("강도 %s 서버 검증 실패 %s → TEMPLATE", intensity, codes)
                 if sources.get(intensity) == "TEMPLATE":
@@ -1220,9 +1274,17 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         return {"failure": None}
 
     async def deterministic_validate(state: SentenceGraphState) -> dict[str, Any]:
-        result = assemble(state, state["drafts"], state["draft_sources"], state.get("sentencing"))
+        result = assemble(
+            state,
+            state["drafts"],
+            state["draft_sources"],
+            state.get("sentencing"),
+            allow_repair=True,
+        )
         if "drafts" in result:
             result["validation"] = {i: [] for i in result["drafts"]}
+        # `route` 는 늘 덮어쓴다. 앞 노드가 남긴 값이 그대로 남으면 간선이 잘못 돈다.
+        result.setdefault("route", _ROUTE_EVALUATOR)
         return result
 
     # --- 노드: 검수·보정 -----------------------------------------------------
@@ -1791,6 +1853,11 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
 
         return route
 
+    def after_validate(state: SentenceGraphState) -> str:
+        if state.get("failure"):
+            return "generation_failed"
+        return _ROUTE_REPAIR if state.get("route") == _ROUTE_REPAIR else "evaluator"
+
     def after_evaluator(state: SentenceGraphState) -> str:
         if state.get("failure"):
             return "generation_failed"
@@ -1836,7 +1903,9 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         "join", failed_or("deterministic_validate"), ["deterministic_validate", "generation_failed"]
     )
     graph.add_conditional_edges(
-        "deterministic_validate", failed_or("evaluator"), ["evaluator", "generation_failed"]
+        "deterministic_validate",
+        after_validate,
+        ["evaluator", "writer_repair", "generation_failed"],
     )
     graph.add_conditional_edges(
         "evaluator", after_evaluator, ["finalize", "writer_repair", "generation_failed"]

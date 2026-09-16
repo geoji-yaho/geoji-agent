@@ -2,7 +2,8 @@
 
     GEOJI_EVAL=1 uv run python -m tests.evaluations.run_regression \
         [--dry-run] [--quick] [--baseline PATH] [--write-baseline PATH] \
-        [--policy guardrail-v1|guardrail-v2] [--writer-model M] [--evaluator-hell-model M] \
+        [--policy guardrail-v1|guardrail-v2|guardrail-v3] [--writer-model M] \
+        [--evaluator-hell-model M] \
         [--temperature T] [--only-hell] [--concurrency 4] [--out PATH]
 
 사건마다 고정 dossier·banter·형량(사건 데이터)을 넣고 그래프 C 를 돌린다. 모델은 **서기·검수관만**
@@ -760,7 +761,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--quick", action="store_true", help="judge·검수관 생략")
     parser.add_argument("--baseline", type=Path, default=None)
     parser.add_argument("--write-baseline", type=Path, default=None)
-    parser.add_argument("--policy", choices=["guardrail-v1", "guardrail-v2"], default=None)
+    parser.add_argument(
+        "--policy", choices=["guardrail-v1", "guardrail-v2", "guardrail-v3"], default=None
+    )
     parser.add_argument("--writer-model", default=None)
     parser.add_argument("--evaluator-hell-model", default=None)
     parser.add_argument("--temperature", type=float, default=None)

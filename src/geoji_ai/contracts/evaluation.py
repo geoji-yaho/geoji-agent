@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from geoji_ai.domain.intensity import Intensity
 
-PolicyVersion = Literal["guardrail-v1", "guardrail-v2"]
+PolicyVersion = Literal["guardrail-v1", "guardrail-v2", "guardrail-v3"]
 
 
 class ViolationCode(StrEnum):

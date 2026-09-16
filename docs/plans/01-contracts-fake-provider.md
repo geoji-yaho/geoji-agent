@@ -118,6 +118,7 @@ strict 규칙: 모든 키 `required`, `additionalProperties=false`. enum 주입 
 | `taxi-hell-input.json` | `{"reason": "늦잠자서 출근할 때 택시 탐 9200", "amount_krw": 9200, "intensity": "hell"}` |
 | `taxi-hell-requested-output.json` | 사용자 지정 hell 문구 **원문 그대로 보존**(부록 A.2). 평결·형량·과거 이력을 추가하지 않는다 |
 | `taxi-hell-expected-evaluation.guardrail-v1.json` | `pass=false`, `PERSONAL_ATTACK` 1건(`texts[0].statement[0].text`). 형태는 `EvaluationReport` 미러(9/11): `sentence_check`·`sentencing_reason_check` 는 `{pass:true, violations:[]}`, `problem_sentences` 에 원문 문장 1개 |
+| `taxi-hell-expected-evaluation.guardrail-v3.json` | 9/16 추가. v2 와 같은 내용에 `policy_version` 만 `guardrail-v3`. 현행 정책의 기대값은 이 파일이다. 총 **17개** |
 | `taxi-hell-expected-evaluation.guardrail-v2.json` | `pass=true`, 위반 0. **단 `PROFANITY_OUT_OF_LIST` 여부는 비속어 허용 목록 확정 전까지 열어 둔다**. `additionalProperties:false` 라 파일은 `{"expected": <EvaluationReport>, "open_questions": [...]}` 로 감싼다(9/11) |
 | `case-snapshot-taxi.json` · `jury-guilty-75.json` · `jury-rejected.json` · `jury-not-guilty.json` | 합성 백엔드 fixture. 택시 12,000원·`policy.allowed_sentences=[probation#1, oneDay#2]`·`fallback_sentence=oneDay` 등 |
 | `dossier-taxi.json` | `scripts/probe_writer_latency.py:71-103` 의 `CASE.dossier`(F0~F6) + `label_map` |
@@ -130,7 +131,22 @@ strict 규칙: 모든 키 `required`, `additionalProperties=false`. enum 주입 
 | 모듈 | 내용 |
 |---|---|
 | `intensity.py` | `Intensity` enum(`mild`·`spicy`·`hell`, 9/8 확정 프론트 값) ↔ 표시명(순한맛·매운맛·지옥맛) 매핑 **단일 지점**(D-21). 다른 곳에서 한글 문자열을 쓰지 않는다 |
-| `lexicon.py` | `DEATH_WORDS`(자살·자해·죽어·죽고 싶·죽여·뒤져·뒤지·목을 매·손목·극단적 선택), `PROFANITY`(순한맛·매운맛 0개 검사용 — 미친·미쳤·돌았·지랄·새끼·처먹·처타·처박·처발·개같·개무시·씨발·씨빨·ㅅㅂ·병신·ㅂㅅ·존나·ㅈㄴ·좆·꺼져·닥쳐·또라이·등신·멍청), `HELL_ALLOWED_PROFANITY`(미친·돌았냐·정신 나갔냐·실화냐·어이없네·개같은 선택·지랄·꼴·처타다·헛소리·레전드·새끼), `HELL_ONCE_PER_VERDICT`(새끼·ㅋㅋ), `WORN_PHRASES`(정신 차리십시오. **"등" 의 나머지는 미정 — 9/11 현재 1개**), `ID_IN_TEXT = r"\bF\d+"`. 강도별 적용 표를 함수로(`applies(intensity, rule)`) |
+| `lexicon.py` | `DEATH_WORDS`(자살·자해·죽어·죽고 싶·죽여·뒤져·뒤지·목을 매·손목·극단적 선택), `PROFANITY`(순한맛·매운맛 0개 검사용 — 미친·미쳤·돌았·지랄·새끼·처먹·처타·처박·처발·개같·개무시·씨발·씨빨·ㅅㅂ·병신·ㅂㅅ·존나·ㅈㄴ·좆·꺼져·닥쳐·또라이·등신·멍청), ~~`HELL_ALLOWED_PROFANITY`(미친·돌았냐·…·레전드·새끼), `HELL_ONCE_PER_VERDICT`(새끼·ㅋㅋ)~~ **→ 9/16 검사에서 뺌**(아래 지옥맛 결정), `WORN_PHRASES`(정신 차리십시오. **"등" 의 나머지는 미정 — 9/11 현재 1개**), `ID_IN_TEXT = r"\bF\d+"`. 강도별 적용 표를 함수로(`applies(intensity, rule)`) |
+
+**9/16 결정 — 지옥맛은 비속어를 차단하지 않는다.** `applies()` 표에서 `HELL_ALLOWED_PROFANITY`·
+`HELL_ONCE_PER_VERDICT` 를 어느 강도에도 켜지 않는다. `PROFANITY` 는 mild·spicy 만, `DEATH_WORDS`·
+`WORN_PHRASES`·`ID_IN_TEXT` 는 전 강도 그대로다. 목록 상수와 `_hell_out_of_list()` 는 되살릴 때를 위해
+남기되 불리지 않는다. 검수관도 같이 바뀐다(guardrail-v3, 06 §3.3).
+
+(원문) hell 은 허용 목록 12개 안에서만 욕을 쓰고 `새끼`·`ㅋㅋ` 는 판결당 1회였다. **이유**: 두 목록의
+층위가 달랐다. `PROFANITY` 는 어간(`처먹`·`돌았`·`개같`)이고 허용 목록은 표층형(`처타다`·`돌았냐`·
+`개같은 선택`)인데, 판정이 "어간 매치가 허용 표층형 범위 안에 드는가" 라서 허용 단어의 활용형까지
+막혔다(`미쳤네`·`돌았어`·`개같은 판단`). `처타다` 는 사전형이라 문장에 나올 수 없었다. 9/16 실측에서
+서기가 쓴 `처먹네` 가 막혀 판결문 전체가 템플릿이 됐다(15 §6 5회차). 지옥맛 방은 "봐주지 마라"에
+동의한 방이므로 목록을 넓히는 대신 검사를 없앴다. 남는 금지는 자해·죽음(안전), 정체성 비하와
+성적 표현(검수관 `IDENTITY_DEGRADATION`·`UNSAFE_CONTENT`), 닳은 문구다. 댓글 규칙(04 §3.5)도
+같은 표를 쓰므로 지옥맛 방 댓글의 비속어 필터가 함께 풀린다.
+
 | `attack_angles.py` | 6종 + 마무리 방식 문장(스크립트 `:235-242`). `pick(post_id, offset) = ANGLE_ORDER[(crc32(post_id) % 6 + offset) % 6]`(바깥 `% 6` 은 9/11 정정 — 6종 순환). 모델이 고르지 않는다 |
 | `validation.py` (구조) | `validate_writer_draft(draft, target_intensities, label_map)`: 강도 집합 정확히 일치·중복 없음·길이·라벨 ∈ `label_map`·문장 수 2~4·`kind` enum. `validate_evaluation(report, intensities, policy_version)`: 강도 완전성·검사 필드 완전성·`pass` 불리언·정책 버전 일치. **`false`·누락·파싱 실패는 모두 검수 실패**(proposal2 §5.3 ⑥) |
 

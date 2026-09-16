@@ -97,6 +97,7 @@ def test_조서가_timeout_까지_걸려도_서기_timeout_은_0보다_크다(
     )
     assert contexts[0].timeout_s == pytest.approx(expected)
     writers = result.calls_of("writer")
-    assert len(writers) == 2
+    # 최초 fan-out 2회(강도 2). 9/16 부터 서버 검증 ⑤ 위반이면 재작성 호출이 더 붙는다.
+    assert len(writers) >= 2
     assert all(call.timeout_s > 0 for call in writers)
     assert "DEADLINE_EXCEEDED" not in result.backend.failed

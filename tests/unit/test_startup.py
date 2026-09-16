@@ -54,7 +54,7 @@ def test_기본값이_계획서_표와_같다():
     assert settings.MODEL_WRITER == "grok-4.20-0309-non-reasoning"
     assert settings.MODEL_EVALUATOR_HELL == "gpt-5.6-luna"
     assert settings.PROMPT_BUNDLE_VERSION == "bundle-v1"
-    assert settings.GUARDRAIL_POLICY_VERSION == "guardrail-v2"
+    assert settings.GUARDRAIL_POLICY_VERSION == "guardrail-v3"
     assert settings.INTAKE_TIMEOUT_SECONDS == 4
     assert settings.MODEL_CONCURRENCY_LIMIT == 8
     assert settings.COST_ALERT_KRW_PER_DAY == 5000
@@ -126,7 +126,7 @@ def test_정책_값이_목록_밖이면_설정_자체가_거부된다(policy: st
 def test_production_에_정책이_없으면_기동_실패():
     # 환경이 GUARDRAIL_POLICY_VERSION 을 명시하지 않고 기본값에 기대면 "정책 누락" 이다.
     settings = make_settings(APP_ENV="production")
-    assert settings.GUARDRAIL_POLICY_VERSION == "guardrail-v2"  # 기본값은 있지만
+    assert settings.GUARDRAIL_POLICY_VERSION == "guardrail-v3"  # 기본값은 있지만
     with pytest.raises(StartupError):
         validate(settings)
 
@@ -158,7 +158,7 @@ def test_env_example_을_그대로_복사해도_설정이_뜬다(tmp_path):
     env = tmp_path / ".env"
     env.write_text(text, encoding="utf-8")
     settings = Settings(_env_file=env)
-    assert settings.GUARDRAIL_POLICY_VERSION == "guardrail-v2"
+    assert settings.GUARDRAIL_POLICY_VERSION == "guardrail-v3"
     assert settings.WORKER_SLOTS == {"SENTENCE": 2, "PREPARE": 1, "BACKGROUND": 1}
     assert missing_keys(settings) == ["OPENAI_API_KEY", "XAI_API_KEY"]
     # 키 이름이 설정 필드와 1:1 이다.

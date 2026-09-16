@@ -118,15 +118,25 @@ class SentenceState(TypedDict):
 | `sentencing` | `spent ∧ guilty ∧ FIXED 아님` 만. 입력: jury snapshot·허용 목록(`code, rank`)·Evidence pack·걸린 RULE. **방 말투 예시 없음.** 출력 `sentence` ∉ 허용 목록 → `rank` 최대(상한)로 절삭 + 감사 로그. timeout·오류 → `policy.fallback_sentence`, `reason=null`, `sentencing_source=RULE`. `sentencing_reason` > 100자 → **검수 실패로 취급하지 않고 즉시 템플릿 치환**(D-19, `reason_source=TEMPLATE`) |
 | `writer` (fan-out) | 강도마다 `asyncio.create_task`(세마포어 8 안): 입력 = 양형 결과(인용·수정 금지), Evidence(라벨), 그 강도 후보(`fits ∋ result`), 그 강도 말투 예시(플래그), `attack_angle = angles.pick(post_id, offset)`, **그 강도 섹션만의 시스템 프롬프트**. 출력 `TextDraft` 1개 + `meme_tag`·`meme_hints`(`default_intensity` 호출 값 채택). 실패 강도는 `draft_sources[i]=TEMPLATE`(`templates-v1.json`) |
 | `join` | 강도 집합 == `target_intensities` 확인. 전부 실패 → `generation_failed(VENDOR_UNAVAILABLE)` |
-| `deterministic_validate` | §3.4 |
+| `deterministic_validate` | §3.4. 위반이 있으면 **재작성 가능하면 `writer_repair`, 아니면 TEMPLATE 치환**(9/16) |
 | `evaluator` | 전 강도 초안 1호출(luna; `hell` 포함 ∧ `MODEL_EVALUATOR_HELL≠MODEL_JUDGMENT` 면 `hell` 만 별도 호출). 입력: 최종 draft·Evidence(라벨→텍스트)·jury·형량·정책 버전·검사표. `validate_evaluation` 통과 못 하면 검수 실패. `sentencing_reason_check` 실패 → **템플릿 치환 후 재검수 없이 진행**(D-19, 문구 검수는 별개) |
-| `writer_repair` | `repair_count==0 ∧ 남은 ≥ 5s`: 실패 강도만 각도 +1, 위반·문제 문장을 "피할 것" 으로 전달, 양형·조서 고정 → ⑤ → ⑥(실패 강도만). 실패 → 그 강도 `TEMPLATE` |
+| `writer_repair` | `repair_count==0 ∧ 남은 ≥ 5s`: 실패 강도만 각도 +1, 위반·문제 문장을 "피할 것" 으로 전달, 양형·조서 고정 → ⑤ → ⑥(실패 강도만). 실패 → 그 강도 `TEMPLATE`. **9/16: 들어오는 문이 둘이다.** 검수(⑥) 실패와 **서버 검증 ⑤ 실패**가 같은 조건·같은 예산(`IMMEDIATE_REPAIR_MAX`)을 나눠 쓴다. 한 판결에서 재작성은 여전히 최대 1회 |
 | `finalize` | `FinalizeRequest` 조립(§3.5) → 200 → `complete`. 409 → 폐기. 422 → repair 남았으면 1회, 아니면 `generation_failed(SCHEMA_INVALID)` |
 | `generation_failed` | 오류 코드 표(03 §1). 전 강도 실패·검수관 오류·예산 초과 → `VENDOR_UNAVAILABLE`/`EVAL_FAILED`/`DEADLINE_EXCEEDED` |
 - **입력 최소화 표(proposal2 §5.3)**를 노드별 `build_messages` 에 그대로 코드로: 조서에 평결·형량 추정 없음, 양형관에 말투 예시 없음, 서기에 다른 강도 예시·형량 변경 통로 없음, 검수관에 페르소나·메모리 도구 없음
 - 모든 노드는 입력 문자열의 명령을 업무 지시로 승격하지 않는다. `kind=opinion` 이어도 의미 검사 생략 없음
 
 ### 3.4 서버 검증 ⑤ (`domain/validation.py` 텍스트 규칙, proposal2 §5.3 ⑤ + 실측 규칙)
+
+**9/16 — 규칙 위반의 첫 처리는 TEMPLATE 치환이 아니라 재작성 1회다.** 조건은 `writer_repair` 와 같다
+(`INITIAL` ∧ `repair_count < IMMEDIATE_REPAIR_MAX` ∧ 남은 ≥ 5s ∧ 그 강도가 아직 AI). 서기에게는 위반 코드와
+규칙 메시지를 "피할 것"(`repair_avoid`)으로 준다. 재작성이 또 걸리면 그때 TEMPLATE 이다. `REGENERATE`
+(TEXT_RETRY)는 예전처럼 round 안 보정이 없다.
+
+(원문) 걸린 AI 강도는 곧바로 TEMPLATE 로 바꾸고 다시 검사했다. **이유**: 대상 강도가 하나일 때
+(= 공유 방이 하나. 보통의 경우다) 그 하나가 TEMPLATE 이 되는 순간 `all(TEMPLATE)` 이라 검수관을 부르지도
+못하고 `EVAL_FAILED` 로 끝났다. 같은 위반인데 방이 둘이면 살아남고 하나면 판결문이 통째로 사라졌다
+(15 §6 5회차).
 | # | 검사 | 처리 |
 |---|---|---|
 | 1 | `kind=fact|claim` 인데 `evidence_labels` 비었거나 `label_map` 에 없음 | **문장 삭제.** 남은 문장 < 1 → 검수 실패(`UNGROUNDED_CLAIM`) |

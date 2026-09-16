@@ -39,6 +39,7 @@
 
 | 날짜 | 무엇이 바뀌었나 → 백엔드가 할 일 | 절 | 상태 |
 |---|---|---|---|
+| 9/16 | **가드레일 정책 `guardrail-v2` → `guardrail-v3`.** 지옥맛 비속어 제한을 없애고 `UNGROUNDED_CLAIM` 범위를 좁힌 새 검수관 프롬프트다(15 §6). AI 이미지 기본값이 `guardrail-v3` 으로 바뀌었고 `finalize` 의 `guardrail_policy_version` 도 그 값으로 온다 → **AI API·worker 환경변수 `GUARDRAIL_POLICY_VERSION=guardrail-v3`** 으로 바꾸고, 정책 버전을 저장·비교하는 컬럼·검사에 `guardrail-v3` 을 허용값으로 추가. 옛 값(`guardrail-v1`·`guardrail-v2`)도 그대로 받는다 | §15.3 D-07·§16.1 | 미전달 |
 | 9/16 | **운영 템플릿 폴백 원인**: AI 워커 검수관 상한 4초 vs luna 실측 14~17초 → 매 판결 `EVAL_FAILED`(TIMEOUT). AI 이미지 기본값을 양형 12·서기 10·검수 30초, `TEXT_RETRY_TIMEOUT_SECONDS` 60 으로 올림(01 §3.7) → **새 이미지 태그로 재배포**. `.env` 에 `*_NODE_TIMEOUT_SECONDS` 를 따로 적어 뒀다면 지우거나 같은 값으로. `JobKind.TEXT_RETRY` 마감 20s → **60s**(§3). SENTENCE 90s 는 그대로 | §3·§16.1·§16.3 | 미전달 |
 | 9/16 | 워커 로그에 `sentence_call`·`sentence_fallback`·`sentence_summary`(역할·강도·timeout·오류 kind·결과) 추가 → 템플릿이 뜨면 `docker logs geoji-ai-worker` 에서 `trace_id` 로 검색해 `sentence_summary.outcome`·`fallback_reason` 을 보면 된다. 백엔드 작업 없음(참고) | §16.2 | 미전달 |
 | 9/16 | 최신 배포 PR #41은 `.env` 필수이며 호스트에 export한 LLM 키만으로는 컨테이너에 전달되지 않음. AI 담당과 환경변수 전달 방식을 확정하고 **AI API·worker 각각**에 주입. Spring EB 설정만으로는 부족 | §16.1·§16.6 | 미전달 |
@@ -455,7 +456,7 @@ WHERE status = 'RUNNING' AND lease_until < now();
 | ID | 결정 | 백엔드에 걸리는 것 |
 |---|---|---|
 | D-08 | AI 파트 **2명**, 일정 그대로(07 보류 없음, M3 9/15 유지) | 없음 |
-| D-07 | `GUARDRAIL_POLICY_VERSION=guardrail-v2` 로 시작. 팀 비준은 M3 검수(9/15) 때, 미비준 시 v1 | finalize 가 저장하는 정책 버전 문자열이 `guardrail-v2`. (9/14 코드 대조: `APP_ENV=production` 이면 환경에 **명시하지 않으면 기동 실패**, §16.1) |
+| D-07 | `GUARDRAIL_POLICY_VERSION=guardrail-v3`(9/16 지옥맛 비속어 제한 해제로 v2 에서 올림, 15 §6). 허용값은 `guardrail-v1|v2|v3` | finalize 가 저장하는 정책 버전 문자열이 `guardrail-v3`. (9/14 코드 대조: `APP_ENV=production` 이면 환경에 **명시하지 않으면 기동 실패**, §16.1) |
 | D-19 | 양형 이유 템플릿 치환 **확정으로 닫음**(팀 확인 불필요) | §5 `reason_source=TEMPLATE` 그대로 |
 | D-04 | 방 댓글 말투 예시는 **P0 제외**, `ROOM_COMMENT_STYLE_ENABLED=false` 유지. retain 은 한다 | `resolve-evidence` 의 `style_comments` 는 P0 에서 빈 배열 |
 | D-22 | 모델 동시성 8 로 시작, 429 시 하향 | 없음 |
@@ -502,7 +503,7 @@ Spring/Elastic Beanstalk에 등록한 값은 별도 EC2의 AI 컨테이너로 �
 | 키 | 값 | 없으면 | 비고 |
 |---|---|---|---|
 | `APP_ENV` | `production` | 개발 모드로 뜬다(기동 검사 느슨) | 9/11 확정 |
-| `GUARDRAIL_POLICY_VERSION` | `guardrail-v2` | **기동 실패.** production 은 이 값을 환경에 직접 적어야 한다(코드 기본값에 기대면 막힌다) | 01 §3.7 ①, §15.3 D-07. 팀 비준 뒤 `guardrail-v1` 로 내릴 수 있다 |
+| `GUARDRAIL_POLICY_VERSION` | `guardrail-v3`(9/16) | **기동 실패.** production 은 이 값을 환경에 직접 적어야 한다(코드 기본값에 기대면 막힌다) | 01 §3.7 ①, §15.3 D-07. 허용값 `guardrail-v1|v2|v3` |
 | `OPENAI_API_KEY` · `XAI_API_KEY` | AI 파트가 전달 | 뜨긴 하나 `/health/ready` 가 503. intake 는 폴백(§4) | §15.3 키·결제. 로그 금지 |
 | `DATABASE_URL` | Supabase Session Pooler 접속 문자열(`ai_api`/`ai_worker` role) | `/health/ready` 503. AI API 는 제출 임시 예산(§4) 없이 돈다 | §2, D-20. `postgresql://` 그대로 줘도 된다(어댑터가 `+asyncpg` 로 바꾼다) |
 | `BACKEND_INTERNAL_URL` | 백엔드 호스트 루트(예: `http://127.0.0.1:18080`), `/internal/v1`을 붙이지 않는다 | **워커 기동 실패**(비어 있으면) | §4 |

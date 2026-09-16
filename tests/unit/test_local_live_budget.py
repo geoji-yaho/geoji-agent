@@ -231,8 +231,9 @@ def test_live_dry_run_reports_scope_without_writing_state_or_keys(tmp_path):
     )
     plan = json.loads(result.stdout)
     assert plan["posts"] == 1
-    assert plan["max_calls_including_repair"] == 10
-    assert plan["reservation_cap_usd"] == 0.05
+    # 9/16: 노드 상한을 올리면서 한 판결의 호출 수·예약도 같이 올렸다(재작성 포함 12회·$0.15).
+    assert plan["max_calls_including_repair"] == 12
+    assert plan["reservation_cap_usd"] == 0.15
     assert SECRET not in result.stdout + result.stderr
     assert list(tmp_path.iterdir()) == []
 

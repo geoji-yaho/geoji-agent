@@ -193,11 +193,19 @@ PYTHONPATH=src .venv/bin/python scripts/run_local_live_e2e.py --execute-approved
 | 4 | FALLBACK `EVAL_FAILED` | ① 양형관 `SCHEMA`: reasoning 400 이 출력 상한 400 을 다 먹음 → RULE 형량 ② 검수관이 지옥맛 문구 2회 거부(`UNGROUNDED_CLAIM` "커피 두 잔"·"다음엔 두 번째", `PROFANITY_OUT_OF_LIST` "처태우는") → 전 강도 TEMPLATE | ① `SENTENCING_MAX_OUTPUT_TOKENS` 400→2000, `CONTEXT` 700→1500 |
 | 5 | FALLBACK `EVAL_FAILED` | 양형관 AI 정상(`oneDay`, 4초). 서버 검증 ⑤ `PROFANITY_OUT_OF_LIST`: 서기가 "처먹네"·"처태우는"(허용 목록은 "처타다"뿐) → 단일 강도라 바로 전 강도 TEMPLATE, 검수관 호출 전 종료 | 미조치. 아래 두 건은 06(프롬프트·정책) 결정 |
 
-남은 것(06 소관, 프롬프트 변경은 골든셋 회귀 + 사람 검수):
+**위 세 건의 조치(9/16, 같은 날 반영).** 사용자 결정 "지옥맛은 일단 다 허용하고 차단하지마".
 
-- **서기 v5.4 와 어휘표의 어긋남.** 지옥맛 프롬프트는 "처타다"를 허용하지만 모델은 "처먹"·"처태우는"으로 활용한다. 검수관(guardrail-v2)도 활용형을 목록 밖으로 본다. 어휘표를 어간(`처타`·`처먹`)으로 넓히거나 프롬프트에 "활용하지 말고 목록 그대로"를 못박아야 한다
-- **"미래 예언" 기법 vs `UNGROUNDED_CLAIM`.** 지옥맛 프롬프트가 기법으로 권하는 미래 예언("다음엔 주 3회")과 극단 환산("커피 두 잔")을 검수관이 근거 없는 주장으로 거부한다. 둘 중 하나를 바꿔야 지옥맛이 통과한다
-- **단일 강도 방의 구조 문제.** 방이 하나면 `target_intensities` 가 1개라 서버 검증 ⑤ 위반 하나로 전 강도 TEMPLATE → `EVAL_FAILED` 가 된다(⑤ 는 repair 없이 TEMPLATE 치환, 05 §3.3). ⑤ 위반도 `writer_repair` 를 한 번 태우는 안을 05 에 제안할 만하다
+| 문제 | 조치 | 반영 |
+| --- | --- | --- |
+| 서기 v5.4 와 어휘표의 어긋남(`처먹네` 가 허용 목록 밖) | 목록을 넓히는 대신 **지옥맛 비속어 검사를 없앴다**. `applies()` 표에서 `HELL_ALLOWED_PROFANITY`·`HELL_ONCE_PER_VERDICT` 를 끈다. 자해·죽음·정체성 비하·성적 표현·닳은 문구는 그대로 금지 | 01 §3.5, `domain/lexicon.py` |
+| "미래 예언"·"극단 환산" vs `UNGROUNDED_CLAIM` | 검수관 검사표에서 `UNGROUNDED_CLAIM` 을 **"조서에 없는 과거 사실 단정"** 으로 좁히고, 비유·과장·미래 예언·극단 환산은 수사라고 명시. 서기 프롬프트에도 같은 선을 적었다 | `guardrail-v3`, `writer/hell-v5.5.md` |
+| 단일 강도 방의 구조 문제 | 서버 검증 ⑤ 위반도 `writer_repair` 를 1회 태운다. 재작성이 또 걸릴 때만 TEMPLATE | 05 §3.3·§3.4 |
+
+프롬프트 버전: 서기 `v5.4` → **`v5.5`**(지옥맛 섹션만 변경), 검수관 `guardrail-v2` → **`guardrail-v3`**.
+정책 버전은 백엔드가 `finalize` 로 받아 저장하므로 배포 환경변수도 같이 바뀐다(10 §0.1·§16.1).
+옛 버전 파일은 남긴다. 회귀와 사람 검수는 아래 "다음 작업".
+
+남은 것:
 
 - 실제 LLM 품질·계정 모델 가용성·비용·지연시간은 키 준비 뒤 승인된1건에서 확인한다.
 - 생성형 이미지 provider·모델·유료 호출은 별도 구현/승인이 필요하다.

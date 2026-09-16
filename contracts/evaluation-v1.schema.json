@@ -121,7 +121,8 @@
         "policy_version": {
           "enum": [
             "guardrail-v1",
-            "guardrail-v2"
+            "guardrail-v2",
+            "guardrail-v3"
           ],
           "type": "string"
         },

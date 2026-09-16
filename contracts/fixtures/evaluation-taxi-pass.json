@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "policy_version": "guardrail-v2",
+  "policy_version": "guardrail-v3",
   "sentence_check": {
     "pass": true,
     "violations": []
