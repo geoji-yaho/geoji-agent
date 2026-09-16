@@ -1,0 +1,19 @@
+# 이미지에 넣지 않는 것. Dockerfile 이 COPY 하는 경로만 남긴다(10 §16.3).
+.git
+.venv
+.env
+.env.*
+!.env.example
+_workspace
+docs
+tests
+assets
+inputs
+outputs
+skills
+tools
+scripts/probe_out
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
