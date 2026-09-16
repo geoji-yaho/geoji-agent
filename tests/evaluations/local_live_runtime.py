@@ -1,11 +1,34 @@
 """승인한 로컬 1건 실측 전용. 프로세스 공통 예산 예약 후 실제 모델을 호출한다."""
 
 import asyncio
-import fcntl
 import json
 import math
 import os
+import sys
 from pathlib import Path
+
+if sys.platform == "win32":
+    import msvcrt
+
+    def _lock(stream):
+        # 파일 첫 바이트 하나를 잠근다. 같은 파일을 잠그는 다른 프로세스는 기다린다.
+        stream.seek(0)
+        msvcrt.locking(stream.fileno(), msvcrt.LK_LOCK, 1)
+        stream.seek(0)
+
+    def _unlock(stream):
+        stream.seek(0)
+        msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+
+else:
+    import fcntl
+
+    def _lock(stream):
+        fcntl.flock(stream, fcntl.LOCK_EX)
+
+    def _unlock(stream):
+        fcntl.flock(stream, fcntl.LOCK_UN)
+
 
 from geoji_ai.adapters.backend_http import BackendHttp
 from geoji_ai.adapters.llm_router import build_llm, price_for
@@ -32,32 +55,39 @@ def reserve_call(path: Path, *, vendor, model, role, messages, schema, output_to
     input_bound = len(json.dumps([messages, schema], ensure_ascii=False).encode()) + 1024
     micro_usd = math.ceil(input_bound * price[0] + output_tokens * price[1])
     with path.open("r+") as stream:
-        fcntl.flock(stream, fcntl.LOCK_EX)
-        budget = json.load(stream)
-        if (
-            type(budget.get("max_calls")) is not int
-            or budget["max_calls"] <= 0
-            or type(budget.get("cap_micro_usd")) is not int
-            or budget["cap_micro_usd"] <= 0
-            or type(budget.get("reserved_micro_usd")) is not int
-            or budget["reserved_micro_usd"] < 0
-            or not isinstance(budget.get("calls"), list)
-        ):
-            raise LLMError("BUDGET", message="실측 예약 예산 상태가 올바르지 않습니다.")
-        if (
-            len(budget["calls"]) >= budget["max_calls"]
-            or budget["reserved_micro_usd"] + micro_usd > budget["cap_micro_usd"]
-        ):
-            raise LLMError("BUDGET", message="승인된 호출 수 또는 보수적 예약 예산에 도달했습니다.")
-        budget["reserved_micro_usd"] += micro_usd
-        budget["calls"].append(
-            {"vendor": vendor, "model": model, "role": role, "reserved_micro_usd": micro_usd}
-        )
-        stream.seek(0)
-        json.dump(budget, stream, ensure_ascii=False)
-        stream.truncate()
-        stream.flush()
-        os.fsync(stream.fileno())
+        _lock(stream)
+        try:
+            _reserve_locked(stream, vendor, model, role, micro_usd)
+        finally:
+            _unlock(stream)
+
+
+def _reserve_locked(stream, vendor, model, role, micro_usd):
+    budget = json.load(stream)
+    if (
+        type(budget.get("max_calls")) is not int
+        or budget["max_calls"] <= 0
+        or type(budget.get("cap_micro_usd")) is not int
+        or budget["cap_micro_usd"] <= 0
+        or type(budget.get("reserved_micro_usd")) is not int
+        or budget["reserved_micro_usd"] < 0
+        or not isinstance(budget.get("calls"), list)
+    ):
+        raise LLMError("BUDGET", message="실측 예약 예산 상태가 올바르지 않습니다.")
+    if (
+        len(budget["calls"]) >= budget["max_calls"]
+        or budget["reserved_micro_usd"] + micro_usd > budget["cap_micro_usd"]
+    ):
+        raise LLMError("BUDGET", message="승인된 호출 수 또는 보수적 예약 예산에 도달했습니다.")
+    budget["reserved_micro_usd"] += micro_usd
+    budget["calls"].append(
+        {"vendor": vendor, "model": model, "role": role, "reserved_micro_usd": micro_usd}
+    )
+    stream.seek(0)
+    json.dump(budget, stream, ensure_ascii=False)
+    stream.truncate()
+    stream.flush()
+    os.fsync(stream.fileno())
 
 
 class BoundedRouter:

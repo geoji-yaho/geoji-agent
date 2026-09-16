@@ -102,9 +102,12 @@ class Settings(BaseSettings):
     MAX_TOTAL_PROMPT_TOKENS: int = 6000
     WRITER_MAX_PROMPT_TOKENS: int = 8000
     INTAKE_MAX_OUTPUT_TOKENS: int = 300
-    CONTEXT_MAX_OUTPUT_TOKENS: int = 700
+    # 9/16 실측: luna 조서 reasoning 200 + 출력 367. 옛 700 은 여유가 없다.
+    CONTEXT_MAX_OUTPUT_TOKENS: int = 1500
     BANTER_MAX_OUTPUT_TOKENS: int = 1200
-    SENTENCING_MAX_OUTPUT_TOKENS: int = 400
+    # 9/16 실측: luna 양형 reasoning 이 400 을 다 먹어 출력 0 → SCHEMA → RULE 형량.
+    # 실측 reasoning 92~400.
+    SENTENCING_MAX_OUTPUT_TOKENS: int = 2000
     WRITER_MAX_OUTPUT_TOKENS: int = 700  # 강도 1개당
     # OpenAI 는 이 상한에 reasoning 토큰을 포함한다. luna 검수 1회 reasoning 866~1,363(9/16 실측).
     EVALUATOR_MAX_OUTPUT_TOKENS: int = 3000

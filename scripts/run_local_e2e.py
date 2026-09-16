@@ -32,6 +32,63 @@ from tests.local_e2e.support import LocalIssuer, expected_meme  # noqa: E402
 
 USERS = [f"00000000-0000-4000-8000-{i:012d}" for i in range(1, 6)]
 
+# --- OS 차이(9/16 Windows 이식) ----------------------------------------------------
+# 프로세스 그룹·종료·시작 시각·java 경로·글꼴만 다르다. 나머지는 같은 코드다.
+IS_WINDOWS = sys.platform == "win32"
+#: `uv run` 이 띄운 인터프리터. 옛 `.venv/bin/python` 은 Windows 에 없다.
+VENV_PYTHON = Path(sys.executable)
+
+
+def spawn_kwargs():
+    """자식 프로세스를 별도 그룹으로. 종료할 때 그룹째 보낸다."""
+    if IS_WINDOWS:
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+def terminate_tree(pid, *, force=False):
+    """프로세스와 자식을 끝낸다. Windows 는 SIGTERM 이 없어 taskkill /T."""
+    if IS_WINDOWS:
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True)
+        return
+    os.killpg(pid, signal.SIGKILL if force else signal.SIGTERM)
+
+
+def process_started_at(pid):
+    """PID 재사용 검사용 시작 시각 문자열. 못 읽으면 빈 문자열."""
+    if IS_WINDOWS:
+        result = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                f"(Get-Process -Id {pid}).StartTime.ToString('o')",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip() if result.returncode == 0 else ""
+    result = subprocess.run(["ps", "-p", str(pid), "-o", "lstart="], capture_output=True, text=True)
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def default_java_home():
+    env = os.environ.get("JAVA_HOME")
+    return Path(env) if env else Path("/private/tmp/geoji-e2e-jdk25/Contents/Home")
+
+
+def java_binary(java_home):
+    return java_home / "bin" / ("java.exe" if IS_WINDOWS else "java")
+
+
+def default_font_path():
+    """공유 카드 PNG 의 한글 글꼴. 백엔드 `GEOJI_MEDIA_FONT_PATH`."""
+    if IS_WINDOWS:
+        return str(Path(os.environ.get("SystemRoot", r"C:\Windows")) / "Fonts" / "malgun.ttf")
+    if sys.platform == "darwin":
+        return "/System/Library/Fonts/AppleSDGothicNeo.ttc"
+    return "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"
+
 
 def write_json(path, value, *, private=False):
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -94,7 +151,7 @@ class Stack:
             "SUPABASE_JWT_ISSUER_URI": self.helper_url,
             "GEOJI_MEDIA_ADMIN_IDS": USERS[0],
             "GEOJI_MEDIA_ROOT": str(self.directory / "media"),
-            "GEOJI_MEDIA_FONT_PATH": "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+            "GEOJI_MEDIA_FONT_PATH": default_font_path(),
             "GEOJI_MEDIA_SOURCE_ORIGIN": self.helper_url,
         }
         self.report = {
@@ -119,7 +176,7 @@ class Stack:
             env=self.env,
             stdout=stream,
             stderr=subprocess.STDOUT,
-            start_new_session=True,
+            **spawn_kwargs(),
         )
         stream.close()
         self.processes.append((name, proc))
@@ -129,11 +186,11 @@ class Stack:
         for index, (label, proc) in enumerate(self.processes):
             if label == name:
                 if proc.poll() is None:
-                    os.killpg(proc.pid, signal.SIGTERM)
+                    terminate_tree(proc.pid)
                     try:
                         proc.wait(timeout=15)
                     except subprocess.TimeoutExpired:
-                        os.killpg(proc.pid, signal.SIGKILL)
+                        terminate_tree(proc.pid, force=True)
                         proc.wait(timeout=5)
                 self.processes.pop(index)
                 return
@@ -211,7 +268,7 @@ class Stack:
             await self.db.execute(file.read_text())
         self.report["schema_files"] = [f.name for f in files]
         self.client = httpx.AsyncClient(timeout=15, trust_env=False)
-        python = str(ROOT / ".venv/bin/python")
+        python = str(VENV_PYTHON)
         self.start(
             "issuer",
             [
@@ -253,12 +310,15 @@ class Stack:
         self.start(
             "backend",
             [
-                str(self.args.java_home / "bin/java"),
+                str(java_binary(self.args.java_home)),
                 "-jar",
                 str(jar),
                 "--server.address=127.0.0.1",
                 f"--server.port={self.args.backend_port}",
                 "--logging.level.org.hibernate.SQL=warn",
+                # 짤 카탈로그 시드가 1MB 를 넘는 PNG 를 올린다. 백엔드 기본 multipart 상한은 1MB.
+                "--spring.servlet.multipart.max-file-size=10MB",
+                "--spring.servlet.multipart.max-request-size=20MB",
             ],
             cwd=self.args.backend,
         )
@@ -272,9 +332,7 @@ class Stack:
                 "container": self.name,
                 "pids": {name: proc.pid for name, proc in self.processes},
                 "started": {
-                    name: subprocess.check_output(
-                        ["ps", "-p", str(proc.pid), "-o", "lstart="], text=True
-                    ).strip()
+                    name: process_started_at(proc.pid)
                     for name, proc in self.processes
                     if proc.poll() is None
                 },
@@ -337,7 +395,7 @@ class Stack:
                 expected=201,
                 json={
                     "name": "로컬 E2E 법정",
-                    "spiceLevel": "mild",
+                    "spiceLevel": getattr(self, "intensity", "mild"),
                     "voteDeadlineMinutes": 60,
                     "rules": [],
                 },
@@ -489,7 +547,8 @@ class Stack:
             expected=409,
             json={"verdict": vote, "reason": "중복", "roomId": self.room_id},
         )
-        end = time.monotonic() + 65
+        # 9/16: SENTENCE 마감 90초(10 §3) + PREPARE 대기 30초. 실측은 검수 30초까지 든다.
+        end = time.monotonic() + (200 if self.live else 65)
         while time.monotonic() < end:
             verdict = (
                 await self.request("GET", f"/api/posts/{post}/verdict?room_id={self.room_id}")
@@ -498,7 +557,7 @@ class Stack:
                 break
             await asyncio.sleep(max(0.1, min(verdict["pollAfterMs"] / 1000, 1)))
         else:
-            raise TimeoutError(f"{name} PREPARE30초+SENTENCE10초 초과")
+            raise TimeoutError(f"{name} PREPARE 30초 + SENTENCE 90초 초과")
         expected_statuses = (
             {"AI_READY", "TEMPLATE_READY"}
             if self.live
@@ -828,12 +887,12 @@ class Stack:
             return
         for _, proc in reversed(self.processes):
             if proc.poll() is None:
-                os.killpg(proc.pid, signal.SIGTERM)
+                terminate_tree(proc.pid)
         for _, proc in reversed(self.processes):
             try:
                 proc.wait(timeout=15)
             except subprocess.TimeoutExpired:
-                os.killpg(proc.pid, signal.SIGKILL)
+                terminate_tree(proc.pid, force=True)
         if self.container_started:
             subprocess.run(["docker", "stop", self.name], capture_output=True, check=True)
 
@@ -843,9 +902,7 @@ async def main():
     parser.add_argument("--backend", type=Path, required=True)
     parser.add_argument("--frontend", type=Path)
     parser.add_argument("--jar", type=Path)
-    parser.add_argument(
-        "--java-home", type=Path, default=Path("/private/tmp/geoji-e2e-jdk25/Contents/Home")
-    )
+    parser.add_argument("--java-home", type=Path, default=default_java_home())
     parser.add_argument("--db-port", type=int, default=55436)
     parser.add_argument("--backend-port", type=int, default=18080)
     parser.add_argument("--ai-port", type=int, default=18100)

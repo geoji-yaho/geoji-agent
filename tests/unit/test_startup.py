@@ -370,3 +370,5 @@ def test_노드_상한_기본값이_9_16_luna_실측값이다():
     assert settings.FIRST_RESULT_TARGET_SECONDS == 90
     # OpenAI 는 출력 상한에 reasoning 토큰을 포함한다. 800 이면 검수 보고서가 잘린다.
     assert settings.EVALUATOR_MAX_OUTPUT_TOKENS == 3000
+    assert settings.SENTENCING_MAX_OUTPUT_TOKENS == 2000
+    assert settings.CONTEXT_MAX_OUTPUT_TOKENS == 1500

@@ -100,7 +100,17 @@ Vite가 실행되지 않으면 해당 디렉터리 `frontend.log`를 확인한�
 
 ### 실제 LLM 1건
 
-현재 사용자의 승인 범위는 가상 택시 지출1건, mild, 배심원3표, 재시도 포함 최대10회,
+**9/16 Windows 이식·옵션 추가.** `run_local_e2e.py`·`run_local_live_e2e.py`·`start_local_e2e_web.py`·
+`stop_local_e2e.py`·`tests/evaluations/local_live_runtime.py` 가 Windows 에서도 돈다(프로세스 그룹은
+`CREATE_NEW_PROCESS_GROUP`·`taskkill /T`, 시작 시각은 PowerShell `Get-Process`, java 는 `bin/java.exe`, 글꼴은
+`malgun.ttf`, 예산 파일 잠금은 `msvcrt.locking`). `--java-home` 기본값은 `JAVA_HOME`. 실측 스크립트에
+`--intensity mild|spicy|hell`(방 강도)·`--max-calls`(기본 12)·`--cap-usd`(기본 0.15)·`--keep` 이 생겼고,
+끝나면 강도별 판결문·형량·양형 이유·출처를 stdout("===== 판결문 =====")과 `report.json` 의 `verdict` 에 남긴다.
+server main 에 없는 짤 관리자 API·PNG 렌더는 404 면 건너뛴다(`report.json` `skipped`). 백엔드는 짤 시드 PNG(1MB 초과)
+때문에 `--spring.servlet.multipart.max-file-size=10MB` 로 띄운다. 판결 폴링 대기는 실측에서 200초(SENTENCE 마감 90초 +
+PREPARE 30초 + 여유). 실행 명령은 README "실제 모델로 판결문 보기".
+
+(원문) 현재 사용자의 승인 범위는 가상 택시 지출1건, mild, 배심원3표, 재시도 포함 최대10회,
 보수적 예약 US$0.05다. 이미지 생성은 포함하지 않는다.
 
 ```bash
@@ -173,6 +183,21 @@ PYTHONPATH=src .venv/bin/python scripts/run_local_live_e2e.py --execute-approved
 | PRIOR 원천삭제 후 문구 노출 | 현재post snapshot만으로 과거 원천삭제를 못검사 | 정확한 인용 버전의 원천 게시물 즉시조회, 템플릿 전환 |
 
 ## 6. 경계와 다음 작업
+
+**9/16 Windows 실측 5회 결과(지옥맛 방, server main `aef14f3`, 실제 키, 총 약 $0.03).** 스택은 돌고 운영 증상이 그대로 재현됐다.
+새 역할별 로그(`sentence_call`·`sentence_fallback`·`sentence_summary`)로 실패 지점이 한 줄씩 잡힌다.
+
+| 회차 | 결과 | 실패 지점(로그) | 조치 |
+| --- | --- | --- | --- |
+| 1~3 | 부팅·시드 실패 | 짤 관리자 API·멱등키 재전송이 server main 에 없음(참고 패치 전용) | 실측은 `baseline` 검사 집합, 404 단계 건너뜀 |
+| 4 | FALLBACK `EVAL_FAILED` | ① 양형관 `SCHEMA`: reasoning 400 이 출력 상한 400 을 다 먹음 → RULE 형량 ② 검수관이 지옥맛 문구 2회 거부(`UNGROUNDED_CLAIM` "커피 두 잔"·"다음엔 두 번째", `PROFANITY_OUT_OF_LIST` "처태우는") → 전 강도 TEMPLATE | ① `SENTENCING_MAX_OUTPUT_TOKENS` 400→2000, `CONTEXT` 700→1500 |
+| 5 | FALLBACK `EVAL_FAILED` | 양형관 AI 정상(`oneDay`, 4초). 서버 검증 ⑤ `PROFANITY_OUT_OF_LIST`: 서기가 "처먹네"·"처태우는"(허용 목록은 "처타다"뿐) → 단일 강도라 바로 전 강도 TEMPLATE, 검수관 호출 전 종료 | 미조치. 아래 두 건은 06(프롬프트·정책) 결정 |
+
+남은 것(06 소관, 프롬프트 변경은 골든셋 회귀 + 사람 검수):
+
+- **서기 v5.4 와 어휘표의 어긋남.** 지옥맛 프롬프트는 "처타다"를 허용하지만 모델은 "처먹"·"처태우는"으로 활용한다. 검수관(guardrail-v2)도 활용형을 목록 밖으로 본다. 어휘표를 어간(`처타`·`처먹`)으로 넓히거나 프롬프트에 "활용하지 말고 목록 그대로"를 못박아야 한다
+- **"미래 예언" 기법 vs `UNGROUNDED_CLAIM`.** 지옥맛 프롬프트가 기법으로 권하는 미래 예언("다음엔 주 3회")과 극단 환산("커피 두 잔")을 검수관이 근거 없는 주장으로 거부한다. 둘 중 하나를 바꿔야 지옥맛이 통과한다
+- **단일 강도 방의 구조 문제.** 방이 하나면 `target_intensities` 가 1개라 서버 검증 ⑤ 위반 하나로 전 강도 TEMPLATE → `EVAL_FAILED` 가 된다(⑤ 는 repair 없이 TEMPLATE 치환, 05 §3.3). ⑤ 위반도 `writer_repair` 를 한 번 태우는 안을 05 에 제안할 만하다
 
 - 실제 LLM 품질·계정 모델 가용성·비용·지연시간은 키 준비 뒤 승인된1건에서 확인한다.
 - 생성형 이미지 provider·모델·유료 호출은 별도 구현/승인이 필요하다.

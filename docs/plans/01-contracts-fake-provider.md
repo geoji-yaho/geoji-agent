@@ -200,7 +200,7 @@ class LedgerPort(Protocol):
 | `MODEL_CONCURRENCY_LIMIT` | 8 | D-22(9/8 확정) |
 | `ALERT_DISCORD_WEBHOOK_URL` · `COST_ALERT_KRW_PER_DAY` | — · 5000 | 9/8 확정. 알림 규칙은 08 §3.3, 평가 실행(`GEOJI_EVAL=1`)분은 별도 집계 |
 | `MAX_TOTAL_PROMPT_TOKENS` · `WRITER_MAX_PROMPT_TOKENS` | 6000 · 8000 | |
-| 출력 토큰 상한 `{INTAKE,CONTEXT,BANTER,SENTENCING,WRITER,EVALUATOR}_MAX_OUTPUT_TOKENS` | intake 300 · context 700 · banter 1200 · sentencing 400 · writer 700/강도 · evaluator 3000 (9/16 코드 대조, OpenAI 는 reasoning 포함. 원문 800) | 잘리면 스키마 실패로 처리하고 사용량 기록. 키 이름은 9/11 확정 |
+| 출력 토큰 상한 `{INTAKE,CONTEXT,BANTER,SENTENCING,WRITER,EVALUATOR}_MAX_OUTPUT_TOKENS` | intake 300 · context 1500 · banter 1200 · sentencing 2000 · writer 700/강도 · evaluator 3000 (9/16 코드 대조, OpenAI 는 reasoning 을 이 상한에 포함한다. 실측 reasoning: 조서 200·양형 92~400·검수 866~1,363. 원문 context 700 · sentencing 400 · evaluator 800) | 잘리면 스키마 실패로 처리하고 사용량 기록. 키 이름은 9/11 확정 |
 | 기능 플래그 | `ROOM_COMMENT_STYLE_ENABLED=false` · `PUBLIC_HISTORY_CALLBACK_ENABLED=false` · `REFLECT_ENABLED=false` · `HINDSIGHT_ENABLED=false` | hell 을 끄는 플래그는 없다 — 정책 버전으로 통제 |
 | `WORKER_SLOTS` | `{"SENTENCE": 2, "PREPARE": 1, "BACKGROUND": 1}` | 작업 2. 환경변수는 JSON 문자열(9/11) |
 
