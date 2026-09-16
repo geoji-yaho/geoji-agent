@@ -3,10 +3,13 @@
 
 import argparse
 import json
-import os
-import signal
 import subprocess
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from run_local_e2e import process_started_at, terminate_tree  # noqa: E402
 
 
 def main():
@@ -20,14 +23,12 @@ def main():
     ):
         raise ValueError("E2E 실행 디렉터리가 아닙니다.")
     for name, pid in reversed(list(state["pids"].items())):
-        current = subprocess.run(
-            ["ps", "-p", str(pid), "-o", "lstart="], capture_output=True, text=True
-        )
-        if current.returncode != 0:
+        current = process_started_at(pid)
+        if not current:
             continue
-        if current.stdout.strip() != state["started"].get(name):
+        if current != state["started"].get(name):
             raise ValueError(f"{name} PID가 다른 프로세스에 재사용되어 종료하지 않습니다.")
-        os.killpg(pid, signal.SIGTERM)
+        terminate_tree(pid)
     label = subprocess.run(
         [
             "docker",

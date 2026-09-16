@@ -59,12 +59,16 @@ class Settings(BaseSettings):
 
     # 시간 예산
     # 노드 timeout 은 float 다. 예산 초과 리허설이 0.1 을 준다(08 §3.5).
+    # 9/16 luna 실측(03 §3.6, `scripts/probe_out/20260916-*-openai-*.json`)으로 조정:
+    # 양형관 p90 5.7초·백엔드 관측 8.6초 → 12, 검수관 13.9~17.3초(reasoning 900~1,400 토큰) → 30.
+    # 서기(grok, 9/7 실측 p90 5.8초)는 repair 여유로 10. 옛 값 3·6·4 는 "첫 결과 10초" 시절
+    # 역산값이라 검수관이 늘 TIMEOUT → 전 강도 TEMPLATE 이었다. 백엔드 SENTENCE 마감은 90초.
     INTAKE_TIMEOUT_SECONDS: float = 4.0
-    FIRST_RESULT_TARGET_SECONDS: int = 10
+    FIRST_RESULT_TARGET_SECONDS: int = 90
     REPAIR_PATH_BUDGET_SECONDS: int = 15
-    SENTENCING_NODE_TIMEOUT_SECONDS: float = 3.0
-    WRITER_NODE_TIMEOUT_SECONDS: float = 6.0
-    EVALUATOR_NODE_TIMEOUT_SECONDS: float = 4.0
+    SENTENCING_NODE_TIMEOUT_SECONDS: float = 12.0
+    WRITER_NODE_TIMEOUT_SECONDS: float = 10.0
+    EVALUATOR_NODE_TIMEOUT_SECONDS: float = 30.0
 
     # 큐·워커 (작업 2)
     WORKER_POLL_MS: int = 250
@@ -81,7 +85,8 @@ class Settings(BaseSettings):
     INLINE_CONTEXT_MIN_REMAINING_MS: int = 8500
     IMMEDIATE_REPAIR_MAX: int = 1
     TEXT_RETRY_ROUNDS: int = 3
-    TEXT_RETRY_TIMEOUT_SECONDS: int = 20
+    # 9/16: 서기 10 + 검수 30 + finalize 가 들어가야 한다. 백엔드 TEXT_RETRY 마감도 같이 60(10 §3).
+    TEXT_RETRY_TIMEOUT_SECONDS: int = 60
 
     # 기억·증거 (작업 4)
     RECALL_CANDIDATE_LIMIT: int = 20
@@ -97,11 +102,15 @@ class Settings(BaseSettings):
     MAX_TOTAL_PROMPT_TOKENS: int = 6000
     WRITER_MAX_PROMPT_TOKENS: int = 8000
     INTAKE_MAX_OUTPUT_TOKENS: int = 300
-    CONTEXT_MAX_OUTPUT_TOKENS: int = 700
+    # 9/16 실측: luna 조서 reasoning 200 + 출력 367. 옛 700 은 여유가 없다.
+    CONTEXT_MAX_OUTPUT_TOKENS: int = 1500
     BANTER_MAX_OUTPUT_TOKENS: int = 1200
-    SENTENCING_MAX_OUTPUT_TOKENS: int = 400
+    # 9/16 실측: luna 양형 reasoning 이 400 을 다 먹어 출력 0 → SCHEMA → RULE 형량.
+    # 실측 reasoning 92~400.
+    SENTENCING_MAX_OUTPUT_TOKENS: int = 2000
     WRITER_MAX_OUTPUT_TOKENS: int = 700  # 강도 1개당
-    EVALUATOR_MAX_OUTPUT_TOKENS: int = 800
+    # OpenAI 는 이 상한에 reasoning 토큰을 포함한다. luna 검수 1회 reasoning 866~1,363(9/16 실측).
+    EVALUATOR_MAX_OUTPUT_TOKENS: int = 3000
 
     # 기능 플래그. hell 을 끄는 플래그는 없다 — 정책 버전으로 통제한다.
     ROOM_COMMENT_STYLE_ENABLED: bool = False

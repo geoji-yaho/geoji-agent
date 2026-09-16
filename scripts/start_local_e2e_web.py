@@ -6,8 +6,13 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from urllib.parse import urlparse
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from run_local_e2e import process_started_at, spawn_kwargs  # noqa: E402
 
 
 def main():
@@ -44,12 +49,10 @@ def main():
             env=env,
             stdout=stream,
             stderr=subprocess.STDOUT,
-            start_new_session=True,
+            **spawn_kwargs(),
         )
     state["pids"]["frontend"] = proc.pid
-    state["started"]["frontend"] = subprocess.check_output(
-        ["ps", "-p", str(proc.pid), "-o", "lstart="], text=True
-    ).strip()
+    state["started"]["frontend"] = process_started_at(proc.pid)
     temporary = state_path.with_suffix(".tmp")
     temporary.write_text(json.dumps(state, indent=2) + "\n")
     temporary.chmod(0o600)

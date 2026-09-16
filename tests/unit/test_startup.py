@@ -354,3 +354,21 @@ def test_DB_검사_타임아웃은_2초다():
 def test_앱_생성도_기동_검사를_돈다():
     with pytest.raises(StartupError):
         create_app(make_settings(MODEL_WRITER="grok-4.6"))
+
+
+def test_노드_상한_기본값이_9_16_luna_실측값이다():
+    """9/16 실측(03 §3.6): 양형관 p90 5.7초·검수관 13.9~17.3초(reasoning 900~1,400 토큰).
+
+    옛 3·6·4 는 "첫 결과 10초" 역산값이라 검수관이 늘 TIMEOUT → 전 강도 TEMPLATE 이었다.
+    백엔드 SENTENCE 마감 90초에 맞춘다. 값은 01 §3.7·README 설정 표와 같아야 한다.
+    """
+    settings = Settings(_env_file=None)
+    assert settings.SENTENCING_NODE_TIMEOUT_SECONDS == 12.0
+    assert settings.WRITER_NODE_TIMEOUT_SECONDS == 10.0
+    assert settings.EVALUATOR_NODE_TIMEOUT_SECONDS == 30.0
+    assert settings.TEXT_RETRY_TIMEOUT_SECONDS == 60
+    assert settings.FIRST_RESULT_TARGET_SECONDS == 90
+    # OpenAI 는 출력 상한에 reasoning 토큰을 포함한다. 800 이면 검수 보고서가 잘린다.
+    assert settings.EVALUATOR_MAX_OUTPUT_TOKENS == 3000
+    assert settings.SENTENCING_MAX_OUTPUT_TOKENS == 2000
+    assert settings.CONTEXT_MAX_OUTPUT_TOKENS == 1500

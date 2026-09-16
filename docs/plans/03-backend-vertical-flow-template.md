@@ -113,6 +113,7 @@ POST /post-submissions ──▶ POST /internal/v1/intake (스텁: PASS, intake_
 | `sentencing` | 작업 5 초안(밴드·허용 목록 enum·근거 라벨) | 택시 `CASE` + `jury-guilty-75` | 5 | **p90 ≤ 2.0초** — 초과 시 D-23 |
 | `evaluator` | `prompts/evaluator/guardrail-v2.md` 초안 + 검사표 | 택시 초안 2강도 | 5 | p90 ≤ 3.0초, 재현율은 작업 6 |
 - 결과 `scripts/probe_out/<ts>-openai-<role>.json`(기존 형식). p50/p90·비용·`cached_tokens` 기록. `SENTENCING_NODE_TIMEOUT_SECONDS`·`EVALUATOR_NODE_TIMEOUT_SECONDS` 초기값(3·4)을 실측 p90 + 0.5초로 조정해 `00-INDEX.md` §7·§8.4 에 기록
+- **9/16 실측(운영 템플릿 폴백 원인 조사 중, n=3, 스크립트 초안 프롬프트)**: `20260916-163512-openai-sentencing.json` — 2.9 / 4.2 / 5.7초, completion 223~232(reasoning 92~116), 3건 $0.002. `20260916-163603-openai-evaluator.json` — 13.9 / 17.2 / 17.3초, completion 1,395~1,705(**reasoning 866~1,363**), 3건 $0.011. 백엔드 운영 관측(server `JobKind.java` 주석)은 양형 8.6초·검수 13.9초. 판정: 양형관 p90 > 2.0초 → **D-23 대응은 상한 조정으로**(사전 후보 안 함), 검수관 p90 > 3.0초 → 상한 30초·`EVALUATOR_MAX_OUTPUT_TOKENS` 3000(OpenAI 는 reasoning 포함). 상한은 01 §3.7. `intake` 는 이날 재지 않았다
 
 ### 3.7 가짜 백엔드 (`tests/fakes/backend_app.py`)
 - FastAPI 앱 하나가 10 §4 의 5 API 를 **최소 상태 기계**로 구현: verdict 별 `sentence_status`·`text_status`·`text_version`·`active_generation_id`·commit record dict. `begin-generation` 409 규칙, `finalize` 의 hash·버전·generation 검사와 commit record 멱등, `generation-failed` 오류 코드 표, `snapshot` fixture 반환, `resolve-evidence` fixture 반환

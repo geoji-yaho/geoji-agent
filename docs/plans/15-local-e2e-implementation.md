@@ -100,7 +100,17 @@ Vite가 실행되지 않으면 해당 디렉터리 `frontend.log`를 확인한�
 
 ### 실제 LLM 1건
 
-현재 사용자의 승인 범위는 가상 택시 지출1건, mild, 배심원3표, 재시도 포함 최대10회,
+**9/16 Windows 이식·옵션 추가.** `run_local_e2e.py`·`run_local_live_e2e.py`·`start_local_e2e_web.py`·
+`stop_local_e2e.py`·`tests/evaluations/local_live_runtime.py` 가 Windows 에서도 돈다(프로세스 그룹은
+`CREATE_NEW_PROCESS_GROUP`·`taskkill /T`, 시작 시각은 PowerShell `Get-Process`, java 는 `bin/java.exe`, 글꼴은
+`malgun.ttf`, 예산 파일 잠금은 `msvcrt.locking`). `--java-home` 기본값은 `JAVA_HOME`. 실측 스크립트에
+`--intensity mild|spicy|hell`(방 강도)·`--max-calls`(기본 12)·`--cap-usd`(기본 0.15)·`--keep` 이 생겼고,
+끝나면 강도별 판결문·형량·양형 이유·출처를 stdout("===== 판결문 =====")과 `report.json` 의 `verdict` 에 남긴다.
+server main 에 없는 짤 관리자 API·PNG 렌더는 404 면 건너뛴다(`report.json` `skipped`). 백엔드는 짤 시드 PNG(1MB 초과)
+때문에 `--spring.servlet.multipart.max-file-size=10MB` 로 띄운다. 판결 폴링 대기는 실측에서 200초(SENTENCE 마감 90초 +
+PREPARE 30초 + 여유). 실행 명령은 README "실제 모델로 판결문 보기".
+
+(원문) 현재 사용자의 승인 범위는 가상 택시 지출1건, mild, 배심원3표, 재시도 포함 최대10회,
 보수적 예약 US$0.05다. 이미지 생성은 포함하지 않는다.
 
 ```bash
@@ -173,6 +183,46 @@ PYTHONPATH=src .venv/bin/python scripts/run_local_live_e2e.py --execute-approved
 | PRIOR 원천삭제 후 문구 노출 | 현재post snapshot만으로 과거 원천삭제를 못검사 | 정확한 인용 버전의 원천 게시물 즉시조회, 템플릿 전환 |
 
 ## 6. 경계와 다음 작업
+
+**9/16 Windows 실측 5회 결과(지옥맛 방, server main `aef14f3`, 실제 키, 총 약 $0.03).** 스택은 돌고 운영 증상이 그대로 재현됐다.
+새 역할별 로그(`sentence_call`·`sentence_fallback`·`sentence_summary`)로 실패 지점이 한 줄씩 잡힌다.
+
+| 회차 | 결과 | 실패 지점(로그) | 조치 |
+| --- | --- | --- | --- |
+| 1~3 | 부팅·시드 실패 | 짤 관리자 API·멱등키 재전송이 server main 에 없음(참고 패치 전용) | 실측은 `baseline` 검사 집합, 404 단계 건너뜀 |
+| 4 | FALLBACK `EVAL_FAILED` | ① 양형관 `SCHEMA`: reasoning 400 이 출력 상한 400 을 다 먹음 → RULE 형량 ② 검수관이 지옥맛 문구 2회 거부(`UNGROUNDED_CLAIM` "커피 두 잔"·"다음엔 두 번째", `PROFANITY_OUT_OF_LIST` "처태우는") → 전 강도 TEMPLATE | ① `SENTENCING_MAX_OUTPUT_TOKENS` 400→2000, `CONTEXT` 700→1500 |
+| 5 | FALLBACK `EVAL_FAILED` | 양형관 AI 정상(`oneDay`, 4초). 서버 검증 ⑤ `PROFANITY_OUT_OF_LIST`: 서기가 "처먹네"·"처태우는"(허용 목록은 "처타다"뿐) → 단일 강도라 바로 전 강도 TEMPLATE, 검수관 호출 전 종료 | 아래 조치표 |
+| 6 | FALLBACK `EVAL_FAILED` | ⑤ 는 통과(지옥맛 어휘 검사 해제가 먹었다). 검수관이 지옥맛 하나를 위반별로 쪼개 `texts` 에 같은 강도를 여러 항목으로 냄 → `DUPLICATE_INTENSITY`. 이 코드는 강도별이 아니라 전역이라 재검수 없이 끝 | 같은 강도 항목을 하나로 합친다(`_merge_same_intensity`, `pass` 는 AND). 검수관 strict 스키마의 `texts` 에 "강도마다 정확히 한 항목" 설명 추가 |
+| 7 | FALLBACK `SCHEMA_INVALID` | 서기·검수관 전부 AI 통과(`source=PREP\|AI\|hell=AI`), finalize 에서 백엔드 **422 `INVALID_DRAFT`** 2회 → 재작성 1회 뒤 실패. 원인은 문구가 아니라 정책 버전 문자열: 백엔드 `FinalizeRequestParser.GUARDRAIL_VERSIONS = Set.of("guardrail-v1", "guardrail-v2")` 가 `guardrail-v3` 을 거부 | 정책 버전을 `guardrail-v2` 로 되돌리고 검사표만 제자리 개정. 백엔드 허용 목록 확장은 선반영 요청으로 10 §0.1 |
+| 8~10 | **`AI_READY`** (hell·spicy·mild 각 1회) | 실패 없음. 양형·서기·검수 모두 AI, 재작성 0회, 판결까지 약 20초 | — |
+
+**위 세 건의 조치(9/16, 같은 날 반영).** 사용자 결정 "지옥맛은 일단 다 허용하고 차단하지마".
+
+| 문제 | 조치 | 반영 |
+| --- | --- | --- |
+| 서기 v5.4 와 어휘표의 어긋남(`처먹네` 가 허용 목록 밖) | 목록을 넓히는 대신 **지옥맛 비속어 검사를 없앴다**. `applies()` 표에서 `HELL_ALLOWED_PROFANITY`·`HELL_ONCE_PER_VERDICT` 를 끈다. 자해·죽음·정체성 비하·성적 표현·닳은 문구는 그대로 금지 | 01 §3.5, `domain/lexicon.py` |
+| "미래 예언"·"극단 환산" vs `UNGROUNDED_CLAIM` | 검수관 검사표에서 `UNGROUNDED_CLAIM` 을 **"조서에 없는 과거 사실 단정"** 으로 좁히고, 비유·과장·미래 예언·극단 환산은 수사라고 명시. 서기 프롬프트에도 같은 선을 적었다 | `guardrail-v3`, `writer/hell-v5.5.md` |
+| 단일 강도 방의 구조 문제 | 서버 검증 ⑤ 위반도 `writer_repair` 를 1회 태운다. 재작성이 또 걸릴 때만 TEMPLATE | 05 §3.3·§3.4 |
+
+프롬프트 버전: 서기 `v5.4` → **`v5.5`**(지옥맛 섹션만 변경). 검수관은 **`guardrail-v2` 를 제자리에서**
+개정했다. 버전을 `guardrail-v3` 으로 올려 봤더니 백엔드 finalize 파서의 허용 목록이
+`{guardrail-v1, guardrail-v2}` 로 박혀 있어 422 `INVALID_DRAFT` 가 났다(아래 7회차). 검사 코드 집합과
+`EvaluationReport` 모양은 그대로다. v3 승격은 백엔드 허용 목록이 늘어난 뒤(10 §0.1).
+회귀와 사람 검수는 아래 "다음 작업".
+
+8~10회차 판결문(실제 출력, 같은 택시 사건):
+
+- hell — "이 속도면 연말에 택시로 차 산다 / 늦잠 자서 12,000원 택시라니 지하철 8번 탈 돈을 한 번에
+  처먹는 판단력 실화냐. / … 연말엔 택시비로 중고차 한 대 뽑고 있을 거다. / 그때 가서 통장 임종 보고 울지 마라."
+  → 옛 어휘 규칙이라면 "처먹"에서 막혔을 문장이다.
+- spicy — "늦잠 1번, 지하철 8번 날림 / … 1,400원짜리 지하철을 8번 포기한 셈이다. / … 알람을 8개 맞춰라." 욕 0개.
+- mild — "늦잠이 12,000원을 부른다고요? / … 지하철이 파업이라도 했나요? / … 다음엔 알람을 두 번 더 맞춰보세요." 존댓말 유지.
+
+남은 것:
+
+- 판결문에 티어 코드가 영어 그대로 샌다("king 티어"). 조서·프롬프트 어느 쪽에서 한글 표시명으로
+  바꿀지 정해야 한다(8·9회차 모두에서 보였다)
+- 골든셋 실호출 회귀와 사람 검수(06 §3.4)는 아직이다. fake provider dry-run 까지만 확인했다
 
 - 실제 LLM 품질·계정 모델 가용성·비용·지연시간은 키 준비 뒤 승인된1건에서 확인한다.
 - 생성형 이미지 provider·모델·유료 호출은 별도 구현/승인이 필요하다.

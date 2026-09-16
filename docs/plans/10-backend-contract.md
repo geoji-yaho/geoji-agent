@@ -39,6 +39,9 @@
 
 | 날짜 | 무엇이 바뀌었나 → 백엔드가 할 일 | 절 | 상태 |
 |---|---|---|---|
+| 9/16 | **`FinalizeRequestParser.GUARDRAIL_VERSIONS` 에 `guardrail-v3` 을 더해 달라**(현재 `Set.of("guardrail-v1", "guardrail-v2")`). 지옥맛 비속어 제한을 없앤 새 검수 정책을 v3 으로 올리려 했는데 finalize 가 422 `INVALID_DRAFT` 를 내서 판결이 통째로 막혔다(15 §6 7회차). **지금은 AI 쪽이 v2 를 제자리에서 개정해 쓰므로 백엔드 작업 없이도 돈다.** 이 줄은 나중에 정책 버전을 올릴 수 있게 하는 선반영 요청이다. 허용 목록만 늘리면 되고 기본값·저장 컬럼은 그대로 | §5·§15.3 D-07 | 미전달 |
+| 9/16 | **운영 템플릿 폴백 원인**: AI 워커 검수관 상한 4초 vs luna 실측 14~17초 → 매 판결 `EVAL_FAILED`(TIMEOUT). AI 이미지 기본값을 양형 12·서기 10·검수 30초, `TEXT_RETRY_TIMEOUT_SECONDS` 60 으로 올림(01 §3.7) → **새 이미지 태그로 재배포**. `.env` 에 `*_NODE_TIMEOUT_SECONDS` 를 따로 적어 뒀다면 지우거나 같은 값으로. `JobKind.TEXT_RETRY` 마감 20s → **60s**(§3). SENTENCE 90s 는 그대로 | §3·§16.1·§16.3 | 미전달 |
+| 9/16 | 워커 로그에 `sentence_call`·`sentence_fallback`·`sentence_summary`(역할·강도·timeout·오류 kind·결과) 추가 → 템플릿이 뜨면 `docker logs geoji-ai-worker` 에서 `trace_id` 로 검색해 `sentence_summary.outcome`·`fallback_reason` 을 보면 된다. 백엔드 작업 없음(참고) | §16.2 | 미전달 |
 | 9/16 | 최신 배포 PR #41은 `.env` 필수이며 호스트에 export한 LLM 키만으로는 컨테이너에 전달되지 않음. AI 담당과 환경변수 전달 방식을 확정하고 **AI API·worker 각각**에 주입. Spring EB 설정만으로는 부족 | §16.1·§16.6 | 미전달 |
 | 9/16 | 백엔드 보고서 A3의 `BACKEND_INTERNAL_URL=호스트+/internal/v1` 안내를 **호스트 루트만**으로 수정. `AI_API_BASE_URL`·양방향 서비스 토큰·정책 버전·DB role·배포 이미지 태그를 함께 대조 | §16.6 | 미전달 |
 | 9/16 | 최신 server `3619f59`에도 non-guilty finalize·POST 파생 삭제·PRIOR 즉시 읽기 차단·관리자 이미지 API 참고 패치는 미반영. 프론트의 기존 `/expenses/.../trial`은 아직 Stub이므로 신규 posts 흐름으로 연결 일정 협의 | §16.4~§16.6 | 미전달 |
@@ -139,9 +142,9 @@ Frontend ──▶ Main Backend ── 내부 HTTP ──▶ AI API (FastAPI)  :
 | 업무 트랜잭션 | kind / event_type | dedupe_key | priority | max_attempts | deadline_at | payload | aggregate_id / version |
 |---|---|---|---:|---:|---|---|---|
 | 게시물 저장(`spent`·`considering` 만, `NO_SPEND` 제외) | `PREPARE` / `post.created` | `prepare:{post_id}:{post_version}:{audience_version}` | 30 | 2 | null | `{post_id, post_version, audience_version}` | `post_id` / `post_version` |
-| 배심원 평결 확정(전원 투표 즉시 or 마감 스캔) — **9/14 D-24: PREPARE 종료 뒤 INSERT** | `SENTENCE` / `verdict.confirmed` | `sentence:{verdict_id}:{verdict_version}` | 100 | 2 | **INSERT 시각 + 10s** (원문 `confirmed_at + 10s`) | `{verdict_id, verdict_version, post_id}` | `verdict_id` / `verdict_version` |
+| 배심원 평결 확정(전원 투표 즉시 or 마감 스캔) — **9/14 D-24: PREPARE 종료 뒤 INSERT** | `SENTENCE` / `verdict.confirmed` | `sentence:{verdict_id}:{verdict_version}` | 100 | 2 | **INSERT 시각 + 90s** (9/16 코드 대조, 백엔드 `JobKind.SENTENCE` 90. AI `dispatch.py` 도 90. 원문 `confirmed_at + 10s` → D-24 10s) | `{verdict_id, verdict_version, post_id}` | `verdict_id` / `verdict_version` |
 | 판결 최초 저장(finalize 또는 watchdog) | `RETAIN` / `sentence.finalized` | `retain:verdict:{verdict_id}:{version}` | 10 | 5 | null | `{event:"sentence.finalized", verdict_id, comment_id:null, version}` — `version` = `verdict_version` (9/14 코드 대조) | `verdict_id` / `version` |
-| 템플릿 저장·재시도 필요 | `TEXT_RETRY` / `verdict.text_retry` | `text-retry:{verdict_id}:{verdict_version}:{round}` | 50 | 1 | INSERT 시각 + 20s | `{verdict_id, verdict_version, round, intensities?}` — `intensities` 는 선택 (9/14 코드 대조) | `verdict_id` / `verdict_version` |
+| 템플릿 저장·재시도 필요 | `TEXT_RETRY` / `verdict.text_retry` | `text-retry:{verdict_id}:{verdict_version}:{round}` | 50 | 1 | **INSERT 시각 + 60s** (9/16, `TEXT_RETRY_TIMEOUT_SECONDS` 60 과 같게. 백엔드 `JobKind.TEXT_RETRY` 는 아직 20 → §0.1) | `{verdict_id, verdict_version, round, intensities?}` — `intensities` 는 선택 (9/14 코드 대조) | `verdict_id` / `verdict_version` |
 | 승인된 댓글(안전 검토 통과) | `RETAIN` / `comment.approved` | `retain:comment:{comment_id}:{version}` | 10 | 5 | null | `{event:"comment.approved", verdict_id:null, comment_id, version}` (9/14 코드 대조) | `comment_id` / `version` |
 
 - (원문) RETAIN payload `{event:"sentence.finalized", verdict_id, verdict_version}` · `{event:"comment.approved", comment_id, comment_version}`, dedupe `retain:verdict:{verdict_id}:{verdict_version}` · `retain:comment:{comment_id}:{comment_version}`, TEXT_RETRY payload `{verdict_id, verdict_version, round, intensities[]}`
@@ -155,7 +158,7 @@ VALUES (gen_random_uuid(), gen_random_uuid(), 'verdict.confirmed', 'SENTENCE', '
         100, 2, now() + interval '10 seconds', :trace_id)
 ON CONFLICT (dedupe_key) DO NOTHING;   -- 같은 업무 트랜잭션 안. commit 뒤 워커가 250ms 안에 집는다
 ```
-- (9/14 코드 대조) 마감은 `now() + 10s`(D-24, AI 저장소 `scripts/enqueue_job.py` 가 같은 규약으로 넣는다). (원문) `:confirmed_at + interval '10 seconds'`
+- (9/16 코드 대조) 마감은 `now() + 90s`(백엔드 `JobKind.SENTENCE`, AI `dispatch.py`·`scripts/enqueue_job.py` 도 90). 9/14 D-24 의 10s 는 노드 상한(3·6·4)과 함께 "첫 결과 10초" 전제였고, luna 실측(03 §3.6)으로 폐기. (원문) `:confirmed_at + interval '10 seconds'`
 - **`(제안)` SENTENCE 게이트(9/14 D-24, §15.5):** 평결 확정 시점에 같은 `post_id` 의 `PREPARE` job 이 `QUEUED`·`RUNNING` 이면 SENTENCE 를 바로 넣지 않는다. 백엔드 스케줄러(§6 watchdog 250ms 스캔에 합쳐도 된다)가 **PREPARE 가 종료(`SUCCEEDED`·`FAILED`·`CANCELLED`)되거나 `confirmed_at + 30s` 에 도달하면** 그때 INSERT 하고, `verdicts.deadline_at` 과 job `deadline_at` 을 **INSERT 시각 + 10s** 로 둔다. 기다리는 동안 `sentence_status=PENDING`·`text_status=PENDING`, 공개 API 는 `view=null`(§9 대기 메시지). PREPARE job 이 아예 없으면(재처리 중 삭제 등) 바로 INSERT (9/14 코드 대조) 가짜 백엔드 재현은 PREPARE 를 `payload->>'post_id'` 로 찾고 INSERT 시각은 DB `now()` 다. 로컬 도구 `scripts/enqueue_job.py` 의 SENTENCE 는 기본으로 PREPARE 를 기다린다(`--no-wait-prepare`, `--prepare-wait-seconds` 기본 30) — 운영 INSERT 는 백엔드 몫
 - `payload` 에는 **참조(ID·version)만.** 사유·댓글을 작업마다 복제하지 않는다
 - `dismissed`(정족수 미달 각하)는 **선고 작업을 만들지 않는다.** `disagree`(살까 말까 부결)는 만든다 — 양형관만 건너뛴다
@@ -304,7 +307,7 @@ COMMIT
 5. `RETAIN` 과 `TEXT_RETRY` round 1 을 같은 트랜잭션에 기록
 6. 이전 워커 응답은 generation/상태 불일치로 거부
 **엄밀한 10,000ms 보장은 아니다.** `confirmed_at → 첫 노출 저장` p95 를 측정하고 프론트 표시 지연을 별도로 합산한다.
-- 9/14 D-24: 마감 기준은 SENTENCE INSERT 시각이다(§3 게이트). PREPARE 대기(최대 30초) 동안은 watchdog 대상이 아니다(`deadline_at` 이 아직 없다). 체감 지연 = PREPARE 대기 + 10초 상한
+- 9/14 D-24: 마감 기준은 SENTENCE INSERT 시각이다(§3 게이트). PREPARE 대기(최대 30초) 동안은 watchdog 대상이 아니다(`deadline_at` 이 아직 없다). 체감 지연 = PREPARE 대기 + 90초 상한(9/16, 원문 10초). 검수가 1회에 통과하면 40초대, repair 까지 가면 60초대(백엔드 관측)
 - (9/14 코드 대조) 4단계 이전 job 상태가 08 §3.1(늦게 끝난 워커의 `complete`)과 어긋난다. AI 테스트는 **`CANCELLED`**(워커 complete 는 0행)로 고정했다. 실제 구현 확인 회신 대기(§14)
 
 ## 7. 재시도 round · reaper (proposal2 §8.3·§11.2)
@@ -453,7 +456,7 @@ WHERE status = 'RUNNING' AND lease_until < now();
 | ID | 결정 | 백엔드에 걸리는 것 |
 |---|---|---|
 | D-08 | AI 파트 **2명**, 일정 그대로(07 보류 없음, M3 9/15 유지) | 없음 |
-| D-07 | `GUARDRAIL_POLICY_VERSION=guardrail-v2` 로 시작. 팀 비준은 M3 검수(9/15) 때, 미비준 시 v1 | finalize 가 저장하는 정책 버전 문자열이 `guardrail-v2`. (9/14 코드 대조: `APP_ENV=production` 이면 환경에 **명시하지 않으면 기동 실패**, §16.1) |
+| D-07 | `GUARDRAIL_POLICY_VERSION=guardrail-v2` 로 시작. 팀 비준은 M3 검수(9/15) 때, 미비준 시 v1. **9/16: 검사표 내용만 개정하고 버전 문자열은 유지**(백엔드 허용 목록이 v2 까지라, §0.1) | finalize 가 저장하는 정책 버전 문자열이 `guardrail-v2`. (9/14 코드 대조: `APP_ENV=production` 이면 환경에 **명시하지 않으면 기동 실패**, §16.1) |
 | D-19 | 양형 이유 템플릿 치환 **확정으로 닫음**(팀 확인 불필요) | §5 `reason_source=TEMPLATE` 그대로 |
 | D-04 | 방 댓글 말투 예시는 **P0 제외**, `ROOM_COMMENT_STYLE_ENABLED=false` 유지. retain 은 한다 | `resolve-evidence` 의 `style_comments` 는 P0 에서 빈 배열 |
 | D-22 | 모델 동시성 8 로 시작, 429 시 하향 | 없음 |
@@ -472,7 +475,7 @@ WHERE status = 'RUNNING' AND lease_until < now();
 | ID | 결정 | 백엔드가 할 일 | AI 파트가 할 일 |
 |---|---|---|---|
 | **D-24** | **SENTENCE 는 PREPARE 가 끝난 뒤 시작한다.** 평결 확정 때 PREPARE 가 진행 중이면 최대 **30초** 기다린다. 판결문은 맨 나중에 나오므로 체감 비용이 작다. 마감 10초는 SENTENCE INSERT 시각부터 | §3 게이트·§6 마감 기준 변경(`(제안)`, §14) | 없음(워커는 SENTENCE 를 받은 시점 기준 그대로). 가짜 백엔드·통합 테스트에 게이트 반영 |
-| **D-25** | **준비 자료 폴백 계단.** ① 조서+드립 → ② 조서만(`DOSSIER_READY`) → ③ PREPARE 실패로 게이트 해제 → ④ 즉석 조서(INLINE, 드립 생략) — **서기·검수·finalize 시간(서기 상한 + 검수 상한 + finalize 0.5초, 구현 `inline_context_reserve`. PR #33 이후 `reserve_after(SENTENCING)` 은 0)을 먼저 남기고 남는 시간이 있을 때만** → ⑤ 최소 조서(MINIMAL, 모델 호출 0) → ⑥ watchdog 템플릿 + TEXT_RETRY. 기본 상한(서기 6초·검수 4초)에서는 10초 마감 안에 ④ 가 들어가지 않아 ⑤ 로 간다 — 상한을 낮추면 자동으로 ④ 가 켜진다 | 없음 | 05 §3.3 `inline_context` 조건을 이 규칙으로(9/14 리뷰 결함(조서가 서기 시간을 먹음) 해소) |
+| **D-25** | **준비 자료 폴백 계단.** ① 조서+드립 → ② 조서만(`DOSSIER_READY`) → ③ PREPARE 실패로 게이트 해제 → ④ 즉석 조서(INLINE, 드립 생략) — **서기·검수·finalize 시간(서기 상한 + 검수 상한 + finalize 0.5초, 구현 `inline_context_reserve`. PR #33 이후 `reserve_after(SENTENCING)` 은 0)을 먼저 남기고 남는 시간이 있을 때만** → ⑤ 최소 조서(MINIMAL, 모델 호출 0) → ⑥ watchdog 템플릿 + TEXT_RETRY. (9/16) 상한 서기 10·검수 30 + 마감 90초에서는 예약 40.5초를 빼고도 남아 ④ 가 켜진다. (원문) 기본 상한(서기 6초·검수 4초)에서는 10초 마감 안에 ④ 가 들어가지 않아 ⑤ 로 간다 | 없음 | 05 §3.3 `inline_context` 조건을 이 규칙으로(9/14 리뷰 결함(조서가 서기 시간을 먹음) 해소) |
 | **D-26** | **게시물 삭제·공유 철회·탈퇴 시 진행 중 작업을 끈다.** 결과를 버리는 것(epoch 검사)에 더해, 모델 비용이 더 나가지 않게 한다 | §8 무효화 트랜잭션에서 영향 job `CANCELLED`(`(제안)`, §14) | 모델 호출 직전 epoch 확인 → 달라졌으면 호출 0·`EVIDENCE_INVALIDATED`. heartbeat 취소 경로 통합 테스트 |
 | **D-27** | **입력이 바뀌면 바뀐 부분만 다시 만든다.** 준비 자료 유효 판정을 한 덩어리 `input_hash` 대신 부분 키로: 조서 = 게시물 필드·심문 결과·방 규칙 버전(epoch 은 키에 넣지 않고 dossier `privacy_versions` == 스냅샷 비교로 따로 본다), 드립 후보 = 조서 + 그 강도(강도별). 방 강도만 바뀌면 드립만, 규칙 버전이 바뀌면 조서부터. **epoch 가 바뀐 것(삭제·철회)은 부분 재사용하지 않는다.** 모델 호출 단위 캐시(`node_results`)는 그대로. 조서 키에 메모리 recall 결과·`audience_version` 은 넣지 않는다 — recall 은 시간에 따라 바뀌어 넣으면 재사용이 거의 안 되고, 대가로 새 과거 기록이 생겨도 게시물·심문 결과·규칙 버전이 같으면 이전 조서를 쓴다(9/14 코드 대조) | 없음(방 강도·규칙 변경 때 PREPARE 재INSERT 는 기존 규약) | 05 §3.2 `input_hash`·§3.3 `load_valid_prep` 을 부분 키로. DDL 은 기존 컬럼(`dossiers.snapshot_hash`·`trial_prep.banter_json`)으로 먼저, 부족하면 결정 요청 |
 | **9/14 거부 본문** | AI API 거부 응답 본문을 백엔드와 같은 `{"code"}` 로 통일. 스키마 위반은 422 `INVALID_REQUEST` | 없음(이미 `{"code"}`) | AI API 예외 핸들러 |
@@ -507,7 +510,7 @@ Spring/Elastic Beanstalk에 등록한 값은 별도 EC2의 AI 컨테이너로 �
 | `SERVICE_AUTH_TOKEN` | 내부 API 서비스 토큰(양쪽 같은 값) | AI API 는 전부 401(열어 두지 않음), 워커 → 백엔드도 401 | §4.7 |
 | `ALERT_DISCORD_WEBHOOK_URL` | 팀 디스코드 웹훅 | 알림 없음 | §15.3 |
 
-- 시간 예산 키 `INTAKE_TIMEOUT_SECONDS`(기본 4)·`SENTENCING_NODE_TIMEOUT_SECONDS`·`WRITER_NODE_TIMEOUT_SECONDS`·`EVALUATOR_NODE_TIMEOUT_SECONDS` 는 소수를 받는다(9/14, 기본값 불변). 운영에서는 적지 않는다
+- 시간 예산 키 `INTAKE_TIMEOUT_SECONDS`(기본 4)·`SENTENCING_NODE_TIMEOUT_SECONDS`(12)·`WRITER_NODE_TIMEOUT_SECONDS`(10)·`EVALUATOR_NODE_TIMEOUT_SECONDS`(30)·`TEXT_RETRY_TIMEOUT_SECONDS`(60)는 소수를 받는다(9/14). **운영에서는 적지 않는다** — 9/16 기본값을 실측으로 올렸으니 `.env` 에 옛 값(3·6·4·20)이 남아 있으면 지운다. 기본값보다 낮추면 검수관이 TIMEOUT 나 매 판결이 템플릿이 된다
 - 서기·드립 모델(`MODEL_WRITER`)에 추론 모델(`grok-4.6`·`4.5`·`4.3`)을 넣으면 환경과 무관하게 기동 실패
 
 ### 16.2 AI API 엔드포인트

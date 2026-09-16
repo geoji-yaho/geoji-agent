@@ -43,21 +43,40 @@ HTTP 클라이언트 3곳에 HTTP/1.1을 명시했고 Uvicorn 기본 `auto`로 �
 
 ### 실제 Spring + 테스트 모델 E2E
 
-Docker, JDK 25, 빌드된 백엔드 JAR가 필요하다. 새 전용 DB만 만들며 외부 모델 키를 제거한다.
+Docker, JDK 25, 빌드된 백엔드 JAR(`./gradlew bootJar -x test`)가 필요하다. 새 전용 DB만 만들며 외부 모델 키를 제거한다.
+macOS·Linux·Windows 에서 같은 명령이다(9/16 Windows 이식: 프로세스 그룹·종료·java 경로·글꼴만 OS 별).
+`--java-home` 은 `JAVA_HOME` 이 있으면 생략한다.
 
 ```bash
-PYTHONPATH=src .venv/bin/python scripts/run_local_e2e.py \
-  --backend /path/to/geoji-server --frontend /path/to/geoji-web \
-  --java-home /path/to/jdk-25/Contents/Home --keep
+uv run scripts/run_local_e2e.py --backend /path/to/geoji-server --frontend /path/to/geoji-web --keep
 # 출력된 geoji-e2e-* 디렉터리로 Vite 실행(Node 24, pnpm 필요)
-.venv/bin/python scripts/start_local_e2e_web.py /path/to/geoji-e2e-run --frontend /path/to/geoji-web
+uv run scripts/start_local_e2e_web.py /path/to/geoji-e2e-run --frontend /path/to/geoji-web
 # 브라우저: http://localhost:3800
-.venv/bin/python scripts/stop_local_e2e.py /path/to/geoji-e2e-run
+uv run scripts/stop_local_e2e.py /path/to/geoji-e2e-run
 ```
 
 `--keep` 없이 실행하면 자동 종료한다. `report.json`은 검증 결과이며, `state.json`에는
-짧게 사용하는 로컬 JWT·DB 비밀번호가 있어 공유하지 않는다. 실제 유료 모델 실측은 별도
-`scripts/run_local_live_e2e.py`를 사용한다. 기본 실행은 비용 없는 계획 출력이다.
+짧게 사용하는 로컬 JWT·DB 비밀번호가 있어 공유하지 않는다.
+
+### 실제 모델로 판결문 보기 (유료, 실측)
+
+`scripts/run_local_live_e2e.py` 는 같은 스택을 **실제 키**(루트 `.env` 의 `OPENAI_API_KEY`·`XAI_API_KEY`)로 띄워
+게시물 1건을 등록하고 배심원 3명이 투표한 뒤 판결문을 stdout 과 `report.json` 의 `verdict` 에 남긴다.
+인자 없이 실행하면 비용 없는 계획 출력이다. 호출 수·예약 상한을 넘으면 그 호출은 `BUDGET` 으로 막힌다.
+server main 에 아직 없는 짤 관리자 API·PNG 렌더(10 §16.6)는 404 면 건너뛰고 `report.json` 의 `skipped` 에 적는다.
+
+```bash
+uv run scripts/run_local_live_e2e.py                                   # 계획만 출력
+uv run scripts/run_local_live_e2e.py --execute-approved \
+  --backend /path/to/geoji-server --frontend /path/to/geoji-web \
+  --intensity hell --keep                                              # mild|spicy|hell, 기본 12회·$0.15
+# 끝나면 "===== 판결문 =====" 블록이 찍힌다. --keep 이면 같은 디렉터리로 웹을 띄워 화면에서도 본다
+uv run scripts/start_local_e2e_web.py /path/to/geoji-e2e-run --frontend /path/to/geoji-web
+uv run scripts/stop_local_e2e.py /path/to/geoji-e2e-run
+```
+
+Windows 에서 한글이 깨지면 `PYTHONUTF8=1` 을 앞에 둔다. 다른 강도를 보려면 `--intensity` 로 방 강도를 바꿔
+다시 돌린다(판결문은 방 강도로만 나온다). 예산은 `--max-calls`·`--cap-usd`.
 
 ### 큐와 워커 (02 §4.3)
 
@@ -133,13 +152,13 @@ uv run python tools/gen_contracts.py
 | `MODEL_WRITER` | `grok-4.20-0309-non-reasoning` | 서기·드립. 추론 모델(`grok-4.6`·`4.5`·`4.3`)이면 기동 실패 |
 | `MODEL_EVALUATOR_HELL` | `gpt-5.6-luna` | 지옥맛 검수관 |
 | `PROMPT_BUNDLE_VERSION` | `bundle-v1` | `prompts/` 파일 해시로 만든다 |
-| `GUARDRAIL_POLICY_VERSION` | `guardrail-v2` | `guardrail-v1` \| `guardrail-v2`(D-07). **production 에서는 환경변수에 직접 적어야 한다.** 안 적고 기본값에 기대면 기동 실패 |
+| `GUARDRAIL_POLICY_VERSION` | `guardrail-v2` | `guardrail-v1` \| `guardrail-v2`(D-07). 검사표 내용은 9/16 개정(지옥맛 비속어 제한 해제). **production 에서는 환경변수에 직접 적어야 한다.** 안 적고 기본값에 기대면 기동 실패 |
 | `INTAKE_TIMEOUT_SECONDS` | `4` | 심문관 |
-| `FIRST_RESULT_TARGET_SECONDS` | `10` | 첫 결과 목표 |
+| `FIRST_RESULT_TARGET_SECONDS` | `90` | 첫 결과 목표. 9/16 백엔드 SENTENCE 마감 90초에 맞춤(옛 10) |
 | `REPAIR_PATH_BUDGET_SECONDS` | `15` | 복구 경로 예산 |
-| `SENTENCING_NODE_TIMEOUT_SECONDS` | `3` | 작업 3 실측 후 조정 |
-| `WRITER_NODE_TIMEOUT_SECONDS` | `6` | |
-| `EVALUATOR_NODE_TIMEOUT_SECONDS` | `4` | 작업 3 실측 후 조정 |
+| `SENTENCING_NODE_TIMEOUT_SECONDS` | `12` | 9/16 luna 실측 p90 5.7초·백엔드 관측 8.6초(옛 3) |
+| `WRITER_NODE_TIMEOUT_SECONDS` | `10` | grok 실측 p90 5.8초 + repair 여유(옛 6) |
+| `EVALUATOR_NODE_TIMEOUT_SECONDS` | `30` | 9/16 luna 실측 13.9~17.3초, reasoning 900~1,400 토큰(옛 4 — 늘 TIMEOUT 이었다) |
 | `WORKER_POLL_MS` | `250` | 작업 2 |
 | `JOB_LEASE_SECONDS` | `15` | 작업 2 |
 | `HEARTBEAT_SECONDS` | `5` | 작업 2 |
@@ -150,7 +169,7 @@ uv run python tools/gen_contracts.py
 | `INLINE_CONTEXT_MIN_REMAINING_MS` | `8500` | 작업 5 |
 | `IMMEDIATE_REPAIR_MAX` | `1` | |
 | `TEXT_RETRY_ROUNDS` | `3` | |
-| `TEXT_RETRY_TIMEOUT_SECONDS` | `20` | |
+| `TEXT_RETRY_TIMEOUT_SECONDS` | `60` | 서기 10 + 검수 30 + finalize. 백엔드 TEXT_RETRY 마감도 60 이어야 한다(옛 20) |
 | `RECALL_CANDIDATE_LIMIT` | `20` | 작업 4 |
 | `EVIDENCE_PACK_LIMIT` | `12` | 작업 4 |
 | `STYLE_EXAMPLE_LIMIT` | `3` | 작업 4 |
@@ -160,11 +179,11 @@ uv run python tools/gen_contracts.py
 | `MAX_TOTAL_PROMPT_TOKENS` | `6000` | |
 | `WRITER_MAX_PROMPT_TOKENS` | `8000` | |
 | `INTAKE_MAX_OUTPUT_TOKENS` | `300` | 잘리면 스키마 실패로 처리한다 |
-| `CONTEXT_MAX_OUTPUT_TOKENS` | `700` | |
+| `CONTEXT_MAX_OUTPUT_TOKENS` | `1500` | 9/16 luna reasoning 포함(옛 700) |
 | `BANTER_MAX_OUTPUT_TOKENS` | `1200` | |
-| `SENTENCING_MAX_OUTPUT_TOKENS` | `400` | |
+| `SENTENCING_MAX_OUTPUT_TOKENS` | `2000` | 9/16 luna reasoning 이 400 을 다 먹어 형량이 RULE 로 떨어졌다(옛 400) |
 | `WRITER_MAX_OUTPUT_TOKENS` | `700` | 강도 1개당 |
-| `EVALUATOR_MAX_OUTPUT_TOKENS` | `800` | |
+| `EVALUATOR_MAX_OUTPUT_TOKENS` | `3000` | OpenAI 는 reasoning 토큰을 포함해 센다(옛 800 이면 잘림) |
 | `ROOM_COMMENT_STYLE_ENABLED` | `false` | |
 | `PUBLIC_HISTORY_CALLBACK_ENABLED` | `false` | |
 | `REFLECT_ENABLED` | `false` | |

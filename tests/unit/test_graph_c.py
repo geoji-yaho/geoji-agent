@@ -63,6 +63,17 @@ class Rejected(Exception):
         self.code = code
 
 
+#: 05 §3.1 스펙 단위 케이스가 쓴 "첫 결과 10초" 시절 노드 상한(3·6·4)과 TEXT_RETRY 20초.
+#: 9/16 luna 실측으로 제품 기본값은 12·10·30·60 이 됐다(01 §3.7). 여기 케이스는 timeout
+#: 산식(`min(상한, 남은 − 예약)`)을 고정하는 것이라 옛 상한을 명시해 두고 돈다.
+SPEC_CAPS: dict[str, Any] = {
+    "SENTENCING_NODE_TIMEOUT_SECONDS": 3,
+    "WRITER_NODE_TIMEOUT_SECONDS": 6,
+    "EVALUATOR_NODE_TIMEOUT_SECONDS": 4,
+    "TEXT_RETRY_TIMEOUT_SECONDS": 20,
+}
+
+
 class FakeClock:
     def __init__(self) -> None:
         self.now = 1000.0
@@ -355,7 +366,7 @@ def run(
         llm=llm,
         preparation=preparation or FakePreparation(make_prep() if prep == "default" else prep),
         semaphore=asyncio.Semaphore(8),
-        settings=settings or Settings(_env_file=None),
+        settings=settings or Settings(_env_file=None, **SPEC_CAPS),
         generation_id=GENERATION_ID,
         worker_id=WORKER_ID,
         notifier=notifier,
@@ -764,6 +775,35 @@ def report(intensities: Iterable[str], fail: Iterable[str] = ()) -> dict[str, An
     return base
 
 
+def test_31_evaluator_splits_one_intensity_into_two_entries() -> None:
+    """검수관이 같은 강도를 위반별로 쪼개 내도 하나로 합쳐 판정한다(9/16).
+
+    옛 동작: `validate_evaluation` 이 `DUPLICATE_INTENSITY` 를 내고, 그 코드는 강도별이 아니라
+    전역이라 재검수 없이 `EVAL_FAILED` 였다(15 §6 6회차).
+    """
+    split = report(["spicy", "hell"])
+    hell = split["texts"][1]
+    split["texts"] = [split["texts"][0], dict(hell), dict(hell)]
+    result = run(ScriptedLLM(sequences={"evaluator": [split, None]}))
+
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [("spicy", "AI"), ("hell", "AI")]
+    assert [t.intensity for t in req.evaluation.texts] == ["spicy", "hell"]
+    assert result.backend.failed == []
+
+
+def test_31b_splitted_entries_fail_if_any_says_false() -> None:
+    """쪼개진 항목 중 하나라도 `pass=false` 면 그 강도는 검수 실패로 본다."""
+    split = report(["spicy", "hell"])
+    failed_hell = report(["spicy", "hell"], fail=["hell"])["texts"][1]
+    split["texts"] = [split["texts"][0], dict(split["texts"][1]), failed_hell]
+    result = run(ScriptedLLM(sequences={"evaluator": [split, report(["hell"]), None]}))
+
+    # hell 만 재작성 대상이 된다.
+    assert result.state["repair_count"] == 1
+    assert [writer_intensity(c) for c in result.calls_of("writer")] == ["spicy", "hell", "hell"]
+
+
 def writer_angle(call: FakeCall) -> str:
     return call.schema["properties"]["attack_angle"]["enum"][0]
 
@@ -837,6 +877,93 @@ def test_18_no_repair_when_less_than_5s_remain() -> None:
         ("spicy", "AI"),
         ("hell", "TEMPLATE"),
     ]
+
+
+class RuleBreakingWriter(ScriptedLLM):
+    """주어진 강도의 서기 호출 `break_calls` 번만 서버 검증 ⑤ 규칙 6 위반 문장을 넣는다.
+
+    mild·spicy 는 비속어 0개라 "지랄" 하나로 `PROFANITY_OUT_OF_LIST` 가 난다(9/16 기준 hell 은
+    비속어를 검사하지 않는다).
+    """
+
+    def __init__(self, intensity: str = "spicy", break_calls: int = 1, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.break_intensity = intensity
+        self.break_calls = break_calls
+        self.broken = 0
+
+    async def structured_call(self, *, role: Any, messages: list[dict], schema: dict, **kw: Any):
+        result = await super().structured_call(role=role, messages=messages, schema=schema, **kw)
+        wanted = self._requested_intensity(schema)
+        if (
+            role == "writer"
+            and wanted == self.break_intensity
+            and self.broken < self.break_calls
+            and result.output is not None
+        ):
+            self.broken += 1
+            output = dict(result.output)
+            statement = [dict(item) for item in output["statement"]]
+            statement[-1] = {**statement[-1], "text": "지랄 같은 선택이다."}
+            output["statement"] = statement
+            result = replace(result, output=output)
+        return result
+
+
+def test_30_server_rule_violation_goes_to_writer_repair() -> None:
+    """서버 검증 ⑤ 위반 → 곧바로 TEMPLATE 이 아니라 재작성 1회(9/16).
+
+    재작성이 깨끗한 문구를 내면 그 강도는 AI 로 남는다.
+    """
+    result = run(RuleBreakingWriter())
+
+    assert result.roles()["writer"] == 3  # 최초 2 + spicy 재작성 1
+    assert result.state["repair_count"] == 1
+    assert result.state["draft_sources"] == {Intensity.spicy: "AI", Intensity.hell: "AI"}
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [("spicy", "AI"), ("hell", "AI")]
+    assert result.backend.failed == []
+
+
+def test_30b_single_intensity_room_recovers_by_repair() -> None:
+    """공유 방이 하나(대상 강도 1개)여도 규칙 위반 한 번으로 끝나지 않는다.
+
+    옛 동작: 그 하나가 TEMPLATE → `all(TEMPLATE)` → 검수관을 부르지도 못하고 `EVAL_FAILED`.
+    같은 위반인데 방 개수로 결과가 갈리던 것을 고쳤다(15 §6).
+    """
+    snapshot = make_snapshot(target_intensities=["spicy"], default_intensity="spicy")
+    result = run(RuleBreakingWriter(), snapshot=snapshot)
+
+    assert result.roles()["writer"] == 2  # 최초 1 + 재작성 1
+    assert result.roles()["evaluator"] == 1  # 검수관까지 갔다
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [("spicy", "AI")]
+    assert result.backend.failed == []
+
+
+def test_30c_repair_budget_exhausted_falls_back_to_template() -> None:
+    """재작성이 또 규칙을 어기면 예전처럼 TEMPLATE 이다. 재작성은 한 판결에 1회."""
+    snapshot = make_snapshot(target_intensities=["spicy"], default_intensity="spicy")
+    result = run(RuleBreakingWriter(break_calls=2), snapshot=snapshot)
+
+    assert result.roles()["writer"] == 2
+    assert result.state["repair_count"] == 1
+    assert result.backend.failed == ["EVAL_FAILED"]
+    assert result.backend.finalized == []
+
+
+def test_30d_regenerate_does_not_repair_on_rule_violation() -> None:
+    """REGENERATE(TEXT_RETRY)는 round 안 보정이 없다. 규칙 위반이면 저장 없이 실패한다."""
+    result = run(
+        RuleBreakingWriter(),
+        backend_kwargs={"fixed": FIXED, "remaining_s": 60.0},
+        kind="TEXT_RETRY",
+    )
+
+    assert result.roles()["writer"] == 2  # 재작성 없음
+    assert result.state["repair_count"] == 0
+    assert result.backend.failed == ["EVAL_FAILED"]
+    assert result.backend.finalized == []
 
 
 FIXED = {"sentence": "probation", "sentencing_reason": "고정된 이유", "reason_source": "AI"}
@@ -930,7 +1057,9 @@ def test_29_regenerate_budget_is_text_retry_timeout(
         backend_kwargs={"fixed": FIXED, "remaining_s": 60.0},
         kind="TEXT_RETRY",
         clock=clock,
-        settings=Settings(_env_file=None, TEXT_RETRY_TIMEOUT_SECONDS=retry_timeout_s),
+        settings=Settings(
+            _env_file=None, **{**SPEC_CAPS, "TEXT_RETRY_TIMEOUT_SECONDS": retry_timeout_s}
+        ),
     )
     assert result.backend.failed == failed
     if failed:
