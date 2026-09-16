@@ -1,0 +1,14 @@
+{
+  "checked_at": "2026-09-15T14:43:57.033907+00:00",
+  "scope": "real backend + real AI API/worker, no vendor keys, fallback only",
+  "results": {
+    "posts": 12,
+    "votes": 26,
+    "template_verdicts": 10,
+    "texts": 10,
+    "succeeded_jobs": 52,
+    "other_jobs": 0,
+    "model_calls": 0,
+    "meme_images": 0
+  }
+}

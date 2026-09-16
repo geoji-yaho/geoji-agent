@@ -26,7 +26,7 @@ from geoji_ai.contracts.jobs import Job
 from geoji_ai.core.config import Settings
 from geoji_ai.core.logging import get_logger
 from geoji_ai.graphs.preparation import PrepareDeps, run_preparation
-from geoji_ai.ports.backend import BackendPort
+from geoji_ai.ports.backend import BackendPort, SnapshotNotFound
 from geoji_ai.ports.jobs import JobsPort
 from geoji_ai.ports.llm import LLMPort
 from geoji_ai.ports.memory import MemoryPort
@@ -70,6 +70,11 @@ class PrepareHandler:
         )
         try:
             state = await run_preparation(job, deps)
+        except SnapshotNotFound as exc:
+            await ctx.jobs.cancel(
+                job.id, ctx.worker_id, ctx.generation_id, error_code=exc.error_code
+            )
+            return
         except EvidenceInvalidated as exc:
             instrument.count("invalidated_evidence_total")
             await ctx.jobs.fail(
