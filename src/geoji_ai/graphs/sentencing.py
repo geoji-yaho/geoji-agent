@@ -475,18 +475,11 @@ def _merge_same_intensity(entries: Sequence[Mapping[str, Any]]) -> list[dict[str
 
 
 def _dedup_dicts(items: Sequence[Any]) -> list[Any]:
-    """순서를 지키면서 같은 내용을 한 번만 남긴다(dict 는 정렬한 items 로 비교)."""
-    seen: set[Any] = set()
+    """순서를 지키며 중첩 배열(evidence_labels)을 포함한 동일 위반도 제거한다."""
     out: list[Any] = []
     for item in items:
-        mark = tuple(sorted(item.items())) if isinstance(item, Mapping) else item
-        try:
-            if mark in seen:
-                continue
-            seen.add(mark)
-        except TypeError:
-            pass
-        out.append(item)
+        if item not in out:
+            out.append(item)
     return out
 
 
@@ -499,9 +492,11 @@ def _merge_reports(outputs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
     for name in _EVALUATION_CHECKS:
         checks = [output.get(name) for output in outputs]
-        broken = next((check for check in checks if not isinstance(check, Mapping)), None)
-        if broken is not None or any(not isinstance(c.get("pass"), bool) for c in checks):
-            merged[name] = broken if broken is not None else {"pass": None, "violations": []}
+        if any(not isinstance(check, Mapping) for check in checks):
+            merged[name] = None
+            continue
+        if any(not isinstance(check.get("pass"), bool) for check in checks):
+            merged[name] = {"pass": None, "violations": []}
             continue
         merged[name] = {
             "pass": all(check["pass"] for check in checks),

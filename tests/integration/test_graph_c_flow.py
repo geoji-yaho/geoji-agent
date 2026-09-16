@@ -346,14 +346,19 @@ async def test_01_Banter_실패해도_DOSSIER_READY_조서로_선고한다(env: 
 
 
 #: D-25(9/14) 로 서기 상한 + 검수 상한 + finalize 예약을 남긴 뒤에만 즉석 조서를 부른다. 기본 상한
-#: (6·4)에서는 10초 안에 들어가지 않아, INLINE 경로는 상한을 낮춘 설정으로 본다(제품 값 아님).
+#: (10·30)에서는 40.5초를 예약하므로, INLINE 경로는 상한을 낮춘 설정으로 본다(제품 값 아님).
 _LOW_CAPS: dict[str, Any] = {"WRITER_NODE_TIMEOUT_SECONDS": 2, "EVALUATOR_NODE_TIMEOUT_SECONDS": 2}
 
 
 @pytest.mark.parametrize(
     ("remaining_s", "caps", "source"),
-    [(8.4, {}, "MINIMAL"), (10.0, {}, "MINIMAL"), (10.0, _LOW_CAPS, "INLINE")],
-    ids=["8.4s_MINIMAL", "기본상한_10s_MINIMAL", "서기2_검수2_10s_INLINE"],
+    [
+        (8.4, {}, "MINIMAL"),
+        (10.0, {}, "MINIMAL"),
+        (35.0, {}, "MINIMAL"),
+        (10.0, _LOW_CAPS, "INLINE"),
+    ],
+    ids=["8.4s_MINIMAL", "기본상한_10s_MINIMAL", "기본상한_35s_MINIMAL", "서기2_검수2_10s_INLINE"],
 )
 async def test_02_prep_없으면_남은시간으로_MINIMAL_또는_INLINE(
     env: Env, remaining_s: float, caps: dict[str, Any], source: str
@@ -372,10 +377,15 @@ async def test_02_prep_없으면_남은시간으로_MINIMAL_또는_INLINE(
         assert llm.roles()["context"] == 0
         assert "resolve-evidence" not in env.paths()
         assert [label for label, _ in labels] == ["F0"]
-        # 서기 fixture 문장은 F0 밖 라벨을 인용해 ⑤ 에서 걸린다(fixture 한계, 01 소유).
-        # 그래서 finalize 없이 EVAL_FAILED 로 끝나는 것까지 고정한다.
         assert env.backend.finalized == []
-        assert env.backend.failed == ["EVAL_FAILED"]
+        if remaining_s <= 10:
+            # 검수 30초 예약보다 짧으면 서기를 부르지 않는다.
+            assert llm.roles()["writer"] == 0
+            assert env.backend.failed == ["DEADLINE_EXCEEDED"]
+        else:
+            # 서기 fixture가 F0 밖 라벨을 인용해 서버 검증에서 걸린다.
+            assert llm.roles()["writer"] > 0
+            assert env.backend.failed == ["EVAL_FAILED"]
     else:
         assert llm.roles()["context"] == 1
         assert "resolve-evidence" in env.paths()

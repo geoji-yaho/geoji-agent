@@ -59,6 +59,33 @@ curl -s localhost:8100/internal/v1/trials/$POST_ID/trace -H "Authorization: Bear
 - 알림 채널: 디스코드 웹훅 `ALERT_DISCORD_WEBHOOK_URL`. 알림 조건 4종은 08 §3.3(보정 가능한 오류 1건마다
   보내지 않는다)
 
+### 판결문이 기본 문구로 나오거나 생성이 끝나지 않을 때
+
+먼저 실행 중인 worker의 로그를 확인한다. `TEMPLATE_READY`는 대체 문구 저장이며 실제 모델 생성
+성공을 뜻하지 않는다. 저장소 테스트 통과만으로 운영 모델·키·백엔드 연결 상태를 확인할 수 없다.
+
+```bash
+docker compose -f docker-compose.prod.yml logs --since 30m ai-worker \
+  | rg 'sentence_summary|sentence_fallback|sentence_call|HANDLER_ERROR|ledger_reserve_failed'
+```
+
+같은 `job_id`·`generation_id`의 `sentence_call` → `sentence_fallback` → `sentence_summary`를
+따라가며 최초 실패 역할과 코드를 확인한다.
+
+| 기록 | 확인할 것 |
+| --- | --- |
+| `AI_NOT_READY` | worker에 두 모델 키가 모두 없는지 확인. API와 worker 설정은 각각 확인한다 |
+| 서기 `NO_BUDGET`·`DEADLINE_EXCEEDED` | 백엔드 마감과 AI 노드 상한이 맞는지 확인. 현재 기본값은 SENTENCE 90초·TEXT_RETRY 60초이며, 옛 10초 마감이면 검수 예약 30초 때문에 서기를 시작하지 못한다 |
+| `AUTH`·`TRANSPORT`·`TIMEOUT` | 해당 역할의 벤더 키·연결·시간 제한 확인. 키 원문은 공유하지 않는다 |
+| `BUDGET_EXCEEDED` | `llm_budget_exceeded`의 예약액과 사건 상한을 확인. 별도 검수 모델을 고가 모델로 바꾸면 기본 출력 토큰 상한에서도 호출 전에 차단될 수 있다 |
+| `EVAL_FAILED` | `sentence_fallback`의 상세 이유 확인. 검수 거부, 불완전 응답, 전 강도 템플릿을 구분한다 |
+| finalize `422`·`SCHEMA_INVALID` | 백엔드의 계약·정책 버전과 AI 설정을 비교한다 |
+
+9/17 회귀 테스트로 검수 결과 병합의 두 오류를 재현했다. `evidence_labels` 배열 때문에 동일 위반이
+제거되지 않아 계약 상한을 초과하던 경로는 중첩 값 비교로 고쳤다. 별도 지옥맛 검수 응답에서 필수
+검사가 null·누락이면 예외로 중단되던 경로는 `EVAL_FAILED`를 보고하도록 고쳤다. 이 증거만으로
+개별 운영 장애의 원인을 단정하지 않으며, 해당 사건의 로그와 대조한다.
+
 ## 5. 원장 정리 (하루 1회)
 
 `UNKNOWN` 호출의 예약액을 `spent` 로 확정(보수적)하고 리포트한다(08 §3.2). 백엔드 스케줄러 또는 cron.

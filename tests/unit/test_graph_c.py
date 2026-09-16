@@ -804,6 +804,38 @@ def test_31b_splitted_entries_fail_if_any_says_false() -> None:
     assert [writer_intensity(c) for c in result.calls_of("writer")] == ["spicy", "hell", "hell"]
 
 
+@pytest.mark.parametrize("evidence_labels", [[], ["F1"]])
+def test_split_duplicate_violations_still_allow_repair(evidence_labels: list[str]) -> None:
+    """중복 위반 합계가 계약 상한을 넘어도 고유 위반만 남겨 재작성한다."""
+    split = report(["spicy", "hell"], fail=["hell"])
+    hell = split["texts"][1]
+    violation = {**hell["violations"][0], "evidence_labels": evidence_labels}
+    hell["violations"] = [dict(violation) for _ in range(11)]
+    split["texts"].append({**hell, "violations": [dict(violation) for _ in range(11)]})
+
+    result = run(ScriptedLLM(sequences={"evaluator": [split, report(["hell"])]}))
+
+    assert result.state["repair_count"] == 1
+    assert [t.source for t in result.finalize().draft.texts] == ["AI", "AI"]
+    assert result.backend.failed == []
+
+
+def test_split_distinct_violations_over_limit_are_not_discarded() -> None:
+    """서로 다른 위반은 중복 제거로 버리거나 계약 상한에 맞춰 잘라 내지 않는다."""
+    split = report(["spicy", "hell"], fail=["hell"])
+    hell = split["texts"][1]
+    violation = hell["violations"][0]
+    hell["violations"] = [{**violation, "explanation": f"위반 {i}"} for i in range(11)]
+    split["texts"].append(
+        {**hell, "violations": [{**violation, "explanation": f"위반 {i}"} for i in range(11, 22)]}
+    )
+
+    result = run(ScriptedLLM(sequences={"evaluator": [split]}))
+
+    assert result.backend.finalized == []
+    assert result.backend.failed == ["EVAL_FAILED"]
+
+
 def writer_angle(call: FakeCall) -> str:
     return call.schema["properties"]["attack_angle"]["enum"][0]
 
@@ -1128,6 +1160,28 @@ def test_21_hell_evaluated_separately_when_model_differs() -> None:
 def test_21b_same_model_single_evaluator_call() -> None:
     result = run()
     assert [evaluator_intensities(c) for c in result.calls_of("evaluator")] == [["spicy", "hell"]]
+
+
+@pytest.mark.parametrize("check", ["sentence_check", "sentencing_reason_check"])
+@pytest.mark.parametrize("missing", [False, True])
+@pytest.mark.parametrize("broken_index", [0, 1])
+def test_split_evaluator_missing_check_reports_failure(
+    check: str, missing: bool, broken_index: int
+) -> None:
+    """분리 검수 응답이 불완전해도 핸들러 예외 대신 백엔드에 실패를 보고한다."""
+    outputs = [report(["spicy"]), report(["hell"])]
+    if missing:
+        outputs[broken_index].pop(check)
+    else:
+        outputs[broken_index][check] = None
+    result = run(
+        ScriptedLLM(sequences={"evaluator": outputs}),
+        settings=Settings(_env_file=None, MODEL_EVALUATOR_HELL="other-hell-model"),
+    )
+
+    assert result.backend.finalized == []
+    assert result.backend.failed == ["EVAL_FAILED"]
+    assert result.jobs.completed == ["job-1"]
 
 
 def test_22_epoch_mismatch_before_finalize() -> None:
