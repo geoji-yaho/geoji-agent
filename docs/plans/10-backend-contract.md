@@ -3,6 +3,7 @@
 > 근거: proposal2 §1(아키텍처), §2.2 결정 16~24, §7.1 업무 테이블 추가 필드, §8.1 이벤트·큐, §9 API 계약, §10 판결 확정 트랜잭션, §11 마감·재시도·삭제 경합, §12(정책 버전이 finalize 에 걸림), §17 짤, §19 role 분리, §20 작업 3·8 완료 기준·먼저 실패시킬 케이스, §21 백엔드·프론트 변경 계약. proposal2 는 git 에 없으므로 백엔드가 **이 파일 한 장만 읽으면** 되게 옮겨 적었다.
 > **대상 독자: 백엔드 담당. 9/14 부터 백엔드가 읽는 문서는 이 한 장이다.** 계약(§1~§12)·배포와 연동(§16)·백엔드가 할 일과 전달 상태(§0.1)·회신 대기(§14)가 모두 여기 있다. AI 파트 계획서(01~09)는 이 문서를 참조한다. 계약이 바뀌면 여기와 `01-contracts-fake-provider.md` 를 같이 고친다.
 > **9/16 인수인계:** 아래 로컬 구현은 임시 checkout의 검증용 변경이다. 백엔드 저장소에는 커밋·푸시하지 않았다. 이 문서와 참고 패치를 담당자 검토용으로만 남긴다. 키 없이 기존 b-meme 파일을 등록하는 최소 API 요청은 **§16.5**, 배포 키는 **§16.1**이다.
+> **9/16 최신 원격 대조:** agent·server·web의 `main`, web `develop`, agent의 열린 PR #40·#41을 확인했다. 실행 환경별 키 주입, 배포 PR의 `.env` 제약, 백엔드에 남은 요청은 **§16.6**이다. 아래 과거 날짜의 구현 상태와 구분해서 읽는다.
 > **9/14 코드 대조:** AI 저장소 `main`(52b6433) 코드와 어긋나던 문장을 코드 기준으로 고쳤다. 고친 곳은 `(9/14 코드 대조)`, 크게 바뀐 옛 문장은 `(원문)` 으로 남겼다. 코드에 아직 없는 백엔드 요구(`(제안)`, D-24·D-26)는 그대로 백엔드 몫이다.
 > **9/8 갱신: D-20 · D-21 · 전달 방식 · 배포는 §15 에서 확정됐다. 서버에는 재판 흐름이 아직 없으므로 §2~§9 가 전부 신규 작업이다.** (원문) **가장 먼저 답해야 할 것: D-20.** 백엔드와 AI 가 같은 Postgres 인스턴스를 쓰고, 업무 트랜잭션 안에서 `ai.jobs` 를 INSERT 할 수 있는가. 아니면 outbox 전달 계층이 먼저 필요하고 9/8~9/18 일정 전체가 흔들린다(proposal2 부록 D). **9/8 까지 회신.**
 
@@ -37,8 +38,11 @@
 
 | 날짜 | 무엇이 바뀌었나 → 백엔드가 할 일 | 절 | 상태 |
 |---|---|---|---|
+| 9/16 | 최신 배포 PR #41은 `.env` 필수이며 호스트에 export한 LLM 키만으로는 컨테이너에 전달되지 않음. AI 담당과 환경변수 전달 방식을 확정하고 **AI API·worker 각각**에 주입. Spring EB 설정만으로는 부족 | §16.1·§16.6 | 미전달 |
+| 9/16 | 백엔드 보고서 A3의 `BACKEND_INTERNAL_URL=호스트+/internal/v1` 안내를 **호스트 루트만**으로 수정. `AI_API_BASE_URL`·양방향 서비스 토큰·정책 버전·DB role·배포 이미지 태그를 함께 대조 | §16.6 | 미전달 |
+| 9/16 | 최신 server `3619f59`에도 non-guilty finalize·POST 파생 삭제·PRIOR 즉시 읽기 차단·관리자 이미지 API 참고 패치는 미반영. 프론트의 기존 `/expenses/.../trial`은 아직 Stub이므로 신규 posts 흐름으로 연결 일정 협의 | §16.4~§16.6 | 미전달 |
 | 9/16 | `(제안)` 로컬 b-meme 결과 파일을 관리자 JWT로 업로드·검수·활성화하는 API를 백엔드에 반영. OpenAI/xAI 키와 AI readiness 없이 동작해야 함. 최소 계약·키 없는 재현·수용검사는 §16.5 | §16.5 | 미전달 |
-| 9/16 | AI API와 worker에 키를 프로세스 환경변수로 주입. `.env`는 필수 아님, 환경변수가 우선. 키 교체 때 두 프로세스 재시작 | §16.1 | 미전달 |
+| 9/16 | AI API와 worker에 키를 프로세스 환경변수로 주입. Python 설정은 `.env` 없이 동작하고 환경변수가 우선. **배포 PR #41의 Compose는 별도로 `.env`를 요구하므로 §16.6 참조.** 키 교체 때 두 프로세스 재시작 | §16.1 | 미전달 |
 | 9/16 | 로컬 참고 패치 검토 요청: HTTP client 3곳 HTTP/1.1, 최초 non-guilty `sentencing:null`, 공개 camelCase/nullable, 삭제 Q2·Q3, 별도 PNG/이미지 API. 백엔드 커밋·푸시 없음 | §5·§8·§9·§16.4 | 미전달 |
 | 9/14 | D-26 무효화 트랜잭션에서 진행 중 job 끄기를 가짜 백엔드로 재현함 → 게시물 삭제·공유 철회 트랜잭션에서 epoch +1 먼저, 같은 트랜잭션에서 그 post 의 `QUEUED`·`RUNNING` PREPARE·SENTENCE·TEXT_RETRY 를 `CANCELLED`(`owner_id`·`generation_id`·`lease_until` NULL). **TEXT_RETRY payload 에는 `post_id` 가 없어 `verdict_id` → post 로 찾아야 한다.** 워커는 다음 heartbeat(기본 5초) 안에 멈추고 그 사이 나간 모델 호출 1건은 원장 `UNKNOWN` | §8 | 미전달 |
 | 9/14 | D-24 SENTENCE 게이트를 가짜 백엔드로 재현함 → 평결 확정 때 같은 post(`payload->>'post_id'`) PREPARE 가 `QUEUED`·`RUNNING` 이면 보류, PREPARE 종료(`SUCCEEDED`·`FAILED`·`CANCELLED`) 또는 `confirmed_at + 30s` 에 INSERT, job·verdict `deadline_at` = INSERT 시각(DB `now()`) + 10s. 보류 중엔 마감이 없어 watchdog 대상 아님 | §3·§6 | 미전달 |
@@ -394,6 +398,7 @@ WHERE status = 'RUNNING' AND lease_until < now();
 
 | ID | 항목 | 기한 |
 |---|---|---|
+| 배포 키 전달 `(제안)` | PR #41에서 `.env` 없는 환경변수 주입을 지원할지, 배포 시 비밀값 파일을 생성할지 합의. API/worker별 DB role, 실행 이미지 태그·CPU 아키텍처, 내부 접속 주소 확정. A3 URL 수정은 §16.6 | 운영 연동 전 |
 | 관리자 b-meme 등록 `(제안)` | §16.5의 파일 업로드·검수·활성화를 백엔드에서 소유하고 LLM 키/AI readiness와 독립시킬 것. 참고 패치의 운영 DDL/스토리지 적용은 담당자 검토 필요 | 담당자와 조율 |
 | ~~D-20~~ | **확정(§15.2)** — Supabase 인스턴스 공유. 남은 것: `ai_api`·`ai_worker`·`backend` role 생성·grants(§1 표), Session Pooler 접속 정보 | 9/9(지남) |
 | ~~D-21~~ | **확정(§15.2)** — 프론트 값 표준. 남은 것: `rooms.spice_level` 값 변경 | 9/9 |
@@ -483,6 +488,12 @@ WHERE status = 'RUNNING' AND lease_until < now();
 실행 중 자동 갱신되지 않는다. `tests/unit/test_startup.py`가 파일 없는 환경변수 로드·우선순위·
 캐시 경계를 검증한다. 관리자 파일 등록에는 OpenAI/xAI 키를 요구하지 않는다(§16.5).
 
+**(9/16 최신 코드 대조)** 위 설명은 **Python 프로세스가 실제로 받은 환경변수** 기준이다.
+Spring/Elastic Beanstalk에 등록한 값은 별도 EC2의 AI 컨테이너로 자동 전달되지 않는다.
+백엔드 담당이 배포를 맡는다면 AI API·worker의 환경에도 주입하면 되며, AI 담당이 별도 키를
+발급하거나 등록 API를 만들 필요는 없다. 열린 배포 PR #41은 현재 필수 `env_file: [.env]`를
+사용하므로, 배포 플랫폼 환경변수만으로 실행하려면 Compose 전달 설정도 맞춰야 한다(§16.6).
+
 `ai-api`·`ai-worker` 컨테이너 둘 다 같은 목록을 받는다. 키 이름 전체는 AI 저장소 `.env.example`, 기본값·설명은 AI 저장소 `README.md` 설정 표. 여기는 **직접 적어야 하는 것**만.
 
 | 키 | 값 | 없으면 | 비고 |
@@ -523,7 +534,7 @@ WHERE status = 'RUNNING' AND lease_until < now();
 | `scripts/seed_agent_db.py` | 실행만(AI 저장소) | 데모 시드(드립 예시·데모 C 메모리). 멱등. `uv run scripts/seed_agent_db.py [--banter-csv … --banter-candidates …] [--demo-user U --demo-room R --post-ids P1,P2 [--verdict-ids V1,V2] [--now ISO8601]]`(08 §3.5). `meme_catalog` 은 만들지 않는다 |
 | `scripts/seed_memory_demo_c.py` | 실행만(AI 저장소) | 데모 C 메모리만 따로. 백엔드 시드가 만든 스타벅스 post 2개·verdict 2개 id 를 받아 `uv run scripts/seed_memory_demo_c.py --user U --room R --post-ids P1,P2 [--verdict-ids V1,V2] [--now ISO8601]`. 멱등. `--now` 는 백엔드 시드 기준 시각과 맞춘다(04 §3.6, §12) |
 | `docs/runbook.md` | 참조 | 헬스·알림·비용 경고·롤백·동결·토큰 회전 절차(08 §3.6). 리허설 체크리스트 포함 |
-| `ai-api`·`ai-worker` 이미지 · compose 조각 | EC2 | §15.2 배포. (9/14 코드 대조: 아직 AI 저장소에 없다. 생기면 이 행에 태그 규칙 `ai-YYYYMMDD-N`(runbook §6)과 파일 경로를 적는다) |
+| `ai-api`·`ai-worker` 이미지 · compose 조각 | EC2 | §15.2 배포. (9/16 코드 대조) `Dockerfile`·`docker-compose.prod.yml`은 열린 [PR #41](https://github.com/geoji-yaho/geoji-agent/pull/41)에 있으며 `main`에는 아직 없다. 이미지 빌드·배포 태그와 환경변수 전달 방식은 §16.6. (원문, 9/14) 아직 AI 저장소에 없다 |
 
 ### 16.4 9/16 로컬 구현 대조
 
@@ -644,3 +655,99 @@ printf 'Authorization: Bearer %s\n' "$GEOJI_ADMIN_TOKEN" | \
 | 승인·활성 완료 | 기존 태그 필터/점수로 선택, 선택ID·원본hash 일치 | 로컬 E2E 확인 |
 
 환경변수 및 최신 검증 실행 기록은 §16.1과 [15](15-local-e2e-implementation.md)를 함께 참고한다.
+
+### 16.6 9/16 최신 원격 코드 대조 — 키 주입·배포 협의
+
+#### 확인 기준
+
+agent는 `git pull --ff-only origin main`, server·web은 기존 로컬 참고 패치를 보존하기 위해
+별도 임시 디렉터리에 원격 최신 코드를 새로 받아 확인했다. 아래는 **코드 상태**이며,
+AWS에 실제 등록된 키·배포된 이미지·운영 DB 반영 여부를 확인한 결과는 아니다.
+
+| 대상 | 확인한 커밋 | 결과 |
+| --- | --- | --- |
+| agent `main` | [`6bfe077`](https://github.com/geoji-yaho/geoji-agent/commit/6bfe077e752d07d524553662018785f97b3a4bb5) | Python 환경변수 로드·agent 계약 변경 반영 |
+| server `main` | [`3619f59`](https://github.com/geoji-yaho/geoji-server/commit/3619f59a48583ac26b5c162d6bcdc755024d15df) | 방 초대 미리보기까지 반영. §16.4 임시 패치는 아직 미반영 |
+| web `main` / `develop` | [`f7fd4f4`](https://github.com/geoji-yaho/geoji-web/commit/f7fd4f443999fff83459b21262222f50564d776d) / [`9a79ca6`](https://github.com/geoji-yaho/geoji-web/commit/9a79ca6c921203a980261b46c25fc73f2fa42051) | 커밋은 다르지만 파일 tree는 동일. 기존 expenses/trial 흐름 |
+| agent [PR #41](https://github.com/geoji-yaho/geoji-agent/pull/41) | `e805f562a4015f3b62b4a9d8cd4d091e6bf3c9b4` | OPEN. 운영 Dockerfile·Compose 추가; 아래 환경 주입 보완 필요 |
+| agent [PR #40](https://github.com/geoji-yaho/geoji-agent/pull/40) | `0c8ea67cbf69e5daa36d3df3969c42d58ee040ed` | OPEN. 백엔드 보고서의 A3·Q4·Q12를 최신 코드와 다시 맞춰야 함 |
+
+조회 시 server·web의 열린 PR은 없었다. agent PR 두 건은 검토만 했으며 이 대조 작업에서 머지하지 않았다.
+
+#### 키를 넣는 곳과 담당자의 구분
+
+| 실행 환경 | 필요한 설정 | 담당자에게 요청할 내용 |
+| --- | --- | --- |
+| Spring 백엔드(EB) | `AI_API_BASE_URL`, `SERVICE_AUTH_TOKEN`, `GUARDRAIL_POLICY_VERSION` | Spring 코드에는 OpenAI/xAI 키를 읽는 경로가 없다. AI API 주소·인증·정책을 맞춘다 |
+| Python `ai-api` | `OPENAI_API_KEY`, `XAI_API_KEY`, §16.1 설정 | 현재 공통 router·readiness가 두 벤더 키를 사용한다. 컨테이너 안의 프로세스 환경으로 주입 |
+| Python `ai-worker` | `OPENAI_API_KEY`, `XAI_API_KEY`, §16.1 설정 | OpenAI 판단·검수와 xAI 문구 생성을 직접 호출하므로 두 키가 필요 |
+| 개발자 PC에서 실제 모델 테스트 | 로컬 프로세스의 두 키 | 배포 서버의 키가 PC로 전달되지는 않는다. 로컬 환경변수 또는 무시된 `.env`로 별도 주입. fake 테스트·완성 이미지 파일 등록에는 불필요 |
+| 프론트엔드 | LLM 키 없음 | 백엔드 공개 API만 호출 |
+
+키는 각 벤더별로 한 번 발급한 값을 두 AI 프로세스에 주입할 수 있다. “백엔드에서 등록”은
+**백엔드 담당자가 AI 서버의 비밀값 설정까지 운영한다**는 의미로 합의하면 된다.
+근거는 agent `core/config.py`의 `Settings`, `adapters/llm_router.py`의 `from_settings`,
+`api/app.py`와 `workers/main.py`의 별도 `build_llm` 호출이다(경로 접두어 `src/geoji_ai/`).
+백엔드 설정은 `src/main/resources/application.yml`의 `geoji.ai`와 `geoji.internal`을 기준으로 한다.
+
+#### PR #41: 환경변수만 설정하는 배포에는 보완 필요
+
+PR의 `docker-compose.prod.yml`은 두 서비스 모두 `env_file: [.env]`이며 `environment`에는
+`APP_ENV`·`GUARDRAIL_POLICY_VERSION`만 적혀 있다. 실제 키 대신 테스트 문자열로
+`docker compose config --format json`만 실행해 다음을 확인했다. 컨테이너는 띄우지 않았다.
+
+| 조건 | 결과 |
+| --- | --- |
+| 호스트에 두 키를 export, `.env` 없음 | Compose 설정 해석 실패: 필수 `.env` 파일 없음 |
+| 호스트에 두 키를 export, 빈 `.env` 있음 | 설정 해석 성공, 그러나 두 컨테이너의 환경에 LLM 키 없음 |
+| `.env`에 두 테스트 키 있음 | 두 컨테이너의 환경에 키 포함 |
+
+Compose는 서비스에 명시한 `environment`·`env_file` 등을 통해 컨테이너 환경을 구성한다.
+호스트 환경변수가 전부 자동 상속되는 것은 아니다.
+근거: [Docker 공식 환경변수 전달 문서](https://docs.docker.com/compose/how-tos/environment-variables/set-environment-variables/).
+
+**(제안) 사용자 요청대로 파일 없는 배포를 지원하려면**, AI 담당이 PR #41에서 필요한 변수의
+명시적 전달과 필수 `.env` 의존 제거를 보완하고, 백엔드 담당은 배포 환경의 비밀값 주입을 설정한다.
+대안으로 배포 도구가 비밀값 파일을 생성해 `env_file`에 전달할 수 있으나 방식은 합의해야 한다.
+Docker secret 파일을 마운트만 해서는 현재 `Settings`가 읽지 않으므로 환경으로 전달하거나
+별도의 파일 읽기 설정이 필요하다. 실제 비밀값을 `docker compose config` 출력으로 남기지 않는다.
+
+같은 `.env`를 공유하면 `DATABASE_URL`도 같아진다. §1의 `ai_api`·`ai_worker` role을 분리하려면
+서비스별 값 주입을 구분해야 한다. PR은 이미지 빌드/푸시 CI를 추가하지 않으므로 이미지 게시 방법,
+고정 태그·digest, EC2 CPU 아키텍처도 확정해야 한다.
+
+#### 백엔드에 요청·협의할 항목
+
+아래 경로는 별도 표기가 없으면 최신 server 저장소 기준이다. `src/main/java/com/ttegeoji/backend/`는 생략했다.
+
+| 순서 | 확인한 문제·남은 협의 | 요청·완료 기준 |
+| --- | --- | --- |
+| 1. 배포 | `.github/workflows/deploy.yml`은 Spring JAR만 EB에 배포한다. `.env.example`·`docs/deploy-aws.md`에는 AI 연결 설정 안내가 빠져 있다 | AI EC2 배포 담당·PR #41 보완·게시 이미지 확정. API/worker 각각 키·DB role 주입, Spring에 AI URL·토큰·정책 설정. `/health/ready`와 worker 준비를 별도로 확인 |
+| 2. 내부 URL | `docs/ai-team-report.md` A3와 agent PR #40이 `BACKEND_INTERNAL_URL=EB주소+/internal/v1`로 안내한다. agent `adapters/backend_http.py`가 이미 `/internal/v1/...`를 붙인다 | **호스트 루트만** 설정하도록 두 안내 수정. 중복 경로 `/internal/v1/internal/v1/...`에 따른 404 방지. 세 프로세스의 서비스 토큰과 정책 버전도 일치 확인 |
+| 3. 최초 non-guilty 확정 | `verdict/FinalizeService.java`는 최초 확정에서 `sentencing == null`을 무조건 거부하고 저장부도 역참조한다 | `notGuilty/agree/disagree`의 `sentencing:null`을 계약대로 저장. 유죄의 허용 형량 검증 유지. §16.4 참고 패치·실패 케이스 테스트 검토 |
+| 4. 삭제 반영 | `src/main/resources/sql/invalidate_scope.sql`은 POST의 `payload.post_id` 조건이 없는 구형 복사본. `privacy/VerdictReadGuard.java`는 현재 게시물·저장 epoch만 검사 | 최신 agent SQL 복사. PRIOR로 인용한 다른 게시물/댓글 삭제 직후에도 과거 원문이 공개되지 않게 조회 시 검증. §8·§16.4의 Q2·Q3 검증 포함 |
+| 5. 내부 HTTP | `config/AiApiClientConfig.java`·`ai/IntakeClient.java`·`ai/AiTraceClient.java`는 JDK HTTP 버전을 고정하지 않는다. PR #41도 Uvicorn 기본 HTTP 선택을 사용 | 이전 로컬 E2E에서 재현한 h2c upgrade/422 호환 문제에 대해 HTTP/1.1 고정 패치 검토. 운영 이미지로 실제 Spring→AI 요청 성공 확인. 실제 운영에서 이미 실패 중이라는 뜻은 아님 |
+| 6. 화면 연결 | web `src/shared/api/expenses.ts`·`trials.ts`는 기존 expenses/trial을 호출하고, server `ExpenseTrialController`는 `StubAiClient`를 사용 | 프론트와 신규 `/api/post-submissions`→complete→posts/votes/verdict 연결 일정 및 게시물 상세/피드 조회 계약 협의. 키 등록만으로 기존 화면이 실제 모델로 전환되지는 않음 |
+| 7. 관리자 이미지 | 최신 main에는 `/api/admin/memes`가 없고 `ShareCardController`는 JSON 조회만 제공 | §16.5의 키 없는 관리자 업로드·검수·활성화를 백엔드에서 구현. 저장소·관리자 권한·운영 migration 확정. PNG 렌더링 추가 범위는 §16.4와 구분해 협의 |
+
+중복 요청을 피할 항목:
+
+- D-24 PREPARE 대기/30초 게이트는 `verdict/SentenceGate.java`, D-26 진행 job 취소는
+  `jobs/JobQueries.java`에서 **코드상 구현을 확인**했다. §0.1의 전달 상태는 사용자가 관리하므로 바꾸지 않았다.
+- 백엔드 보고서 Q4의 `RecentVerdict.sentence` nullable, Q12의 공개 camelCase/nullable 계약은
+  agent main에 반영되어 있다. 다만 server `internal/InternalQueries.java`는 아직 `sentence IS NOT NULL`로
+  최근 평결을 거른다. 형량 없는 평결도 기억에 포함할지 합의한 뒤 필터를 조정한다.
+- 백엔드 `API.md`에는 이미 CloudFront HTTPS 주소가 있다. HTTPS 주소 신규 발급을 중복 요청하지 말고
+  프론트의 실제 `VITE_API_BASE_URL`과 배포 문서를 해당 주소에 맞춘다.
+- §16.4의 구현·테스트 기록은 임시 참고 패치 기준이다. 최신 server/web main 반영 완료나 운영 검증으로 읽지 않는다.
+
+#### 이번 검증과 배포 시 확인할 것
+
+- `PYTHONPATH=src .venv/bin/python -m pytest -q tests/unit/test_startup.py`: **34개 통과**.
+- `PYTHONPATH=src .venv/bin/python -m pytest -q tests/unit/test_llm_router.py tests/unit/test_backend_http.py`: **34개 통과**.
+- 위 Compose 설정 해석 3조건과 web main/develop 파일 tree 동일 여부 확인.
+  이번 작업은 문서만 갱신했으므로 Spring/프론트 전체 빌드를 다시 실행하지 않았다.
+- 실제 클라우드 키 등록·유효성·네트워크·DB 권한·이미지 게시 여부는 확인하지 않았다. 유료 모델 호출은 실행하지 않았다.
+- 배포 담당 확인 순서: 두 AI 프로세스의 **키 존재 여부만** 확인 → API `/health/ready` 200 →
+  worker의 DB·내부 API 연결 → 승인된 테스트 1건의 queue/finalize/원장 기록 확인.
+  `/health/live` 200은 프로세스 생존만 뜻하며 키의 유효성이나 실제 모델 성공을 보장하지 않는다.
