@@ -78,11 +78,6 @@ class LocalFixtureLLM(FakeLLM):
                         "kind": "opinion",
                         "evidence_labels": [],
                     },
-                    {
-                        "text": "지갑에도 잠깐의 휴식이 필요합니다.",
-                        "kind": "opinion",
-                        "evidence_labels": [],
-                    },
                 ],
                 banter_strategy="PREMISE_REJECTION",
                 selected_candidate_id=None,

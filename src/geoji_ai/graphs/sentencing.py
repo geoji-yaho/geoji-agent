@@ -25,6 +25,8 @@ generation_failed`.
   `REGENERATE`(TEXT_RETRY) 는 repair 하지 않는다(05 §1 "round 안 보정 없음")
 - repair 대상은 검수관이 `pass=false` 로 판정한 AI 강도다. 보고서에서 빠졌거나 형식이 틀린 강도는
   피할 위반이 없어 바로 TEMPLATE
+- 새 카드 생성 형식(20자 제목·1항목 30자 본문) 위반은 join에서 같은 repair 예산을 사용한다.
+  검수 시간을 예약할 수 없거나 TEXT_RETRY이면 재작성하지 않는다.
 - repair 뒤 검수는 바뀐 강도만 보낸다. 바뀌지 않은 강도는 직전 통과 항목을 이어 붙인다. hash 는
   언제나 전체 draft 기준이다
 - 검수 뒤 TEMPLATE·D-19 치환으로 draft 가 바뀌면 전체를 한 번 더 검수한다(코디네이터 9/14,
@@ -43,8 +45,8 @@ generation_failed`.
   `검수 라운드×2 + (hell 별도면 1)`, 양형·조서 0. 검수 라운드는 state `eval_round` 로 센다
 - 게이트웨이 경로의 timeout·재시도는 게이트웨이가 시도마다 건다(그래프 `wait_for` 가 재시도를 자르지
   않게). 세마포어는 재시도 대기 동안에도 쥐고 있다
-- `node_results` 는 검증을 통과한 출력만: 양형은 `parse_sentencing` 뒤, 서기는 `TextDraft`·강도·각도
-  검사 뒤, 검수는 보고서에 전역 형식 실패가 없을 때(`remember`)
+- `node_results` 는 검증을 통과한 출력만: 양형은 `parse_sentencing` 뒤,
+  서기는 `CardTextDraft`·강도·각도 검사 뒤, 검수는 보고서에 전역 형식 실패가 없을 때(`remember`)
 - `db_now` 는 핸들러가 준다(`application.sentence_case`: `job.updated_at` + 경과 monotonic)
 
 `REGENERATE`(TEXT_RETRY, 08 §3.2):
@@ -89,7 +91,7 @@ from geoji_ai.contracts.finalize import FinalizeRequest, ModelIds
 from geoji_ai.contracts.jobs import Job, SentencePayload, TextRetryPayload, parse_payload
 from geoji_ai.contracts.llm_schemas import evaluator_schema, sentencing_schema, writer_schema
 from geoji_ai.contracts.sentencing import SentencingDecision
-from geoji_ai.contracts.writer import MemeHints, TextDraft, WriterDraft
+from geoji_ai.contracts.writer import CardTextDraft, MemeHints, TextDraft, WriterDraft
 from geoji_ai.domain.attack_angles import ANGLE_GUIDES, pick
 from geoji_ai.domain.budget import (
     EVALUATOR,
@@ -199,6 +201,8 @@ class SentenceGraphState(SentenceState, total=False):
     meme_hints: MemeHints | None
     #: 예산이 없어 서기 호출을 시작하지 않은 강도가 있다.
     writer_budget_skipped: bool
+    #: 캐시에 넣지 않은 카드 형식 오류. 원문 대신 강도만 보관한다.
+    writer_invalid: list[Intensity]
     #: `writer_repair` 가 다시 쓸 강도.
     repair_targets: list[Intensity]
     #: 강도별 "피할 것"(위반 코드·문제 문장).
@@ -271,6 +275,7 @@ def initial_state(
         writer_draft=None,
         meme_hints=None,
         writer_budget_skipped=False,
+        writer_invalid=[],
         repair_targets=[],
         repair_avoid={},
         eval_kept={},
@@ -475,18 +480,11 @@ def _merge_same_intensity(entries: Sequence[Mapping[str, Any]]) -> list[dict[str
 
 
 def _dedup_dicts(items: Sequence[Any]) -> list[Any]:
-    """순서를 지키면서 같은 내용을 한 번만 남긴다(dict 는 정렬한 items 로 비교)."""
-    seen: set[Any] = set()
+    """순서를 지키며 중첩 배열(evidence_labels)을 포함한 동일 위반도 제거한다."""
     out: list[Any] = []
     for item in items:
-        mark = tuple(sorted(item.items())) if isinstance(item, Mapping) else item
-        try:
-            if mark in seen:
-                continue
-            seen.add(mark)
-        except TypeError:
-            pass
-        out.append(item)
+        if item not in out:
+            out.append(item)
     return out
 
 
@@ -499,9 +497,11 @@ def _merge_reports(outputs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
     for name in _EVALUATION_CHECKS:
         checks = [output.get(name) for output in outputs]
-        broken = next((check for check in checks if not isinstance(check, Mapping)), None)
-        if broken is not None or any(not isinstance(c.get("pass"), bool) for c in checks):
-            merged[name] = broken if broken is not None else {"pass": None, "violations": []}
+        if any(not isinstance(check, Mapping) for check in checks):
+            merged[name] = None
+            continue
+        if any(not isinstance(check.get("pass"), bool) for check in checks):
+            merged[name] = {"pass": None, "violations": []}
             continue
         merged[name] = {
             "pass": all(check["pass"] for check in checks),
@@ -774,6 +774,15 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     return {"failure": SCHEMA_INVALID}
                 bad.setdefault(targets[index], []).append(issue.code)
                 messages.setdefault(targets[index], []).append(issue.message)
+            # 라벨·식별자 제거로 빈 제목/본문이 될 수 있으므로 정리한 뒤에도 카드 규격을 검사한다.
+            for intensity, text in zip(targets, rules.draft["texts"], strict=True):
+                try:
+                    CardTextDraft.model_validate(text)
+                except ValidationError:
+                    bad.setdefault(intensity, []).append(SCHEMA_INVALID)
+                    messages.setdefault(intensity, []).append(
+                        "제목·본문 정리 후 카드 규격 위반: 제목 1~20자, 본문 1항목 1~30자."
+                    )
             if not bad:
                 try:
                     writer_draft = WriterDraft.model_validate(rules.draft)
@@ -1220,11 +1229,18 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             output = dict(result.output)
             hints_raw = output.pop("meme_hints", None)
             output.pop("meme_tag", None)
-            text = TextDraft.model_validate({**output, "source": "AI"})
+            text = CardTextDraft.model_validate({**output, "source": "AI"})
             if text.intensity != intensity or text.attack_angle != angle:
                 raise ValueError("서버 지정 강도·각도와 다르다")
             hints = MemeHints.model_validate(hints_raw) if hints_raw is not None else None
             await commit()
+        except ValidationError:
+            # 길이·항목 수·줄바꿈 등 형식 오류는 원문을 기록하거나 캐시하지 않는다.
+            return (
+                "INVALID_CARD",
+                None,
+                CallRecord("writer", intensity, settings.MODEL_WRITER, SCHEMA_INVALID),
+            )
         except (LLMError, TimeoutError, ValueError) as exc:
             record = CallRecord("writer", intensity, settings.MODEL_WRITER, _error_name(exc))
             return ("FAILED", None, record)
@@ -1250,8 +1266,10 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         drafts: dict[Intensity, TextDraft] = dict(state.get("drafts") or {})
         sources: dict[Intensity, Literal["AI", "TEMPLATE"]] = dict(state.get("draft_sources") or {})
         hints: MemeHints | None = state.get("meme_hints")
+        invalid = set(state.get("writer_invalid") or [])
         skipped = False
         for intensity, (kind, value, record) in zip(intensities, outcomes, strict=True):
+            invalid.discard(intensity)
             if record is not None:
                 calls.append(record)
             if kind == "AI":
@@ -1261,6 +1279,8 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 if intensity == jury.default_intensity:
                     hints = text_hints
                 continue
+            if kind == "INVALID_CARD":
+                invalid.add(intensity)
             skipped = skipped or kind == "SKIPPED"
             drafts.pop(intensity, None)
             sources.pop(intensity, None)
@@ -1296,6 +1316,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             "draft_sources": sources,
             "meme_hints": hints,
             "writer_budget_skipped": skipped,
+            "writer_invalid": [i for i in _scope(state) if i in invalid],
             "calls": calls,
         }
 
@@ -1304,6 +1325,39 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
 
     async def join(state: SentenceGraphState) -> dict[str, Any]:
         targets = _scope(state)
+        invalid = state.get("writer_invalid") or []
+        if (
+            invalid
+            and state["mode"] == "INITIAL"
+            and state.get("repair_count", 0) < settings.IMMEDIATE_REPAIR_MAX
+            and state["deadline"].remaining_s() >= REPAIR_MIN_REMAINING_S
+            and state["deadline"].node_timeout(WRITER, settings) is not None
+        ):
+            for intensity in invalid:
+                fallback_log(
+                    state,
+                    node="join",
+                    role="writer",
+                    intensity=intensity,
+                    outcome=_ROUTE_REPAIR,
+                    reason=SCHEMA_INVALID,
+                )
+            return {
+                "failure": None,
+                "route": _ROUTE_REPAIR,
+                "repair_targets": invalid,
+                "repair_avoid": {
+                    i: _rule_avoid(
+                        [SCHEMA_INVALID],
+                        [
+                            "headline 1~20자, statement 정확히 1항목, text 1~30자. "
+                            "줄바꿈·빈 문구 금지."
+                        ],
+                    )
+                    for i in invalid
+                },
+                "eval_kept": {},
+            }
         sources = state.get("draft_sources") or {}
         not_ai = [i for i in targets if sources.get(i) != "AI"]
         if len(not_ai) == len(targets) or (_regenerate(state) and not_ai):
@@ -1311,6 +1365,8 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             code = writer_failure_code(
                 writer_errors, budget_skipped=bool(state.get("writer_budget_skipped"))
             )
+            if invalid and all(sources.get(i) == "AI" or i in invalid for i in targets):
+                code = SCHEMA_INVALID
             kinds = ",".join(sorted({e for e in writer_errors if e})) or "NO_AI"
             fallback_log(
                 state,
@@ -1332,7 +1388,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 reason=f"{SCHEMA_INVALID}:MISSING_{'_'.join(sorted(i.value for i in missing))}",
             )
             return {"failure": SCHEMA_INVALID}
-        return {"failure": None}
+        return {"failure": None, "route": "deterministic_validate"}
 
     async def deterministic_validate(state: SentenceGraphState) -> dict[str, Any]:
         result = assemble(
@@ -1921,6 +1977,11 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             return "generation_failed"
         return _ROUTE_REPAIR if state.get("route") == _ROUTE_REPAIR else "evaluator"
 
+    def after_join(state: SentenceGraphState) -> str:
+        if state.get("failure"):
+            return "generation_failed"
+        return _ROUTE_REPAIR if state.get("route") == _ROUTE_REPAIR else "deterministic_validate"
+
     def after_evaluator(state: SentenceGraphState) -> str:
         if state.get("failure"):
             return "generation_failed"
@@ -1963,7 +2024,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
     graph.add_conditional_edges("sentencing", failed_or("writer"), ["writer", "generation_failed"])
     graph.add_conditional_edges("writer", failed_or("join"), ["join", "generation_failed"])
     graph.add_conditional_edges(
-        "join", failed_or("deterministic_validate"), ["deterministic_validate", "generation_failed"]
+        "join", after_join, ["deterministic_validate", "writer_repair", "generation_failed"]
     )
     graph.add_conditional_edges(
         "deterministic_validate",

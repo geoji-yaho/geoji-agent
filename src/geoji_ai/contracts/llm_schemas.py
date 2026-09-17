@@ -14,7 +14,7 @@ from typing import Any
 from geoji_ai.contracts.evaluation import EvaluationReport
 from geoji_ai.contracts.intake import IntakeResult
 from geoji_ai.contracts.sentencing import SentencingDecision
-from geoji_ai.contracts.writer import BanterStrategy, TextDraft, WriterDraft
+from geoji_ai.contracts.writer import BanterStrategy, CardTextDraft, WriterDraft
 
 __all__ = [
     "banter_schema",
@@ -218,8 +218,8 @@ def writer_schema(
     attack_angles: Sequence[str],
     candidate_ids: Sequence[str] | None = None,
 ) -> dict[str, Any]:
-    """서기. `TextDraft` 1개 + `meme_tag` + `meme_hints`. `source` 는 서버가 채운다."""
-    schema = _derive(TextDraft)
+    """서기. 카드 규격 1개 + `meme_tag` + `meme_hints`. `source` 는 서버가 채운다."""
+    schema = _derive(CardTextDraft)
     _drop(schema, "source")
     draft = _derive(WriterDraft)
     for key in ("meme_tag", "meme_hints"):

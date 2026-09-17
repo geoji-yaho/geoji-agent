@@ -39,6 +39,7 @@
 
 | 날짜 | 무엇이 바뀌었나 → 백엔드가 할 일 | 절 | 상태 |
 |---|---|---|---|
+| 9/17 | **카드 문구 단축 배포 전 필수:** finalize 본문 최소 개수 2→1, 공유 템플릿 갱신. AI는 새 생성에 제목 ≤20자·본문 1항목 ≤30자를 적용한다. 임시 server checkout의 `FinalizeRequestParser`에는 `array(statementNode, 2, 4)`가 남아 있다. 실제 운영 저장소 반영·수용검사 후 AI 이미지 배포 | §5·§10·§16.3 | 미전달 |
 | 9/16 | **`FinalizeRequestParser.GUARDRAIL_VERSIONS` 에 `guardrail-v3` 을 더해 달라**(현재 `Set.of("guardrail-v1", "guardrail-v2")`). 지옥맛 비속어 제한을 없앤 새 검수 정책을 v3 으로 올리려 했는데 finalize 가 422 `INVALID_DRAFT` 를 내서 판결이 통째로 막혔다(15 §6 7회차). **지금은 AI 쪽이 v2 를 제자리에서 개정해 쓰므로 백엔드 작업 없이도 돈다.** 이 줄은 나중에 정책 버전을 올릴 수 있게 하는 선반영 요청이다. 허용 목록만 늘리면 되고 기본값·저장 컬럼은 그대로 | §5·§15.3 D-07 | 미전달 |
 | 9/16 | **운영 템플릿 폴백 원인**: AI 워커 검수관 상한 4초 vs luna 실측 14~17초 → 매 판결 `EVAL_FAILED`(TIMEOUT). AI 이미지 기본값을 양형 12·서기 10·검수 30초, `TEXT_RETRY_TIMEOUT_SECONDS` 60 으로 올림(01 §3.7) → **새 이미지 태그로 재배포**. `.env` 에 `*_NODE_TIMEOUT_SECONDS` 를 따로 적어 뒀다면 지우거나 같은 값으로. `JobKind.TEXT_RETRY` 마감 20s → **60s**(§3). SENTENCE 90s 는 그대로 | §3·§16.1·§16.3 | 미전달 |
 | 9/16 | 워커 로그에 `sentence_call`·`sentence_fallback`·`sentence_summary`(역할·강도·timeout·오류 kind·결과) 추가 → 템플릿이 뜨면 `docker logs geoji-ai-worker` 에서 `trace_id` 로 검색해 `sentence_summary.outcome`·`fallback_reason` 을 보면 된다. 백엔드 작업 없음(참고) | §16.2 | 미전달 |
@@ -248,6 +249,10 @@ intake 동작 (9/14 코드 대조, 07 §3.1·§3.2·§3.4):
 
 ## 5. finalize (proposal2 §10)
 
+**9/17 카드 규격:** 새 AI·TEMPLATE 생성은 제목 1~20자, `statement` 정확히 1항목, 본문 1~30자이며 줄바꿈·공백만 있는 문구를 거부한다. 공백·문장부호를 포함한 Unicode code point 수다. 근거 라벨·문장 종류·전략·밈 태그·감정·키워드는 유지한다. 기존 저장 문구를 읽는 `TextDraft`/공개 DTO는 제목 30자·본문 최대 4항목·합계 300자 상한을 유지하고 `TextDraft`의 최소 항목 수만 2→1로 완화했다. 같은 JSON 필드·enum을 유지하므로 정본의 `schema_version=1`은 유지하지만, **구형 최소 2항목 검증기는 새 출력을 거절한다.** 백엔드를 먼저 갱신해야 한다.
+
+백엔드 적용 지점은 `FinalizeRequestParser`의 `array(statementNode, 2, 4)` → `array(statementNode, 1, 4)`다. 저장·조회 상한을 줄이는 migration은 필요 없다. 수용검사: 1항목 finalize 성공, 빈 배열·5항목 거부, 기존 2~4항목 조회 성공, 메타데이터·`draft_hash` 동일성, §10 기본 문구와 카드 렌더 확인. 실제 운영 저장소는 이번 작업에서 수정하지 못했으며, 확인한 경로는 이전 임시 checkout이다. 글자 수 제한만으로 모든 화면 폭에서 한 줄 표시가 보장되지는 않는다.
+
 요청 `FinalizeRequest`(01 §3.2, 정본 `contracts/finalize-v1.schema.json`): `schema_version`·`job_id`·`generation_id`·`verdict_version`·`expected_text_version`·`dossier_id`·`privacy_versions`·`draft_hash`·`sentencing{sentence, sentencing_reason, reason_source, evidence_labels, aggravating, mitigating} | null`·`draft{texts[{intensity, headline, statement, banter_strategy, selected_candidate_id, attack_angle, source}], meme_tag, meme_hints{emotion, keywords}}`·`evaluation`·`evaluation_draft_hash`·`prompt_bundle_version`·`guardrail_policy_version`·`model_ids{sentencing, writer, evaluator}`. 전부 필수(`sentencing` 은 null 가능), 알 수 없는 필드 거부 (9/14 코드 대조: `schema_version`·`model_ids` 모양 추가)
 
 - (9/11) `sentencing.reason_source` 와 `texts[].source` 는 둘 다 `AI | TEMPLATE` 필수
@@ -361,7 +366,7 @@ WHERE status = 'RUNNING' AND lease_until < now();
 
 ## 10. 템플릿 공유 파일
 
-`contracts/fixtures/templates-v1.json`(AI 저장소, 백엔드에 복사·버전 고정): 결과별 `{headline, statement[], sentencing_reason_template}`. 유죄 "배심원 {n}인 중 {m}인이 유죄로 판단했습니다. 형량: {sentence_label}" / 무죄 "배심원단은 이 지출에 정상 참작의 여지가 있다고 판단했습니다." / 동의 "배심원단이 구매를 승인했습니다. 후회는 본인 몫입니다." / 기각 "배심원단이 구매를 기각했습니다. 지갑을 닫으십시오." 형량 라벨: `집행유예` / `징역 1일 (내일 하루 무지출)` / `무기징역 (3일 무지출)`. watchdog·generation-failed·부분 강도 템플릿 모두 이 파일. **치환 토큰(9/11 확정)**: `{n}` 배심원 수 · `{m}` 유죄 표 수 · `{sentence_label}` 형량 라벨(같은 파일 `sentence_labels` 표). 파일 형태는 `{version, sentence_labels{probation, oneDay, life}, results{guilty|notGuilty|agree|disagree: {headline, statement[], sentencing_reason_template}}}`. `headline` 은 프론트 `VERDICT_LABELS`(유죄·무죄·동의·기각), `sentencing_reason_template` 은 유죄만 `"형량: {sentence_label}"` 나머지 null. (원문) 토큰은 `{형량 라벨}` 이었으나 공백·한글이 든 이름은 `str.format` 으로 채울 수 없어 바꿨다.
+`contracts/fixtures/templates-v1.json`(AI 저장소, 백엔드에 복사·버전 고정): 결과별 `{headline, statement[], sentencing_reason_template}`. **9/17 코드 대조:** 네 결과 모두 §5 카드 규격에 맞는 짧은 본문 1항목으로 변경했다. 문구의 정본은 fixture이며, watchdog·generation-failed·부분 강도 템플릿에 사용하는 백엔드 복사본도 함께 갱신한다. 형량은 본문에 중복하지 않고 기존 `sentence`·`sentenceLabel`·`sentencingReason` 필드로 표시한다. 파일 형태는 `{version, sentence_labels{probation, oneDay, life}, results{guilty|notGuilty|agree|disagree: {headline, statement[], sentencing_reason_template}}}`. `headline`은 유죄·무죄·동의·기각, `sentencing_reason_template`은 유죄만 `"형량: {sentence_label}"`, 나머지는 null이다. `{sentence_label}`은 같은 파일 `sentence_labels` 표에서 치환한다. (원문) 유죄는 배심원 수·유죄 표 수·형량을 포함했고, 동의·기각은 2문장이었다.
 - (9/14 코드 대조) 파일과 일치. `version` 값은 `"templates-v1"`
 
 ## 11. 짤 점수 선택 (finalize 10 단계, proposal2 §17)

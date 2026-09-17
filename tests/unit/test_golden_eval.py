@@ -191,7 +191,7 @@ def test_check_schema() -> None:
     draft["texts"] = draft["texts"][:2]
     assert "schema" in names(run_case_checks(draft))
     draft = good_draft()
-    draft["texts"][0]["statement"] = draft["texts"][0]["statement"][:1]
+    draft["texts"][0]["statement"] = []
     assert "schema" in names(run_case_checks(draft))
 
 

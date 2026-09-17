@@ -105,6 +105,20 @@ async def test_writer_returns_requested_intensity():
     assert "meme_hints" in result.output
 
 
+@pytest.mark.parametrize("intensity", ["mild", "spicy", "hell"])
+async def test_default_writer_uses_card_fixture(intensity: str):
+    from geoji_ai.contracts.llm_schemas import writer_schema
+    from geoji_ai.contracts.writer import CardTextDraft
+
+    result = await call(FakeLLM(), "writer", writer_schema([intensity], ["CONVERSION"]))
+    assert result.output is not None
+    metadata = {key: result.output[key] for key in ("meme_tag", "meme_hints")}
+    text = {key: value for key, value in result.output.items() if key not in metadata}
+    CardTextDraft.model_validate({**text, "source": "AI"})
+    expected = load_fixture("writer-draft-card-taxi")
+    assert metadata == {key: expected[key] for key in metadata}
+
+
 async def test_banter_candidates_use_fits():
     fake = FakeLLM()
     result = await call(fake, "banter")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -30,19 +31,15 @@ def jury(**update: Any) -> JurySnapshot:
     return JurySnapshot.model_validate(data)
 
 
-def test_guilty_statement_substitutes_n_m_sentence_label() -> None:
-    """유죄: {n}=표 합, {m}=유죄 표, {sentence_label}=형량 라벨."""
-    assert render_statement(jury(), "oneDay") == [
-        "배심원 4인 중 3인이 유죄로 판단했습니다. 형량: 징역 1일 (내일 하루 무지출)"
-    ]
+def test_guilty_statement_is_card_length_with_sentence_separate() -> None:
+    assert render_statement(jury(), "oneDay") == ["배심원단이 이 지출을 유죄로 판단했습니다."]
 
 
 def test_guilty_template_draft_shape() -> None:
     draft = template_text_draft("hell", jury(), "oneDay", POST_ID)
     assert draft.headline == "유죄"
     assert [s.text for s in draft.statement] == [
-        "배심원 4인 중 3인이 유죄로 판단했습니다.",
-        "형량: 징역 1일 (내일 하루 무지출)",
+        "배심원단이 이 지출을 유죄로 판단했습니다.",
     ]
     assert all(s.kind == "opinion" and s.evidence_labels == [] for s in draft.statement)
     assert draft.source == "TEMPLATE"
@@ -58,13 +55,13 @@ def test_guilty_template_draft_shape() -> None:
             "agree",
             {"agree": 3, "disagree": 1},
             "동의",
-            ["배심원단이 구매를 승인했습니다.", "후회는 본인 몫입니다."],
+            ["배심원단이 구매를 승인했습니다."],
         ),
         (
             "disagree",
             {"agree": 1, "disagree": 3},
             "기각",
-            ["배심원단이 구매를 기각했습니다.", "지갑을 닫으십시오."],
+            ["배심원단이 구매를 기각했습니다."],
         ),
     ],
 )
@@ -76,14 +73,10 @@ def test_agree_disagree_template_drafts(
     assert [s.text for s in draft.statement] == texts
 
 
-def test_not_guilty_template_cannot_meet_statement_count() -> None:
-    """무죄 템플릿은 1문장이라 TextDraft(2~4문장)를 만들 수 없다 — 문구를 지어내지 않는다."""
+def test_not_guilty_template_meets_card_statement_count() -> None:
     j = jury(result="notGuilty", vote_counts={"guilty": 1, "notGuilty": 3})
-    assert render_statement(j, None) == [
-        "배심원단은 이 지출에 정상 참작의 여지가 있다고 판단했습니다."
-    ]
-    with pytest.raises(TemplateUnavailable):
-        template_text_draft("mild", j, None, POST_ID)
+    draft = template_text_draft("mild", j, None, POST_ID)
+    assert [s.text for s in draft.statement] == ["배심원단이 이 지출을 무죄로 판단했습니다."]
 
 
 def test_guilty_without_sentence_is_unavailable() -> None:
@@ -103,13 +96,24 @@ def test_dismissed_has_no_template() -> None:
     assert "dismissed" not in load_templates()["results"]
 
 
+@pytest.mark.parametrize("statement", [["가" * 31], ["첫 문장", "둘째 문장"], ["앞\n뒤"]])
+def test_template_outside_card_limits_is_unavailable(statement: list[str]) -> None:
+    templates = deepcopy(load_templates())
+    templates["results"]["guilty"]["statement"] = statement
+    with pytest.raises(TemplateUnavailable):
+        template_text_draft("spicy", jury(), "oneDay", POST_ID, templates=templates)
+
+
 @pytest.mark.parametrize("intensity", ["mild", "spicy", "hell"])
-@pytest.mark.parametrize("result", ["guilty", "agree", "disagree"])
+@pytest.mark.parametrize("result", ["guilty", "notGuilty", "agree", "disagree"])
 def test_template_drafts_pass_text_rules(intensity: str, result: str) -> None:
     """템플릿 초안은 서버 검증 ⑤ 를 통과해야 검수 대상 draft 에 넣을 수 있다."""
     j = jury(result=result, target_intensities=[intensity])
     sentence = "oneDay" if result == "guilty" else None
     text = template_text_draft(intensity, j, sentence, POST_ID)
+    assert 1 <= len(text.headline) <= 20
+    assert len(text.statement) == 1
+    assert 1 <= len(text.statement[0].text) <= 30
     draft = {
         "schema_version": 1,
         "texts": [text.model_dump(mode="json")],

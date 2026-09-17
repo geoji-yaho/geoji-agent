@@ -2,11 +2,11 @@
 
 가짜 백엔드 `confirm_verdict`·`run_sentence_gate` 가 백엔드 스케줄러 자리를 한다. 평결 확정 때 같은
 post 의 PREPARE 가 `QUEUED`·`RUNNING` 이면 SENTENCE 를 보류하고, PREPARE 가 끝나거나
-`confirmed_at + 30s` 에 닿으면 INSERT 한다. 마감 = INSERT 시각(DB now) + 10s.
+`confirmed_at + 30s` 에 닿으면 INSERT 한다. 마감 = INSERT 시각(DB now) + 90s.
 시간은 `run_sentence_gate(now=...)` 로 주입한다(대기·폴링 없음).
 
 ① 전원 투표가 PREPARE 보다 빠름 → PREPARE 뒤 INSERT · `dossier_source=PREP`
-② PREPARE 가 30초 넘게 멈춤 → 대기 해제 뒤 INSERT · MINIMAL
+② PREPARE 가 30초 넘게 멈춤 → 대기 해제 뒤 INSERT · INLINE
 ③ PREPARE 가 이미 끝남(FAILED·CANCELLED·SUCCEEDED) → 즉시 INSERT
 ④ PREPARE job 없음(다른 post 의 PREPARE 는 무관) → 즉시 INSERT
 """
@@ -48,7 +48,7 @@ from tests.integration.test_retain_handler import seed_epochs
 Enqueue = Callable[..., Awaitable[str]]
 FetchJob = Callable[[str], Awaitable[dict[str, Any]]]
 
-SENTENCE_DEADLINE = timedelta(seconds=10)
+SENTENCE_DEADLINE = timedelta(seconds=90)
 
 
 @pytest.fixture
@@ -100,7 +100,7 @@ def _assert_inserted_with_deadline(env: Env, rows: list[dict[str, Any]], inserte
     assert row["status"] == "QUEUED"
     assert row["payload"] == {"verdict_id": VERDICT_ID, "verdict_version": 1, "post_id": POST_ID}
     assert row["dedupe_key"] == f"sentence:{VERDICT_ID}:1"
-    # 마감 = INSERT 시각 + 10s(같은 트랜잭션의 DB now()).
+    # 마감 = INSERT 시각 + 90s(같은 트랜잭션의 DB now()).
     assert row["deadline_at"] - row["created_at"] == SENTENCE_DEADLINE
     assert env.fake.verdicts[VERDICT_ID].deadline_at == row["deadline_at"]
     assert env.fake.verdicts[VERDICT_ID].sentence_status == "PENDING"
@@ -154,7 +154,7 @@ async def test_01_전원_투표가_PREPARE_보다_빠르면_PREPARE_가_끝난_�
 # --- ② 30초 대기 해제 --------------------------------------------------------------------
 
 
-async def test_02_PREPARE_가_30초_넘게_멈추면_대기를_풀고_넣고_MINIMAL(env: Env):
+async def test_02_PREPARE_가_30초_넘게_멈추면_대기를_풀고_넣고_INLINE(env: Env):
     prepare = await _claimed_prepare(env)
     confirmed_at = datetime.now(UTC)
     assert env.fake.sentence_gate_wait == SENTENCE_GATE_WAIT == timedelta(seconds=30)
@@ -174,8 +174,10 @@ async def test_02_PREPARE_가_30초_넘게_멈추면_대기를_풀고_넣고_MIN
     llm = PlannedLLM(FakeLLM(outputs={"context": CONTEXT_OK}))
     capture = await _run_sentence(env, inserted[0], llm)
 
-    assert capture.last["dossier_source"] == "MINIMAL"
-    assert llm.roles()["context"] == 0
+    assert capture.last["dossier_source"] == "INLINE"
+    assert llm.roles()["context"] == 1
+    assert len(env.backend.finalized) == 1
+    assert env.backend.failed == []
     assert await _rows(env.engine, "SELECT id FROM ai.trial_prep") == []
 
 

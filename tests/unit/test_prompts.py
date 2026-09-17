@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -52,9 +53,44 @@ def _probe_build_system(intensities: list[str]) -> str:
 
 @pytest.mark.parametrize("intensity", ["mild", "spicy", "hell"])
 def test_writer_system_equals_probe_assembly(intensity: str) -> None:
-    """⑦ `build_writer_system(i)` 가 실측 스크립트의 기존 조립 결과와 같다."""
+    """⑦ 보존한 v5.5 가 실측 스크립트의 기존 조립 결과와 같다."""
     expected = _probe_build_system([intensity.upper()])
-    assert build_writer_system(intensity).strip() == expected.strip()
+    assert build_writer_system(intensity, version="v5.5").strip() == expected.strip()
+
+
+@pytest.mark.parametrize("intensity", ["mild", "spicy", "hell"])
+def test_current_writer_requests_one_short_card_with_metadata(intensity: str) -> None:
+    system = build_writer_system(intensity)
+    assert WRITER_VERSION == "v5.6"
+    assert "headline: 1~20자" in system
+    assert "statement: 정확히 1항목" in system
+    assert "text는 1~30자" in system
+    assert "공백과 문장부호도 글자 수에 포함" in system
+    assert "줄바꿈과 공백뿐인 값은 금지" in system
+    assert "JSON 객체 1개" in system
+    for field in (
+        "intensity",
+        "evidence_labels",
+        "kind",
+        "banter_strategy",
+        "selected_candidate_id",
+        "attack_angle",
+        "meme_tag",
+        "meme_hints",
+        "emotion",
+        "keywords",
+    ):
+        assert field in system
+    for obsolete in ("evidence_ids", "texts 항목", "2~3문장", "200자", "짧은 두 문장 허용"):
+        assert obsolete not in system
+
+
+@pytest.mark.parametrize("intensity", ["mild", "spicy", "hell"])
+def test_current_writer_examples_fit_card_body(intensity: str) -> None:
+    section = load_prompt(f"writer/{intensity}-{WRITER_VERSION}.md")
+    examples = re.findall(r'^- 예시: "([^"]+)"$', section, re.MULTILINE)
+    assert examples
+    assert all(1 <= len(example) <= 30 for example in examples)
 
 
 def test_spicy_system_has_no_hell_section() -> None:
@@ -83,6 +119,10 @@ def test_spicy_system_has_no_hell_section() -> None:
         "writer/mild-v5.5.md",
         "writer/spicy-v5.5.md",
         "writer/hell-v5.5.md",
+        "writer/common-v5.6.md",
+        "writer/mild-v5.6.md",
+        "writer/spicy-v5.6.md",
+        "writer/hell-v5.6.md",
         "sentencing-v1.md",
         "context-v1.md",
         "banter-v1.md",
@@ -161,6 +201,7 @@ WORN_PHRASE_DECLARATIONS = {
     ("writer/common-v5.3.md", "금지어"),
     ("writer/common-v5.4.md", "금지어"),
     ("writer/common-v5.5.md", "금지어"),
+    ("writer/common-v5.6.md", "금지어"),
     ("evaluator/guardrail-v2.md", "| 금지 | 금지 | 금지 |"),
 }
 

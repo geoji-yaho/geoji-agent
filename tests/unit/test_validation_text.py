@@ -204,9 +204,9 @@ def test_rule2_ids_removed_when_too_few_remain() -> None:
         "kind": "opinion",
         "evidence_labels": [],
     }
-    result = _run(_draft(_text("spicy", [FACT, tainted], headline="F0 택시가 출근 수단")))
+    result = _run(_draft(_text("spicy", [tainted], headline="F0 택시가 출근 수단")))
     text = result.draft["texts"][0]
-    assert [s["text"] for s in text["statement"]] == [FACT["text"], "변명은 기준으로 끝났습니다."]
+    assert [s["text"] for s in text["statement"]] == ["변명은 기준으로 끝났습니다."]
     assert text["headline"] == "택시가 출근 수단"
     assert _codes(result) == []
 
@@ -239,7 +239,8 @@ def test_rule3_statement_count_out_of_range() -> None:
 def test_rule3_count_checked_after_deletion() -> None:
     no_label = {"text": "지난달에도 택시를 탔습니다.", "kind": "fact", "evidence_labels": []}
     result = _run(_draft(_text("spicy", [no_label, OPINION_1])))
-    assert _codes(result) == [SCHEMA_INVALID]
+    assert result.draft["texts"][0]["statement"] == [OPINION_1]
+    assert _codes(result) == []
 
 
 def test_rule3_negative_at_limits() -> None:

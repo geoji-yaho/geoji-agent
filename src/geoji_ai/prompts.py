@@ -3,7 +3,7 @@
 프롬프트는 저장소 루트 `prompts/` 의 파일이다. 코드 문자열에 넣지 않는다.
 
 - `build_writer_system(intensity)` — 서기 공통 + **그 강도 섹션만**. 강도 섹션은 공통 파일의
-  `## 출력` 제목 바로 앞에 끼운다(`scripts/probe_writer_latency.py` 의 `build_system` 과 같은 결과)
+  `## 출력` 제목 바로 앞에 끼운다. 과거 버전도 명시적으로 불러올 수 있다.
 - `prompt_bundle_version()` — `prompts/` 아래 모든 파일을 상대 경로(POSIX) 순으로 정렬해
   `경로 UTF-8 · NUL · 파일 바이트 · NUL` 을 이어 sha256 한 값의 앞 12자에 `bundle-` 접두
 """
@@ -26,7 +26,7 @@ __all__ = [
 #: 저장소 루트의 `prompts/`(src/geoji_ai/prompts.py 에서 두 단계 위).
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 
-WRITER_VERSION = "v5.5"
+WRITER_VERSION = "v5.6"
 
 #: 강도 섹션을 끼울 자리. 공통 파일에서 이 제목 바로 앞이다.
 _WRITER_OUTPUT_HEADER = "## 출력\n"

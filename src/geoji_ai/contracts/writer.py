@@ -5,16 +5,32 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from geoji_ai.domain.attack_angles import AttackAngle
 from geoji_ai.domain.intensity import Intensity
 
 # 길이 상한의 단일 정의. `domain/validation.py` 가 같은 값을 import 한다.
 HEADLINE_MAX = 30
-STATEMENT_MIN = 2
+STATEMENT_MIN = 1
 STATEMENT_MAX = 4
 STATEMENT_TOTAL_MAX = 300
+
+# 새 생성은 카드 분량으로 제한한다. 저장된 과거 판결문에는 위의 읽기 계약을 유지한다.
+CARD_HEADLINE_MAX = 20
+CARD_STATEMENT_MAX = 30
+_CARD_LINE_BREAKS = "\r\n\v\f\x1c\x1d\x1e\x85\u2028\u2029"
+_CARD_LINE_PATTERN = (
+    r"^[^\r\n\v\f\u001c-\u001e\u0085\u2028\u2029]*\S"
+    r"[^\r\n\v\f\u001c-\u001e\u0085\u2028\u2029]*$"
+)
+
+
+def _validate_card_line(value: str) -> str:
+    if not value.strip() or any(char in _CARD_LINE_BREAKS for char in value):
+        raise ValueError("카드 문구는 공백뿐이거나 줄바꿈을 포함할 수 없다")
+    return value
+
 
 StatementKind = Literal["fact", "claim", "opinion"]
 TextSource = Literal["AI", "TEMPLATE"]
@@ -82,6 +98,23 @@ class TextDraft(BaseModel):
         if total > STATEMENT_TOTAL_MAX:
             raise ValueError(f"statement 합산 {total}자 > {STATEMENT_TOTAL_MAX}자")
         return self
+
+
+class CardStatement(Statement):
+    text: Annotated[
+        str, Field(min_length=1, max_length=CARD_STATEMENT_MAX, pattern=_CARD_LINE_PATTERN)
+    ]
+
+    _single_line = field_validator("text")(_validate_card_line)
+
+
+class CardTextDraft(TextDraft):
+    headline: Annotated[
+        str, Field(min_length=1, max_length=CARD_HEADLINE_MAX, pattern=_CARD_LINE_PATTERN)
+    ]
+    statement: Annotated[list[CardStatement], Field(min_length=1, max_length=1)]
+
+    _single_line = field_validator("headline")(_validate_card_line)
 
 
 class WriterDraft(BaseModel):

@@ -257,7 +257,8 @@ async def test_09b_남은_10s_유죄_SENTENCE_에서_양형_AI_가_원장에_남
 
 async def test_10_cap_을_낮추면_서기_예산_초과로_TEMPLATE_형량은_AI_그대로(env: Env):
     await env.prepare(FakeLLM(outputs={"context": CONTEXT_OK}))
-    settings = make_settings()
+    # 낮은 cap에서 양형은 허용하고 서기만 차단하는 경계를 고정한다(제품 상한 아님).
+    settings = make_settings(SENTENCING_MAX_OUTPUT_TOKENS=400)
     wired = wire(env.engine, settings, cap=LOW_CAP_MICRO_USD)
     capture = Capture()
 
@@ -393,9 +394,14 @@ async def test_13_같은_입력_PREPARE_재실행은_조서를_재사용하고_p
 # --- ⑭ hell 별도 검수 모델 --------------------------------------------------------------
 
 
-async def test_14_hell_별도_검수는_MODEL_EVALUATOR_HELL_모델로_원장에_남는다(env: Env):
+@pytest.mark.parametrize("max_tokens", [800, 3000])
+async def test_14_hell_별도_검수는_MODEL_EVALUATOR_HELL_모델로_원장에_남는다(
+    env: Env, max_tokens: int
+):
     await env.prepare(FakeLLM(outputs={"context": CONTEXT_OK}))
-    settings = make_settings(MODEL_EVALUATOR_HELL=HELL_MODEL)
+    settings = make_settings(
+        MODEL_EVALUATOR_HELL=HELL_MODEL, EVALUATOR_MAX_OUTPUT_TOKENS=max_tokens
+    )
     assert settings.MODEL_EVALUATOR_HELL != settings.MODEL_JUDGMENT
     assert price_for(HELL_MODEL) is not None
     wired = wire(env.engine, settings, hell=True)
@@ -403,6 +409,13 @@ async def test_14_hell_별도_검수는_MODEL_EVALUATOR_HELL_모델로_원장에
     job_id = await env.sentence(wired.gateway, settings=settings)
 
     assert (await env.fetch_job(job_id))["status"] == "SUCCEEDED"
+    if max_tokens == 3000:
+        # 고가 모델의 출력 예약액만으로 사건 cap을 넘으면 실제 호출하지 않는다.
+        assert env.backend.finalized == []
+        assert env.backend.failed == ["BUDGET_EXCEEDED"]
+        assert roles(wired.hell) == Counter()
+        assert (await _budget(env.engine))["reserved_micro_usd"] == 0
+        return
     assert len(env.backend.finalized) == 1
     evaluators = [row for row in await _calls(env.engine) if row["node"] == "evaluator"]
     assert [

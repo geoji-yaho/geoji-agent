@@ -114,7 +114,7 @@ def validate_writer_draft(
 ) -> list[ValidationIssue]:
     """서기 초안의 구조 규칙. 빈 리스트면 통과.
 
-    강도 집합 정확히 일치 · 중복 없음 · 길이 · 라벨 ∈ `label_map` · 문장 수 2~4 · `kind`.
+    강도 집합 정확히 일치 · 중복 없음 · 길이 · 라벨 ∈ `label_map` · 문장 수 1~4 · `kind`.
     """
     issues: list[ValidationIssue] = []
     data = _normalize(draft, WriterDraft, issues)
