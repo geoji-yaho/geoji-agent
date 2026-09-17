@@ -131,6 +131,7 @@ __all__ = [
     "SentenceGraphState",
     "ValidPrepLike",
     "build_sentence_graph",
+    "build_writer_request",
     "initial_state",
     "minimal_dossier",
 ]
@@ -370,6 +371,59 @@ def _facts_view(dossier: Dossier | None) -> list[dict[str, str]]:
 
 def _sentencing_view(sentencing: SentencingDecision | None) -> dict[str, Any] | None:
     return None if sentencing is None else sentencing.model_dump(mode="json")
+
+
+def build_writer_request(
+    snapshot: CaseSnapshot,
+    dossier: Dossier | None,
+    decision: SentencingDecision | None,
+    intensity: Intensity,
+    *,
+    offset: int = 0,
+    banter: Mapping[Intensity, Sequence[Candidate]] | None = None,
+    avoid: Mapping[str, list[str]] | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """운영 그래프와 서기 실측이 공유하는 순수 요청 조립. 외부 호출·저장은 하지 않는다."""
+    jury = snapshot.jury
+    if jury is None:
+        raise ValueError("선고 스냅샷에 jury 가 없다")
+    angle = pick(snapshot.post_id, offset)
+    guide = ANGLE_GUIDES[angle]
+    candidates = [c for c in (banter or {}).get(intensity, []) if str(jury.result) in c.fits]
+    candidate_ids = [c.candidate_id for c in candidates]
+    user: dict[str, Any] = {
+        "intensity": intensity.value,
+        "attack_angle": {
+            "code": angle.value,
+            "label": guide.label_ko,
+            "instruction": guide.instruction,
+        },
+        "case": _case_view(snapshot),
+        "jury": {
+            "result": str(jury.result),
+            "vote_counts": jury.vote_counts,
+            "guilty_ratio": jury.guilty_ratio,
+        },
+        "sentencing": _sentencing_view(decision),
+        "dossier": _facts_view(dossier),
+        "banter_candidates": [
+            {
+                "id": c.candidate_id,
+                "text": c.text,
+                "strategy": str(c.strategy),
+                "evidence_labels": list(c.evidence_labels),
+            }
+            for c in candidates
+        ],
+    }
+    if avoid:
+        # repair: 검수에서 걸린 위반·문제 문장. 데이터로만 준다.
+        user["avoid"] = dict(avoid)
+    messages = [
+        {"role": "system", "content": build_writer_system(intensity)},
+        {"role": "user", "content": _dumps(user)},
+    ]
+    return messages, writer_schema([intensity.value], [angle.value], candidate_ids or None)
 
 
 def _targets(jury: JurySnapshot) -> list[Intensity]:
@@ -1173,43 +1227,15 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         snapshot = state["snapshot"]
         decision: SentencingDecision | None = state.get("sentencing")
         angle = pick(snapshot.post_id, offset)
-        guide = ANGLE_GUIDES[angle]
-        banter: Mapping[Intensity, Sequence[Candidate]] = state.get("banter") or {}
-        candidates = [c for c in banter.get(intensity, []) if str(jury.result) in c.fits]
-        candidate_ids = [c.candidate_id for c in candidates]
-        user: dict[str, Any] = {
-            "intensity": intensity.value,
-            "attack_angle": {
-                "code": angle.value,
-                "label": guide.label_ko,
-                "instruction": guide.instruction,
-            },
-            "case": _case_view(snapshot),
-            "jury": {
-                "result": str(jury.result),
-                "vote_counts": jury.vote_counts,
-                "guilty_ratio": jury.guilty_ratio,
-            },
-            "sentencing": _sentencing_view(decision),
-            "dossier": _facts_view(state["dossier"]),
-            "banter_candidates": [
-                {
-                    "id": c.candidate_id,
-                    "text": c.text,
-                    "strategy": str(c.strategy),
-                    "evidence_labels": list(c.evidence_labels),
-                }
-                for c in candidates
-            ],
-        }
-        if avoid:
-            # repair: 검수에서 걸린 위반·문제 문장. 데이터로만 준다.
-            user["avoid"] = dict(avoid)
-        messages = [
-            {"role": "system", "content": build_writer_system(intensity)},
-            {"role": "user", "content": _dumps(user)},
-        ]
-        schema = writer_schema([intensity.value], [angle.value], candidate_ids or None)
+        messages, schema = build_writer_request(
+            snapshot,
+            state["dossier"],
+            decision,
+            intensity,
+            offset=offset,
+            banter=state.get("banter"),
+            avoid=avoid,
+        )
         try:
             called = await call_model(
                 state,

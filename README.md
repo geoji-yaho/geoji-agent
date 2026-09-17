@@ -14,6 +14,13 @@
 [백엔드 요청사항](docs/plans/10-backend-contract.md)과
 [프론트 요청사항](docs/plans/16-frontend-handoff.md)을 각 담당자가 검토해 반영한다.
 
+9/17 후속: 카드 본문 1항목 수용과 짧은 기본 문구는 최신 server `c970ab4`에서
+`codex/card-text-contract` 브랜치로 수정했다. 백엔드 전체 빌드·536개 테스트를 통과했으며,
+위 9/16 참고 패치와 별개다. main 머지·운영 배포는 아직 확인하지 않았다.
+백엔드 푸시는 현재 계정의 쓰기 권한이 없어 거절됐다. 동일한 로컬 커밋 `93323a9`을
+[백엔드 카드 패치](docs/plans/evidence/20260917/backend-card-text.patch)로 제공한다.
+적용 방법은 [백엔드 계약서 §5](docs/plans/10-backend-contract.md)에 있다.
+
 로컬에서 `b-meme`으로 만든 이미지를 LLM 키 없이 등록하도록 **백엔드 업로드 API 반영을 요청**했다.
 관리자 인증·스토리지·짤 카탈로그를 관리하는 백엔드 담당자가 반영할 사항이며,
 에이전트에 중복 업로드 API는 추가하지 않았다(10 §16.5).
@@ -109,6 +116,26 @@ uv run scripts/enqueue_job.py --kind SENTENCE --verdict v1 --version 1 --post p1
 curl -s localhost:8200/posts/p1/verdict | jq '.sentence_status, .text_status, .sentence_source, .view.source'   # FINAL TEMPLATE_READY RULE TEMPLATE
 uv run scripts/probe_writer_latency.py --provider openai --role sentencing --n 5   # 실측은 키가 있을 때만
 ```
+
+### 현재 카드 문구 세 강도 점검
+
+현재 운영 코드와 같은 요청 조립·프롬프트·JSON 스키마를 사용한다. 합성 택시비 12,000원,
+늦잠 사유에 유죄·징역 1일을 가정하고 순한맛·매운맛·지옥맛 서기만 점검한다.
+
+```bash
+uv run python scripts/probe_verdict_cards.py --out /tmp/cards-dry.json
+uv run python scripts/probe_verdict_cards.py --fake --out /tmp/cards-fake.json
+# XAI_API_KEY를 실행 환경 또는 git에서 제외된 .env에 설정한 뒤 실행 (유료 최대 3회)
+uv run python scripts/probe_verdict_cards.py --execute --out /tmp/cards-live.json
+```
+
+기본 실행은 모델을 호출하지 않는다. `--execute`는 `MODEL_WRITER`,
+`WRITER_MAX_OUTPUT_TOKENS`, `WRITER_NODE_TIMEOUT_SECONDS`를 그대로 사용하고 자동 재시도하지 않는다.
+보고서에는 원본 구조화 응답, 메타데이터, 형식 검사, 사용량·비용·지연시간이 담긴다.
+키 누락·호출 실패·형식 위반은 종료 코드 1이다. 종료 코드 0은 **카드 형식 검사 통과**이며,
+근거 라벨 존재 여부는 별도 표시한다. 양형·검수·최종 저장·화면 줄바꿈까지 검증하지 않는다.
+`--fake`는 고정 fixture이며 실제 생성 결과가 아니다.
+기존 `probe_writer_latency.py`는 과거 고정 프롬프트 비교용이므로 현재 카드 검증에는 이 도구를 쓴다.
 
 ### 게이트
 

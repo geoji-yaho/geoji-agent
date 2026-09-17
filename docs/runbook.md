@@ -86,6 +86,20 @@ docker compose -f docker-compose.prod.yml logs --since 30m ai-worker \
 서기 출력 토큰 상한 700은 그대로다. 제목·본문의 길이를 줄였으며 밈 선택·검수 메타데이터는 유지한다.
 FakeLLM 회귀 통과는 실제 모델의 문구 품질·토큰 사용량·지연시간이나 실제 카드 줄바꿈을 검증하지 않는다.
 
+현재 실행 환경의 서기 프롬프트·모델·토큰 상한은 다음 명령으로 모델 호출 없이 확인한다.
+스크립트가 포함된 최신 이미지에서 실행해야 한다.
+
+```bash
+docker compose -f docker-compose.prod.yml exec ai-worker \
+  python scripts/probe_verdict_cards.py --out /tmp/cards-dry.json
+```
+
+실제 세 강도 출력 확인은 같은 명령에 `--execute`를 추가한다(xAI 최대 3회 유료 호출).
+키는 컨테이너 환경에서 읽으며 명령이나 채팅에 직접 넣지 않는다. `--out` 보고서의
+`writer_version`·`prompt_bundle`·각 요청의 토큰/시간 상한을 배포 버전과 대조한다.
+이 검사는 서기 단독이며, 양형·검수·백엔드 저장 성공은 별도 사건 trace로 확인한다.
+`success`는 카드 형식 검사 결과이고 근거 라벨 검사 결과는 `evidence_validation`에 따로 기록한다.
+
 9/17 회귀 테스트로 검수 결과 병합의 두 오류를 재현했다. `evidence_labels` 배열 때문에 동일 위반이
 제거되지 않아 계약 상한을 초과하던 경로는 중첩 값 비교로 고쳤다. 별도 지옥맛 검수 응답에서 필수
 검사가 null·누락이면 예외로 중단되던 경로는 `EVAL_FAILED`를 보고하도록 고쳤다. 이 증거만으로

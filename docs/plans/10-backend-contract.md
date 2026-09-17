@@ -3,6 +3,8 @@
 > 근거: proposal2 §1(아키텍처), §2.2 결정 16~24, §7.1 업무 테이블 추가 필드, §8.1 이벤트·큐, §9 API 계약, §10 판결 확정 트랜잭션, §11 마감·재시도·삭제 경합, §12(정책 버전이 finalize 에 걸림), §17 짤, §19 role 분리, §20 작업 3·8 완료 기준·먼저 실패시킬 케이스, §21 백엔드·프론트 변경 계약. proposal2 는 git 에 없으므로 백엔드가 **이 파일 한 장만 읽으면** 되게 옮겨 적었다.
 > **대상 독자: 백엔드 담당. 9/14 부터 백엔드가 읽는 문서는 이 한 장이다.** 계약(§1~§12)·배포와 연동(§16)·백엔드가 할 일과 전달 상태(§0.1)·회신 대기(§14)가 모두 여기 있다. AI 파트 계획서(01~09)는 이 문서를 참조한다. 계약이 바뀌면 여기와 `01-contracts-fake-provider.md` 를 같이 고친다.
 > **9/16 인수인계:** 아래 로컬 구현은 임시 checkout의 검증용 변경이다. 백엔드 저장소에는 커밋·푸시하지 않았다. 이 문서와 참고 패치를 담당자 검토용으로만 남긴다. 키 없이 기존 b-meme 파일을 등록하는 최소 API 요청은 **§16.5**, 배포 키는 **§16.1**이다.
+> **9/17 카드 호환 후속:** 최신 server `c970ab4` 기준 `codex/card-text-contract` 브랜치에서 본문 최소 1항목·짧은 공유 템플릿을 수정했다. 전체 빌드와 536개 테스트를 통과했으며, main 머지·운영 배포는 별도다. 아래 9/16 참고 패치 전체를 반영했다는 뜻은 아니다.
+> 백엔드 커밋 `93323a9` 푸시는 GitHub의 `Permission denied to nemory-dev`로 실패했다. 동일 변경을 §5의 패치로 제공한다. 백엔드 원격 브랜치가 생성됐다는 뜻은 아니다.
 > **9/16 최신 원격 대조:** agent·server·web의 `main`, web `develop`, agent의 열린 PR #40·#41을 확인했다. 실행 환경별 키 주입, 배포 PR의 `.env` 제약, 백엔드에 남은 요청은 **§16.6**이다. 아래 과거 날짜의 구현 상태와 구분해서 읽는다.
 > **9/14 코드 대조:** AI 저장소 `main`(52b6433) 코드와 어긋나던 문장을 코드 기준으로 고쳤다. 고친 곳은 `(9/14 코드 대조)`, 크게 바뀐 옛 문장은 `(원문)` 으로 남겼다. 코드에 아직 없는 백엔드 요구(`(제안)`, D-24·D-26)는 그대로 백엔드 몫이다.
 > **9/8 갱신: D-20 · D-21 · 전달 방식 · 배포는 §15 에서 확정됐다. 서버에는 재판 흐름이 아직 없으므로 §2~§9 가 전부 신규 작업이다.** (원문) **가장 먼저 답해야 할 것: D-20.** 백엔드와 AI 가 같은 Postgres 인스턴스를 쓰고, 업무 트랜잭션 안에서 `ai.jobs` 를 INSERT 할 수 있는가. 아니면 outbox 전달 계층이 먼저 필요하고 9/8~9/18 일정 전체가 흔들린다(proposal2 부록 D). **9/8 까지 회신.**
@@ -39,7 +41,7 @@
 
 | 날짜 | 무엇이 바뀌었나 → 백엔드가 할 일 | 절 | 상태 |
 |---|---|---|---|
-| 9/17 | **카드 문구 단축 배포 전 필수:** finalize 본문 최소 개수 2→1, 공유 템플릿 갱신. AI는 새 생성에 제목 ≤20자·본문 1항목 ≤30자를 적용한다. 임시 server checkout의 `FinalizeRequestParser`에는 `array(statementNode, 2, 4)`가 남아 있다. 실제 운영 저장소 반영·수용검사 후 AI 이미지 배포 | §5·§10·§16.3 | 미전달 |
+| 9/17 | **카드 문구 단축 배포 전 필수:** finalize 본문 최소 개수 2→1, 공유 템플릿 갱신. AI는 새 생성에 제목 ≤20자·본문 1항목 ≤30자를 적용한다. server `c970ab4`에서도 최소 2항목을 재현하고 `codex/card-text-contract`에서 수정·전체 빌드 검증했다. 해당 브랜치의 main 반영·배포 후 AI 이미지 배포 | §5·§10·§16.3 | 미전달 |
 | 9/16 | **`FinalizeRequestParser.GUARDRAIL_VERSIONS` 에 `guardrail-v3` 을 더해 달라**(현재 `Set.of("guardrail-v1", "guardrail-v2")`). 지옥맛 비속어 제한을 없앤 새 검수 정책을 v3 으로 올리려 했는데 finalize 가 422 `INVALID_DRAFT` 를 내서 판결이 통째로 막혔다(15 §6 7회차). **지금은 AI 쪽이 v2 를 제자리에서 개정해 쓰므로 백엔드 작업 없이도 돈다.** 이 줄은 나중에 정책 버전을 올릴 수 있게 하는 선반영 요청이다. 허용 목록만 늘리면 되고 기본값·저장 컬럼은 그대로 | §5·§15.3 D-07 | 미전달 |
 | 9/16 | **운영 템플릿 폴백 원인**: AI 워커 검수관 상한 4초 vs luna 실측 14~17초 → 매 판결 `EVAL_FAILED`(TIMEOUT). AI 이미지 기본값을 양형 12·서기 10·검수 30초, `TEXT_RETRY_TIMEOUT_SECONDS` 60 으로 올림(01 §3.7) → **새 이미지 태그로 재배포**. `.env` 에 `*_NODE_TIMEOUT_SECONDS` 를 따로 적어 뒀다면 지우거나 같은 값으로. `JobKind.TEXT_RETRY` 마감 20s → **60s**(§3). SENTENCE 90s 는 그대로 | §3·§16.1·§16.3 | 미전달 |
 | 9/16 | 워커 로그에 `sentence_call`·`sentence_fallback`·`sentence_summary`(역할·강도·timeout·오류 kind·결과) 추가 → 템플릿이 뜨면 `docker logs geoji-ai-worker` 에서 `trace_id` 로 검색해 `sentence_summary.outcome`·`fallback_reason` 을 보면 된다. 백엔드 작업 없음(참고) | §16.2 | 미전달 |
@@ -251,7 +253,18 @@ intake 동작 (9/14 코드 대조, 07 §3.1·§3.2·§3.4):
 
 **9/17 카드 규격:** 새 AI·TEMPLATE 생성은 제목 1~20자, `statement` 정확히 1항목, 본문 1~30자이며 줄바꿈·공백만 있는 문구를 거부한다. 공백·문장부호를 포함한 Unicode code point 수다. 근거 라벨·문장 종류·전략·밈 태그·감정·키워드는 유지한다. 기존 저장 문구를 읽는 `TextDraft`/공개 DTO는 제목 30자·본문 최대 4항목·합계 300자 상한을 유지하고 `TextDraft`의 최소 항목 수만 2→1로 완화했다. 같은 JSON 필드·enum을 유지하므로 정본의 `schema_version=1`은 유지하지만, **구형 최소 2항목 검증기는 새 출력을 거절한다.** 백엔드를 먼저 갱신해야 한다.
 
-백엔드 적용 지점은 `FinalizeRequestParser`의 `array(statementNode, 2, 4)` → `array(statementNode, 1, 4)`다. 저장·조회 상한을 줄이는 migration은 필요 없다. 수용검사: 1항목 finalize 성공, 빈 배열·5항목 거부, 기존 2~4항목 조회 성공, 메타데이터·`draft_hash` 동일성, §10 기본 문구와 카드 렌더 확인. 실제 운영 저장소는 이번 작업에서 수정하지 못했으며, 확인한 경로는 이전 임시 checkout이다. 글자 수 제한만으로 모든 화면 폭에서 한 줄 표시가 보장되지는 않는다.
+백엔드 적용 지점은 `FinalizeRequestParser`의 `array(statementNode, 2, 4)` → `array(statementNode, 1, 4)`다. 저장·조회 상한을 줄이는 migration은 필요 없다. 수용검사: 1항목 finalize 성공, 빈 배열·5항목 거부, 기존 2~4항목 조회 성공, 메타데이터·`draft_hash` 동일성, §10 기본 문구와 카드 렌더 확인. 9/17 최신 server `c970ab4` 기반 로컬 `codex/card-text-contract`에서 파서·공유 템플릿을 수정했다. 세 강도의 짧은 AI fixture를 finalize하여 DB의 본문 1항목·근거 참조·`AI_READY`·job 성공까지 확인했고 전체 빌드·536개 테스트가 통과했다. main 머지·운영 배포·실제 카드 렌더는 미검증이다. 글자 수 제한만으로 모든 화면 폭에서 한 줄 표시가 보장되지는 않는다.
+
+백엔드 쓰기 권한이 없어 푸시는 실패했다. [로컬 커밋 93323a9의 전체 패치](evidence/20260917/backend-card-text.patch)를 백엔드 담당자가 깨끗한 작업 브랜치에서 적용한다. 이 패치는 9/16 참고 패치와 독립적이다.
+
+```bash
+# geoji-server 저장소에서 실행. 패치는 위 링크에서 내려받은 실제 경로로 지정한다.
+git switch -c fix/card-text-contract
+git am /path/to/backend-card-text.patch
+./gradlew build  # JDK 25 및 Docker 필요
+```
+
+이후 백엔드 담당자가 브랜치를 푸시하고 머지·배포한다. 코드 적용에 필요한 공개 API 형태·DB migration 변경은 없다.
 
 요청 `FinalizeRequest`(01 §3.2, 정본 `contracts/finalize-v1.schema.json`): `schema_version`·`job_id`·`generation_id`·`verdict_version`·`expected_text_version`·`dossier_id`·`privacy_versions`·`draft_hash`·`sentencing{sentence, sentencing_reason, reason_source, evidence_labels, aggravating, mitigating} | null`·`draft{texts[{intensity, headline, statement, banter_strategy, selected_candidate_id, attack_angle, source}], meme_tag, meme_hints{emotion, keywords}}`·`evaluation`·`evaluation_draft_hash`·`prompt_bundle_version`·`guardrail_policy_version`·`model_ids{sentencing, writer, evaluator}`. 전부 필수(`sentencing` 은 null 가능), 알 수 없는 필드 거부 (9/14 코드 대조: `schema_version`·`model_ids` 모양 추가)
 
