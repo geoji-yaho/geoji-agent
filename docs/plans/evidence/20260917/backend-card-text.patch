@@ -1,0 +1,376 @@
+From 93323a9eba7b5973b0e4060d2de98fc8d06dd1ca Mon Sep 17 00:00:00 2001
+From: hyun <rlaalgus132@naver.com>
+Date: Thu, 17 Sep 2026 13:41:53 +0900
+Subject: [PATCH] =?UTF-8?q?fix(verdict):=20=EB=B3=B8=EB=AC=B8=20=ED=95=9C?=
+ =?UTF-8?q?=20=ED=95=AD=EB=AA=A9=20=EC=B9=B4=EB=93=9C=20=EC=A0=80=EC=9E=A5?=
+ =?UTF-8?q?=EA=B3=BC=20=EC=A7=A7=EC=9D=80=20=EA=B8=B0=EB=B3=B8=20=EB=AC=B8?=
+ =?UTF-8?q?=EA=B5=AC=20=EC=A7=80=EC=9B=90?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- finalize 본문을 1~4개로 수용하고 기존 다문장 호환을 유지한다.
+- AI 정본 48c06f8의 짧은 템플릿과 카드 fixture를 동기화한다.
+- 경계 및 실제 DB 저장 회귀를 추가하고 Gradle 전체 build 536개 테스트를 통과했다.
+---
+ docs/ai-team-report.md                        |  4 +-
+ .../verdict/FinalizeRequestParser.java        |  3 +-
+ .../backend/verdict/TemplateCatalog.java      |  2 +-
+ .../resources/contracts/templates-v1.json     |  8 +--
+ .../api/PostVerdictControllerTest.java        |  2 +-
+ .../backend/api/ShareCardControllerTest.java  |  2 +-
+ .../verdict/FinalizeRequestParserTest.java    | 37 +++++++++++
+ .../backend/verdict/FinalizeServiceTest.java  | 29 +++++++++
+ .../backend/verdict/TemplateCatalogTest.java  | 21 +++++-
+ .../verdict/VerdictFallbackServiceTest.java   |  4 +-
+ .../contracts/writer-draft-card-taxi.json     | 65 +++++++++++++++++++
+ 11 files changed, 163 insertions(+), 14 deletions(-)
+ create mode 100644 src/test/resources/contracts/writer-draft-card-taxi.json
+
+diff --git a/docs/ai-team-report.md b/docs/ai-team-report.md
+index 5ce82ba..0b36c95 100644
+--- a/docs/ai-team-report.md
++++ b/docs/ai-team-report.md
+@@ -120,7 +120,9 @@ AI 파트(`geoji-agent`)에 전할 내용을 한곳에 모은다. 백엔드가 1
+ 5. 검수 `texts[]` 에 요청 강도가 빠지면 422
+ 6. `dossier_id` 의 `post_id` 가 판결 게시물과 다르면 422, dossier·evidence 무효화면 409 `EVIDENCE_INVALIDATED`
+ 
+-그 밖 finalize 검증: `reason_source`·`texts[].source` 필수(AI/TEMPLATE, 누락 422), 길이는 코드포인트(라벨 ≤16·`^F\d+$`, statement 1~300자·2~4개, headline ≤30, reason ≤100, keywords ≤10·≤30자) + 강도별 statement 합산 300, `meme_hints.emotion` 6종 밖 422, `draft_hash`·`evaluation_draft_hash` 둘 다 백엔드 재계산과 비교(계산 불가 — 짝 없는 서로게이트·NaN·Infinity — 도 422).
++그 밖 finalize 검증: `reason_source`·`texts[].source` 필수(AI/TEMPLATE, 누락 422), 길이는 코드포인트(라벨 ≤16·`^F\d+$`, statement 1~300자·1~4개, headline ≤30, reason ≤100, keywords ≤10·≤30자) + 강도별 statement 합산 300, `meme_hints.emotion` 6종 밖 422, `draft_hash`·`evaluation_draft_hash` 둘 다 백엔드 재계산과 비교(계산 불가 — 짝 없는 서로게이트·NaN·Infinity — 도 422).
++
++9/17 카드 규격 연동: geoji-agent `48c06f8`의 새 생성은 제목 20자·본문 1항목 30자다. 백엔드는 최소 항목 수를 2→1로 완화하고 기존 저장 문구의 상한은 유지한다. `templates-v1.json`은 같은 커밋의 짧은 문구로 바이트 동기화했다. 템플릿 JSON 구조·버전 이름은 유지하며 파일 출처 커밋으로 변경을 식별한다. 실제 배포 반영은 이 작업 브랜치의 main 머지 이후다.
+ 
+ ### 4.4 폴백·무효화 문구
+ 
+diff --git a/src/main/java/com/ttegeoji/backend/verdict/FinalizeRequestParser.java b/src/main/java/com/ttegeoji/backend/verdict/FinalizeRequestParser.java
+index 54f9b43..0d19670 100644
+--- a/src/main/java/com/ttegeoji/backend/verdict/FinalizeRequestParser.java
++++ b/src/main/java/com/ttegeoji/backend/verdict/FinalizeRequestParser.java
+@@ -175,7 +175,8 @@ public final class FinalizeRequestParser {
+                 "attack_angle", "source"), Set.of());
+         List<Statement> statements = new ArrayList<>();
+         JsonNode statementNode = node.get("statement");
+-        for (JsonNode item : array(statementNode, 2, 4)) {
++        // 새 카드는 1항목, 과거 판결문은 2~4항목이다(10 §5 9/17).
++        for (JsonNode item : array(statementNode, 1, 4)) {
+             object(item, Set.of("text", "kind", "evidence_labels"), Set.of());
+             statements.add(new Statement(string(item.get("text"), 1, 300), oneOf(item.get("kind"), STATEMENT_KINDS),
+                     labels(item.get("evidence_labels"))));
+diff --git a/src/main/java/com/ttegeoji/backend/verdict/TemplateCatalog.java b/src/main/java/com/ttegeoji/backend/verdict/TemplateCatalog.java
+index 6478e93..1535ef9 100644
+--- a/src/main/java/com/ttegeoji/backend/verdict/TemplateCatalog.java
++++ b/src/main/java/com/ttegeoji/backend/verdict/TemplateCatalog.java
+@@ -13,7 +13,7 @@ import tools.jackson.databind.ObjectMapper;
+ /**
+  * 10 §10 폴백 템플릿. AI 워커가 판결문을 못 만들었을 때 백엔드가 같은 문구를 쓰도록
+  * AI 저장소 파일을 바이트 그대로 복사해 버전을 고정한다.
+- * 출처: geoji-agent contracts/fixtures/templates-v1.json @ 995c7fb499875332bd75e1c530a81b2660f81a67
++ * 출처: geoji-agent contracts/fixtures/templates-v1.json @ 48c06f834201479fb7403764ca04e6b7508dfe8d
+  * 형량은 아직 Sentence enum 이 없어 문자열 코드(probation|oneDay|life)로 받는다.
+  */
+ @Component
+diff --git a/src/main/resources/contracts/templates-v1.json b/src/main/resources/contracts/templates-v1.json
+index 1af1919..ce0abc6 100644
+--- a/src/main/resources/contracts/templates-v1.json
++++ b/src/main/resources/contracts/templates-v1.json
+@@ -9,28 +9,28 @@
+     "guilty": {
+       "headline": "유죄",
+       "statement": [
+-        "배심원 {n}인 중 {m}인이 유죄로 판단했습니다. 형량: {sentence_label}"
++        "배심원단이 이 지출을 유죄로 판단했습니다."
+       ],
+       "sentencing_reason_template": "형량: {sentence_label}"
+     },
+     "notGuilty": {
+       "headline": "무죄",
+       "statement": [
+-        "배심원단은 이 지출에 정상 참작의 여지가 있다고 판단했습니다."
++        "배심원단이 이 지출을 무죄로 판단했습니다."
+       ],
+       "sentencing_reason_template": null
+     },
+     "agree": {
+       "headline": "동의",
+       "statement": [
+-        "배심원단이 구매를 승인했습니다. 후회는 본인 몫입니다."
++        "배심원단이 구매를 승인했습니다."
+       ],
+       "sentencing_reason_template": null
+     },
+     "disagree": {
+       "headline": "기각",
+       "statement": [
+-        "배심원단이 구매를 기각했습니다. 지갑을 닫으십시오."
++        "배심원단이 구매를 기각했습니다."
+       ],
+       "sentencing_reason_template": null
+     }
+diff --git a/src/test/java/com/ttegeoji/backend/api/PostVerdictControllerTest.java b/src/test/java/com/ttegeoji/backend/api/PostVerdictControllerTest.java
+index 60391bc..7c60bb7 100644
+--- a/src/test/java/com/ttegeoji/backend/api/PostVerdictControllerTest.java
++++ b/src/test/java/com/ttegeoji/backend/api/PostVerdictControllerTest.java
+@@ -39,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
+ class PostVerdictControllerTest extends PostgresContainerSupport {
+ 
+     private static final JsonMapper JSON = JsonMapper.builder().build();
+-    static final String GUILTY_TEMPLATE_LINE_2_OF_2 = "배심원 2인 중 2인이 유죄로 판단했습니다. 형량: 징역 1일 (내일 하루 무지출)";
++    static final String GUILTY_TEMPLATE_LINE_2_OF_2 = "배심원단이 이 지출을 유죄로 판단했습니다.";
+ 
+     @Autowired
+     private MockMvc mockMvc;
+diff --git a/src/test/java/com/ttegeoji/backend/api/ShareCardControllerTest.java b/src/test/java/com/ttegeoji/backend/api/ShareCardControllerTest.java
+index fbd826a..3b22cf0 100644
+--- a/src/test/java/com/ttegeoji/backend/api/ShareCardControllerTest.java
++++ b/src/test/java/com/ttegeoji/backend/api/ShareCardControllerTest.java
+@@ -36,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
+ class ShareCardControllerTest extends PostgresContainerSupport {
+ 
+     private static final JsonMapper JSON = JsonMapper.builder().build();
+-    private static final String TEMPLATE_LINE = "배심원 0인 중 0인이 유죄로 판단했습니다. 형량: 징역 1일 (내일 하루 무지출)";
++    private static final String TEMPLATE_LINE = "배심원단이 이 지출을 유죄로 판단했습니다.";
+     private static final String PRIVATE_EVIDENCE_TEXT = "비공개근거원문문장";
+ 
+     @Autowired
+diff --git a/src/test/java/com/ttegeoji/backend/verdict/FinalizeRequestParserTest.java b/src/test/java/com/ttegeoji/backend/verdict/FinalizeRequestParserTest.java
+index 0f89574..aa470eb 100644
+--- a/src/test/java/com/ttegeoji/backend/verdict/FinalizeRequestParserTest.java
++++ b/src/test/java/com/ttegeoji/backend/verdict/FinalizeRequestParserTest.java
+@@ -4,6 +4,8 @@ import com.ttegeoji.backend.config.InternalApiException;
+ import com.ttegeoji.backend.verdict.FinalizeRequestParser.FinalizeRequest;
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.ValueSource;
+ import org.springframework.http.HttpStatus;
+ import tools.jackson.databind.JsonNode;
+ import tools.jackson.databind.ObjectMapper;
+@@ -113,6 +115,41 @@ class FinalizeRequestParserTest {
+         assertThat(request.evaluation().texts()).allMatch(FinalizeRequestParser.TextEvaluation::pass);
+     }
+ 
++    @ParameterizedTest
++    @ValueSource(ints = {1, 2, 3, 4})
++    @DisplayName("10 §5 새 카드 본문 1개와 기존 판결문 2~4개를 모두 허용한다")
++    void acceptsCardAndHistoricalStatementCounts(int count) {
++        ObjectNode body = validBody();
++        for (JsonNode item : body.get("draft").get("texts")) {
++            ArrayNode statements = (ArrayNode) item.get("statement");
++            JsonNode statement = statements.get(0).deepCopy();
++            statements.removeAll();
++            for (int i = 0; i < count; i++) {
++                statements.add(statement.deepCopy());
++            }
++        }
++
++        FinalizeRequest request = FinalizeRequestParser.parse(bytes(body));
++        assertThat(request.draft().texts()).allSatisfy(text -> assertThat(text.statement()).hasSize(count));
++        assertThat(request.draft().memeEmotion()).isEqualTo("DISAPPROVAL");
++        assertThat(request.draft().texts().getFirst().statement().getFirst().evidenceLabels())
++                .containsExactly("F0");
++    }
++
++    @ParameterizedTest
++    @ValueSource(ints = {0, 5})
++    @DisplayName("10 §5 본문이 없거나 5개 이상이면 422 INVALID_DRAFT")
++    void rejectsStatementCountOutsideContract(int count) {
++        assertInvalid(body -> {
++            ArrayNode statements = (ArrayNode) text(body, 0).get("statement");
++            JsonNode statement = statements.get(0).deepCopy();
++            statements.removeAll();
++            for (int i = 0; i < count; i++) {
++                statements.add(statement.deepCopy());
++            }
++        });
++    }
++
+     @Test
+     @DisplayName("10 §5 최상위 알 수 없는 필드 → 422 INVALID_DRAFT")
+     void unknownTopLevelField() {
+diff --git a/src/test/java/com/ttegeoji/backend/verdict/FinalizeServiceTest.java b/src/test/java/com/ttegeoji/backend/verdict/FinalizeServiceTest.java
+index 5419682..9d127d6 100644
+--- a/src/test/java/com/ttegeoji/backend/verdict/FinalizeServiceTest.java
++++ b/src/test/java/com/ttegeoji/backend/verdict/FinalizeServiceTest.java
+@@ -70,6 +70,35 @@ class FinalizeServiceTest extends PostgresContainerSupport {
+ 
+     // ---- 최초 SENTENCE ----
+ 
++    @Test
++    @DisplayName("10 §5 새 카드 3강도의 한 문장 본문·근거·검수 hash를 저장한다")
++    void shortCardTextsAreSaved() throws Exception {
++        Case c = newCase();
++        ObjectNode draft;
++        // geoji-agent 48c06f8 contracts/fixtures/writer-draft-card-taxi.json 사본.
++        try (var input = getClass().getResourceAsStream("/contracts/writer-draft-card-taxi.json")) {
++            assertThat(input).isNotNull();
++            draft = (ObjectNode) MAPPER.readTree(input);
++        }
++        FinalizeResult result = service.finalizeVerdict(c.verdictId.toString(),
++                bytes(body(c, draft, sentencing(), evaluation())));
++
++        assertThat(result.textVersion()).isEqualTo(1L);
++        assertThat(jdbc.queryForObject("SELECT text_status FROM verdicts WHERE id = ?", String.class, c.verdictId))
++                .isEqualTo("AI_READY");
++        var texts = jdbc.queryForList("SELECT statement::text AS statement FROM verdict_texts WHERE verdict_id = ?", c.verdictId);
++        assertThat(texts).hasSize(3).allSatisfy(row -> {
++            JsonNode statement = MAPPER.readTree((String) row.get("statement"));
++            assertThat(statement.size()).isEqualTo(1);
++            String text = statement.get(0).get("text").stringValue();
++            assertThat(text.codePointCount(0, text.length())).isBetween(1, 30);
++        });
++        assertThat(jobStatus(c.jobId)).isEqualTo("SUCCEEDED");
++        assertThat(retainCount(c)).isEqualTo(1);
++        assertThat(jdbc.queryForList("SELECT field_path FROM ai.text_evidence_refs WHERE verdict_id = ?",
++                String.class, c.verdictId)).hasSize(3).containsOnly("statement[0]");
++    }
++
+     @Test
+     @DisplayName("10 §5 최초 성공 → FINAL/AI·AI_READY·RETAIN 1·job SUCCEEDED·commit record")
+     void firstSuccess() {
+diff --git a/src/test/java/com/ttegeoji/backend/verdict/TemplateCatalogTest.java b/src/test/java/com/ttegeoji/backend/verdict/TemplateCatalogTest.java
+index a8977b1..3646c2e 100644
+--- a/src/test/java/com/ttegeoji/backend/verdict/TemplateCatalogTest.java
++++ b/src/test/java/com/ttegeoji/backend/verdict/TemplateCatalogTest.java
+@@ -2,6 +2,8 @@ package com.ttegeoji.backend.verdict;
+ 
+ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Test;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.ValueSource;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+@@ -26,13 +28,13 @@ class TemplateCatalogTest {
+     }
+ 
+     @Test
+-    @DisplayName("10 §10 guilty(4,3,oneDay) → {n}·{m}·{sentence_label} 치환된 statement 와 sentencingReason")
++    @DisplayName("10 §10 유죄 카드 본문은 짧게, 형량은 sentencingReason으로 전달한다")
+     void guiltySubstitution() {
+         TemplateCatalog.Rendered rendered = catalog.render("guilty", 4, 3, "oneDay");
+ 
+         assertThat(rendered.statement()).hasSize(1);
+         assertThat(rendered.statement().get(0))
+-                .isEqualTo("배심원 4인 중 3인이 유죄로 판단했습니다. 형량: 징역 1일 (내일 하루 무지출)");
++                .isEqualTo("배심원단이 이 지출을 유죄로 판단했습니다.");
+         assertThat(rendered.sentencingReason()).isEqualTo("형량: 징역 1일 (내일 하루 무지출)");
+     }
+ 
+@@ -43,7 +45,20 @@ class TemplateCatalogTest {
+         assertThat(catalog.render("agree", 4, 0, null).sentencingReason()).isNull();
+         assertThat(catalog.render("disagree", 4, 0, null).sentencingReason()).isNull();
+         assertThat(catalog.render("notGuilty", 4, 1, null).statement())
+-                .containsExactly("배심원단은 이 지출에 정상 참작의 여지가 있다고 판단했습니다.");
++                .containsExactly("배심원단이 이 지출을 무죄로 판단했습니다.");
++    }
++
++    @ParameterizedTest
++    @ValueSource(strings = {"guilty", "notGuilty", "agree", "disagree"})
++    @DisplayName("10 §10 모든 폴백은 제목 20자·본문 1개 30자 이내다")
++    void allFallbacksFitCard(String result) {
++        TemplateCatalog.Rendered rendered = catalog.render(result, 1000, 999,
++                result.equals("guilty") ? "life" : null);
++        assertThat(rendered.headline().codePointCount(0, rendered.headline().length())).isBetween(1, 20);
++        assertThat(rendered.statement()).hasSize(1).allSatisfy(line -> {
++            assertThat(line).isNotBlank().doesNotContain("\n", "\r");
++            assertThat(line.codePointCount(0, line.length())).isBetween(1, 30);
++        });
+     }
+ 
+     @Test
+diff --git a/src/test/java/com/ttegeoji/backend/verdict/VerdictFallbackServiceTest.java b/src/test/java/com/ttegeoji/backend/verdict/VerdictFallbackServiceTest.java
+index fbac7b6..98ca832 100644
+--- a/src/test/java/com/ttegeoji/backend/verdict/VerdictFallbackServiceTest.java
++++ b/src/test/java/com/ttegeoji/backend/verdict/VerdictFallbackServiceTest.java
+@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
+ @SpringBootTest
+ class VerdictFallbackServiceTest extends PostgresContainerSupport {
+ 
+-    static final String GUILTY_LINE = "배심원 3인 중 2인이 유죄로 판단했습니다. 형량: 징역 1일 (내일 하루 무지출)";
++    static final String GUILTY_LINE = "배심원단이 이 지출을 유죄로 판단했습니다.";
+     static final String ONE_DAY_REASON = "형량: 징역 1일 (내일 하루 무지출)";
+ 
+     @Autowired
+@@ -70,7 +70,7 @@ class VerdictFallbackServiceTest extends PostgresContainerSupport {
+     }
+ 
+     @Test
+-    @DisplayName("10 §10 guilty 문구에 {n}·{m}·형량 라벨 치환, 형량 fallback FINAL/RULE·이유 TEMPLATE")
++    @DisplayName("10 §10 guilty 카드 1문장, 형량 fallback FINAL/RULE·이유 TEMPLATE")
+     void guiltyTemplateSubstituted() {
+         UUID verdictId = seed.pendingVerdict("guilty", 2, 1, "now() + interval '10 seconds'").verdictId();
+ 
+diff --git a/src/test/resources/contracts/writer-draft-card-taxi.json b/src/test/resources/contracts/writer-draft-card-taxi.json
+new file mode 100644
+index 0000000..c48d4b9
+--- /dev/null
++++ b/src/test/resources/contracts/writer-draft-card-taxi.json
+@@ -0,0 +1,65 @@
++{
++  "schema_version": 1,
++  "texts": [
++    {
++      "intensity": "mild",
++      "headline": "택시 12,000원, 유죄",
++      "statement": [
++        {
++          "text": "택시비면 지하철을 여덟 번 탈 수 있어요.",
++          "kind": "fact",
++          "evidence_labels": [
++            "F0"
++          ]
++        }
++      ],
++      "banter_strategy": "CHEAPER_ALTERNATIVE",
++      "selected_candidate_id": null,
++      "attack_angle": "CONVERSION",
++      "source": "AI"
++    },
++    {
++      "intensity": "spicy",
++      "headline": "또 늦잠, 또 택시",
++      "statement": [
++        {
++          "text": "최근 7일 택시 3회, 31,000원입니다.",
++          "kind": "fact",
++          "evidence_labels": [
++            "F1"
++          ]
++        }
++      ],
++      "banter_strategy": "REPEAT_OFFENSE",
++      "selected_candidate_id": "8d3f1a62-6c95-4b07-8e41-9a2d5f3b7c18",
++      "attack_angle": "CONVERSION",
++      "source": "AI"
++    },
++    {
++      "intensity": "hell",
++      "headline": "늦잠값이 지하철 여덟 번",
++      "statement": [
++        {
++          "text": "지하철 여덟 번 탈 돈을 늦잠에 태웠네.",
++          "kind": "fact",
++          "evidence_labels": [
++            "F0"
++          ]
++        }
++      ],
++      "banter_strategy": "CHEAPER_ALTERNATIVE",
++      "selected_candidate_id": "6a5d2f83-4b70-4e19-8c26-0f7a9b3e5d14",
++      "attack_angle": "CONVERSION",
++      "source": "AI"
++    }
++  ],
++  "meme_tag": "GUILTY_LIGHT",
++  "meme_hints": {
++    "emotion": "DISAPPROVAL",
++    "keywords": [
++      "택시",
++      "늦잠",
++      "알람"
++    ]
++  }
++}
+-- 
+2.42.0
+
