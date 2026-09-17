@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "013-images-9.png",
+  "asset_sha256": "d54551f0c694bc962184d69e7588f023d9dc355e33fe22b9468bd0e65d83451b",
+  "classification": {
+    "emotions": [
+      "ABSURD_SERIOUSNESS"
+    ],
+    "keywords": [
+      "납득",
+      "당황",
+      "담담함"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "눈을 크게 뜨고 입을 벌려 외침",
+        "pose": "왼쪽 아래에서 놀라 고개를 듦",
+        "captions": [
+          "아아- 납득해 버렸어!"
+        ]
+      },
+      {
+        "expression": "반쯤 감은 눈과 작은 미소",
+        "pose": "오른쪽에 크게 서 있음",
+        "captions": [
+          "그렇군요."
+        ]
+      }
+    ],
+    "evidence": "왼쪽의 과장된 외침과 오른쪽의 담담한 반응이 대비된다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

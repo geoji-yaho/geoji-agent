@@ -85,6 +85,12 @@ def _has_contact(content: str) -> bool:
 
 
 def _has_profanity(content: str, intensity: Intensity) -> bool:
+    """강도별 욕 검사. 9/16 결정으로 hell 은 어느 가지에도 걸리지 않아 늘 False 다.
+
+    지옥맛 방은 비속어를 막지 않는다(`lexicon._RULE_INTENSITIES` 주석). 자해·죽음 어휘와 연락처,
+    멘션은 강도와 무관하게 `check()` 가 그대로 막는다. 아래 hell 가지는 검사를 되살릴 때를 위해
+    남긴다.
+    """
     if applies(intensity, LexiconRule.HELL_ALLOWED_PROFANITY):
         for phrase in _HELL_ALLOWED_LONGEST_FIRST:
             content = content.replace(phrase, " ")

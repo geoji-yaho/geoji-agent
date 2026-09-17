@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "texts": [
+    {
+      "intensity": "mild",
+      "headline": "택시 12,000원, 유죄",
+      "statement": [
+        {
+          "text": "택시비면 지하철을 여덟 번 탈 수 있어요.",
+          "kind": "fact",
+          "evidence_labels": [
+            "F0"
+          ]
+        }
+      ],
+      "banter_strategy": "CHEAPER_ALTERNATIVE",
+      "selected_candidate_id": null,
+      "attack_angle": "CONVERSION",
+      "source": "AI"
+    },
+    {
+      "intensity": "spicy",
+      "headline": "또 늦잠, 또 택시",
+      "statement": [
+        {
+          "text": "최근 7일 택시 3회, 31,000원입니다.",
+          "kind": "fact",
+          "evidence_labels": [
+            "F1"
+          ]
+        }
+      ],
+      "banter_strategy": "REPEAT_OFFENSE",
+      "selected_candidate_id": "8d3f1a62-6c95-4b07-8e41-9a2d5f3b7c18",
+      "attack_angle": "CONVERSION",
+      "source": "AI"
+    },
+    {
+      "intensity": "hell",
+      "headline": "늦잠값이 지하철 여덟 번",
+      "statement": [
+        {
+          "text": "지하철 여덟 번 탈 돈을 늦잠에 태웠네.",
+          "kind": "fact",
+          "evidence_labels": [
+            "F0"
+          ]
+        }
+      ],
+      "banter_strategy": "CHEAPER_ALTERNATIVE",
+      "selected_candidate_id": "6a5d2f83-4b70-4e19-8c26-0f7a9b3e5d14",
+      "attack_angle": "CONVERSION",
+      "source": "AI"
+    }
+  ],
+  "meme_tag": "GUILTY_LIGHT",
+  "meme_hints": {
+    "emotion": "DISAPPROVAL",
+    "keywords": [
+      "택시",
+      "늦잠",
+      "알람"
+    ]
+  }
+}

@@ -28,9 +28,46 @@ def _mask_secrets(_logger: Any, _method: str, event_dict: dict[str, Any]) -> dic
     return event_dict
 
 
+_STDLIB_HANDLER_MARK = "_geoji_structlog_bridge"
+
+
+def _bridge_stdlib(numeric: int) -> None:
+    """stdlib `logging` 을 같은 JSON 렌더러로 보낸다(9/16).
+
+    그래프(`graphs/*.py`)의 결정 로그는 `logging.getLogger(__name__)` 이라 stdlib 로 나간다.
+    이 연결이 없으면 INFO 는 버려지고 WARNING 만 `lastResort` 로 stderr 에 평문으로 남아
+    "어느 역할이 왜 폴백했나" 를 운영 로그에서 볼 수 없었다. 여러 번 불러도 핸들러는 하나다.
+    """
+    formatter = structlog.stdlib.ProcessorFormatter(
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.processors.JSONRenderer(ensure_ascii=False),
+        ],
+        foreign_pre_chain=[
+            structlog.contextvars.merge_contextvars,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.ExtraAdder(),
+            structlog.processors.add_log_level,
+            structlog.processors.TimeStamper(fmt="iso", utc=True),
+            _mask_secrets,
+        ],
+    )
+    root = logging.getLogger()
+    for handler in list(root.handlers):
+        if getattr(handler, _STDLIB_HANDLER_MARK, False):
+            root.removeHandler(handler)
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+    setattr(handler, _STDLIB_HANDLER_MARK, True)
+    root.addHandler(handler)
+    if root.level == logging.NOTSET or root.level > numeric:
+        root.setLevel(numeric)
+
+
 def configure_logging(level: str = "INFO") -> None:
-    """JSON 로그로 설정한다. 여러 번 불러도 된다."""
+    """JSON 로그로 설정한다. 여러 번 불러도 된다. stdlib 로그도 같은 형식으로 묶는다."""
     numeric = logging.getLevelNamesMapping().get(level.upper(), logging.INFO)
+    _bridge_stdlib(numeric)
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,

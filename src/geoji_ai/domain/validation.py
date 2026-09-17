@@ -114,7 +114,7 @@ def validate_writer_draft(
 ) -> list[ValidationIssue]:
     """서기 초안의 구조 규칙. 빈 리스트면 통과.
 
-    강도 집합 정확히 일치 · 중복 없음 · 길이 · 라벨 ∈ `label_map` · 문장 수 2~4 · `kind`.
+    강도 집합 정확히 일치 · 중복 없음 · 길이 · 라벨 ∈ `label_map` · 문장 수 1~4 · `kind`.
     """
     issues: list[ValidationIssue] = []
     data = _normalize(draft, WriterDraft, issues)
@@ -510,7 +510,12 @@ def _text_parts(text: Mapping[str, Any]) -> list[str]:
 
 
 def _hell_out_of_list(blob: str) -> list[str]:
-    """PROFANITY 매치 중 HELL_ALLOWED_PROFANITY 어느 항목의 출현 범위에도 들지 않는 것."""
+    """PROFANITY 매치 중 HELL_ALLOWED_PROFANITY 어느 항목의 출현 범위에도 들지 않는 것.
+
+    9/16 결정으로 hell 비속어 검사를 껐다(`lexicon._RULE_INTENSITIES`). `applies()` 가 False 라
+    지금은 불리지 않는다. 검사를 되살릴 때를 위해 남긴다 — 되살린다면 어간/표층형이 섞인 목록부터
+    고쳐야 한다(같은 주석).
+    """
     allowed_spans = [
         (match.start(), match.end())
         for word in lexicon.HELL_ALLOWED_PROFANITY

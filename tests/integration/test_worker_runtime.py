@@ -329,8 +329,7 @@ async def test_네_kind_모두_스텁으로_처리된다(
         assert row["last_error_code"] == "NOT_IMPLEMENTED", kind
         assert row["attempts"] == 1, kind
         # TEXT_RETRY 는 max_attempts=1 이라 첫 실패에서 FAILED 다(02 §3.4).
-        # SENTENCE 는 기한이 enqueue+10초인데 스텁이 60초 뒤 재시도를 걸어 재시도 시각이
-        # 기한 뒤다. claim 이 다시 집지 못하므로 FAIL_SQL 이 CANCELLED 로 끝낸다.
-        expected = {"TEXT_RETRY": "FAILED", "SENTENCE": "CANCELLED"}.get(kind, "QUEUED")
+        # SENTENCE는 enqueue+90초 마감 안에 60초 뒤 재시도가 가능해 QUEUED로 남는다.
+        expected = "FAILED" if kind == "TEXT_RETRY" else "QUEUED"
         assert row["status"] == expected, kind
     assert await _running_count(engine) == 0

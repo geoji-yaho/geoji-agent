@@ -258,3 +258,30 @@ def test_log_node_는_사유와_토큰_원문을_렌더된_로그에_남기지_�
     assert line["event"] == "node_done"
     assert line[f"{raw_field}_len"] == len(REASON)
     assert raw_field not in line
+
+
+def test_configure_logging_은_stdlib_로그도_같은_JSON_으로_낸다(
+    capsys: pytest.CaptureFixture[str],
+):
+    """9/16: 그래프의 `logging.getLogger` 결정 로그(INFO 포함)가 JSON 으로 stderr 에 남는다.
+
+    이 연결이 없으면 "검수관 오류 → 전 강도 TEMPLATE" 같은 줄이 운영 로그에서 사라진다.
+    """
+    import logging
+
+    configure_logging()
+    configure_logging()  # 두 번 불러도 핸들러는 하나
+    root = logging.getLogger()
+    bridged = [h for h in root.handlers if getattr(h, "_geoji_structlog_bridge", False)]
+    assert len(bridged) == 1
+
+    logging.getLogger("geoji_ai.graphs.sentencing").info(
+        "검수관 오류 %s → 전 강도 TEMPLATE", "TIMEOUT", extra={"audit": "X"}
+    )
+    err = capsys.readouterr().err
+    line = json.loads(err.strip().splitlines()[-1])
+    assert line["event"] == "검수관 오류 TIMEOUT → 전 강도 TEMPLATE"
+    assert line["level"] == "info"
+    assert line["logger"] == "geoji_ai.graphs.sentencing"
+    assert line["audit"] == "X"
+    assert "timestamp" in line

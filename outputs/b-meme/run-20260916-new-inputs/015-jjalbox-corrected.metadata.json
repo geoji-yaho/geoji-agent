@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "015-jjalbox-corrected.png",
+  "asset_sha256": "c79e7cbe5763403ceda300e83796343890df79985e24403451170126f7b31554",
+  "classification": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "째려봄",
+      "분홍캐릭터",
+      "못마땅함"
+    ],
+    "expense_categories": [],
+    "subject": "animal",
+    "panels": [
+      {
+        "expression": "눈을 가늘게 떠 째려보고 입은 픽셀 처리됨",
+        "pose": "정면 상반신",
+        "captions": []
+      }
+    ],
+    "evidence": "좁혀진 눈매와 정면 응시가 못마땅한 표정이다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

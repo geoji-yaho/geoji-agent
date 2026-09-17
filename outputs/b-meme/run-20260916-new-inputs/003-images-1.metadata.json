@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "003-images-1.png",
+  "asset_sha256": "35d70e526066b18760af4c2ccab9f70deb094d6447c9bcdd3b5a2914ea427808",
+  "classification": {
+    "emotions": [
+      "SMUG"
+    ],
+    "keywords": [
+      "능청",
+      "윙크",
+      "자신감"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "한쪽 눈을 찡긋하며 미소",
+        "pose": "주먹을 쥐고 앞에 섬",
+        "captions": []
+      }
+    ],
+    "evidence": "앞 인물의 윙크와 입꼬리, 뒤 인물들의 우려가 능청스러운 자신감을 만든다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

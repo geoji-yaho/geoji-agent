@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "postId": "00000000-0000-4000-8000-000000000001",
+  "juryStatus": "guilty",
+  "sentenceStatus": "FINAL",
+  "textStatus": "AI_READY",
+  "textVersion": 1,
+  "view": {
+    "intensity": "mild",
+    "headline": "지갑도 휴식이 필요합니다",
+    "statement": [
+      "이번 지출은 배심원의 동의를 받았습니다."
+    ],
+    "sentence": "oneDay",
+    "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+    "sentencingReason": "반복된 과소비를 돌아볼 시간을 부여합니다.",
+    "source": "AI",
+    "meme": {
+      "tag": "GUILTY_LIGHT",
+      "imageId": "00000000-0000-4000-8000-000000000010",
+      "imageUrl": "http://127.0.0.1:18101/meme.png"
+    }
+  },
+  "pollAfterMs": 0
+}

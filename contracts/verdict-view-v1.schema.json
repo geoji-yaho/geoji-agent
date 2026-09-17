@@ -38,17 +38,17 @@
         "tag": {
           "$ref": "#/$defs/MemeTag"
         },
-        "image_id": {
+        "imageId": {
           "type": "string"
         },
-        "image_url": {
+        "imageUrl": {
           "type": "string"
         }
       },
       "required": [
         "tag",
-        "image_id",
-        "image_url"
+        "imageId",
+        "imageUrl"
       ],
       "type": "object"
     },
@@ -81,13 +81,27 @@
           "type": "array"
         },
         "sentence": {
-          "$ref": "#/$defs/SentenceCode"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SentenceCode"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
-        "sentence_label": {
-          "maxLength": 30,
-          "type": "string"
+        "sentenceLabel": {
+          "anyOf": [
+            {
+              "maxLength": 30,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
-        "sentencing_reason": {
+        "sentencingReason": {
           "anyOf": [
             {
               "maxLength": 100,
@@ -106,7 +120,14 @@
           "type": "string"
         },
         "meme": {
-          "$ref": "#/$defs/MemeView"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MemeView"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -114,8 +135,8 @@
         "headline",
         "statement",
         "sentence",
-        "sentence_label",
-        "sentencing_reason",
+        "sentenceLabel",
+        "sentencingReason",
         "source",
         "meme"
       ],
@@ -124,24 +145,31 @@
     "VerdictView": {
       "additionalProperties": false,
       "properties": {
-        "schema_version": {
+        "schemaVersion": {
           "const": 1,
           "type": "integer"
         },
-        "post_id": {
+        "postId": {
           "type": "string"
         },
-        "jury_status": {
-          "$ref": "#/$defs/JuryStatus"
+        "juryStatus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JuryStatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
-        "sentence_status": {
+        "sentenceStatus": {
           "enum": [
             "PENDING",
             "FINAL"
           ],
           "type": "string"
         },
-        "text_status": {
+        "textStatus": {
           "enum": [
             "PENDING",
             "GENERATING",
@@ -150,7 +178,7 @@
           ],
           "type": "string"
         },
-        "text_version": {
+        "textVersion": {
           "minimum": 0,
           "type": "integer"
         },
@@ -164,21 +192,21 @@
             }
           ]
         },
-        "poll_after_ms": {
+        "pollAfterMs": {
           "maximum": 60000,
           "minimum": 0,
           "type": "integer"
         }
       },
       "required": [
-        "schema_version",
-        "post_id",
-        "jury_status",
-        "sentence_status",
-        "text_status",
-        "text_version",
+        "schemaVersion",
+        "postId",
+        "juryStatus",
+        "sentenceStatus",
+        "textStatus",
+        "textVersion",
         "view",
-        "poll_after_ms"
+        "pollAfterMs"
       ],
       "type": "object"
     }

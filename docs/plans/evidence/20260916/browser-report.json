@@ -1,0 +1,64 @@
+{
+  "post_id": "55582ab3-5e31-444c-89c6-cafa60d69a91",
+  "room_id": "54659bea-bbf6-4bf1-b1fe-15895814ea44",
+  "registration": "actual UI",
+  "votes": "3 real JWT API calls",
+  "paid_calls": 0,
+  "verdict": {
+    "schemaVersion": 1,
+    "postId": "55582ab3-5e31-444c-89c6-cafa60d69a91",
+    "juryStatus": "guilty",
+    "sentenceStatus": "FINAL",
+    "textStatus": "AI_READY",
+    "textVersion": 1,
+    "view": {
+      "intensity": "mild",
+      "headline": "지갑이 잠시 쉬어 갈 시간",
+      "statement": [
+        "다음 결제 전에는 한 번 더 생각해 봐요.",
+        "지갑에도 잠깐의 휴식이 필요합니다."
+      ],
+      "sentence": "oneDay",
+      "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+      "sentencingReason": "배심원의 투표 결과에 따른 판결입니다.",
+      "source": "AI",
+      "meme": {
+        "tag": "GUILTY_LIGHT",
+        "imageId": "fe3c3773-2f1e-46a9-8fb7-596c69d012ad",
+        "imageUrl": "/api/memes/fe3c3773-2f1e-46a9-8fb7-596c69d012ad/image"
+      }
+    },
+    "pollAfterMs": 0
+  },
+  "card": {
+    "id": "729bb41d-7077-44f2-9783-2d3ae0bcd879",
+    "postId": "55582ab3-5e31-444c-89c6-cafa60d69a91",
+    "status": "READY",
+    "inputHash": "e2fee7665d3b4c9982ba318b30a0810b9e109a13eaba9ec3eb8ac8c6858b6dda",
+    "pngSha256": "b0f0755d09279c25af3fb20da4588453b2ba0466f36d67be569bf605af72999d",
+    "pngUrl": "/api/posts/55582ab3-5e31-444c-89c6-cafa60d69a91/share-card/png",
+    "downloadUrl": "/api/posts/55582ab3-5e31-444c-89c6-cafa60d69a91/share-card/download",
+    "errorCode": null
+  },
+  "chrome_download_sha256": "b0f0755d09279c25af3fb20da4588453b2ba0466f36d67be569bf605af72999d",
+  "in_app_download": "HTTP 200; no completed file observed; Chrome used to verify local file",
+  "screenshot": "browser-card.jpg",
+  "private_image_id": "fb2b10f4-42ac-4ab6-b665-6019fa604f80",
+  "mime_mismatch_rejected_in_ui": true,
+  "private_image": {
+    "id": "fb2b10f4-42ac-4ab6-b665-6019fa604f80",
+    "sha256": "b0f0755d09279c25af3fb20da4588453b2ba0466f36d67be569bf605af72999d",
+    "mimeType": "image/png",
+    "width": 1080,
+    "height": 1440,
+    "status": "PRIVATE",
+    "contentUrl": "/api/images/fb2b10f4-42ac-4ab6-b665-6019fa604f80/content",
+    "reviewStatus": "APPROVED",
+    "selectedVersion": "GRAYSCALE"
+  },
+  "grayscale_review_ui": "PASS",
+  "admin_catalog_preview_and_toggle_ui": "PASS",
+  "sharing_revoke_api_status": 200,
+  "sharing_revoke_live_preview_hidden": true,
+  "sharing_revoke_creation_denied_ui": true
+}

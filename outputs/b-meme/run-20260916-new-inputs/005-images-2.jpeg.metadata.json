@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "005-images-2.jpeg.png",
+  "asset_sha256": "cbdd657eefd4da9a2b47b9bc565472a2312a19ddf1adaf63c7384d2ea4353733",
+  "classification": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "로봇",
+      "미쳤습니까",
+      "의심"
+    ],
+    "expense_categories": [],
+    "subject": "object",
+    "panels": [
+      {
+        "expression": "옆을 흘겨보는 의심스러운 표정",
+        "pose": "기계 손가락을 관자놀이에 댐",
+        "captions": [
+          "미쳤습니까 휴먼?"
+        ]
+      }
+    ],
+    "evidence": "의심스러운 시선과 질문 자막이 상대의 판단을 못마땅해한다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

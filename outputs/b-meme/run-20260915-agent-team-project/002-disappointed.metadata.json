@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "002-disappointed.png",
+  "asset_sha256": "8d44f526cfc398ca904fbe47f209e5f0f649a4bcdbf4c05e9569d2409bebddba",
+  "classification": {
+    "emotions": [
+      "RESIGNATION"
+    ],
+    "keywords": [
+      "실망",
+      "체념",
+      "억지웃음",
+      "예상함",
+      "곁눈질"
+    ],
+    "expense_categories": [],
+    "subject": "object",
+    "panels": [
+      {
+        "expression": "큰 눈으로 옆을 보며 억지로 미소 짓는 담담한 표정",
+        "pose": "회색 기관차 얼굴을 화면 가득 잡은 정면 클로즈업",
+        "captions": [
+          "disappointed",
+          "but not surprised"
+        ]
+      }
+    ],
+    "evidence": "실망했지만 놀라지는 않았다는 자막과 체념한 듯한 억지 미소가 담담한 포기를 나타낸다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-14T15:39:52+00:00",
+  "needs_review": false,
+  "tag": "GUILTY_LIGHT",
+  "strategies": [],
+  "is_active": false
+}

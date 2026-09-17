@@ -135,13 +135,27 @@ async def test_request_body_strict_json_schema() -> None:
     assert len(rec.requests) == 1
     body = json.loads(rec.requests[0].content)
     assert body["model"] == "gpt-5.6-luna"
-    assert body["max_tokens"] == 400
+    # gpt-5 계열은 `max_tokens` 를 400 unsupported_parameter 로 거부한다
+    assert body["max_completion_tokens"] == 400
+    assert "max_tokens" not in body
     assert body["messages"] == MESSAGES
     fmt = body["response_format"]
     assert fmt["type"] == "json_schema"
     assert fmt["json_schema"]["strict"] is True
     assert fmt["json_schema"]["name"] == "sentencing"
     assert fmt["json_schema"]["schema"] == SCHEMA
+
+
+async def test_xai_keeps_max_tokens() -> None:
+    """xAI 는 `max_tokens` 를 그대로 받는다. 토큰 상한 키는 벤더로 가른다."""
+    llm, rec = make_llm(
+        ok(completion_body()), vendor="xai", model_id="grok-4.20-0309-non-reasoning"
+    )
+    await call(llm, role="writer")
+
+    body = json.loads(rec.requests[0].content)
+    assert body["max_tokens"] == 400
+    assert "max_completion_tokens" not in body
 
 
 # ② stop → output·usage 4종·latency

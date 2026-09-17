@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "003-empty_wallet.png",
+  "asset_sha256": "287a6111cfe4d5b879c72be14d0a17fed3d1cbc65944f8ff30d2467ac6ad015a",
+  "classification": {
+    "emotions": [
+      "PITY",
+      "ABSURD_SERIOUSNESS"
+    ],
+    "keywords": [
+      "돈없음",
+      "빈지갑",
+      "당황",
+      "충격",
+      "곤란"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "눈을 크게 뜨고 입을 벌린 당황하고 걱정스러운 표정",
+        "pose": "두 손으로 빈 지갑을 크게 벌려 화면 앞으로 내미는 상반신 구도",
+        "captions": []
+      }
+    ],
+    "evidence": "텅 빈 지갑을 보여 주는 곤란한 상황과 과장되게 심각한 표정이 안타까움과 우스운 진지함을 함께 만든다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-14T15:39:52+00:00",
+  "needs_review": false,
+  "tag": "GUILTY_HEAVY",
+  "strategies": [],
+  "is_active": false
+}

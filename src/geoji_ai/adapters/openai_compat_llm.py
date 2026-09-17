@@ -67,14 +67,21 @@ class OpenAICompatLLM:
             "type": "json_schema",
             "json_schema": {"name": role, "strict": True, "schema": schema},
         }
+        # gpt-5 계열은 `max_tokens` 를 거부한다(400 unsupported_parameter, "Use
+        # 'max_completion_tokens' instead"). xAI 는 `max_tokens` 를 그대로 받으므로 벤더로 가른다.
+        token_limit = (
+            {"max_completion_tokens": max_output_tokens}
+            if self.vendor == "openai"
+            else {"max_tokens": max_output_tokens}
+        )
         started = time.perf_counter()
         try:
             raw = await self.client.chat.completions.with_raw_response.create(
                 model=self.model_id,
                 messages=messages,  # type: ignore[arg-type]
                 response_format=response_format,  # type: ignore[arg-type]
-                max_tokens=max_output_tokens,
                 timeout=timeout_s,
+                **token_limit,
             )
             completion = raw.parse()
         except openai.APITimeoutError as exc:

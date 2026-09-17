@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "011-images-7.png",
+  "asset_sha256": "3011f627da0c4407c3cecf942c4635ace9c06b939bfd2594f5ee973a53f04f88",
+  "classification": {
+    "emotions": [
+      "ABSURD_SERIOUSNESS"
+    ],
+    "keywords": [
+      "돈걱정",
+      "고양이",
+      "반전"
+    ],
+    "expense_categories": [],
+    "subject": "animal",
+    "panels": [
+      {
+        "expression": "녹색 눈으로 정면을 봄",
+        "pose": "나무 바닥 앞 얼굴 클로즈업",
+        "captions": [
+          "돈 걱정 안하고 살고싶어?"
+        ]
+      },
+      {
+        "expression": "더 가까이서 정면을 봄",
+        "pose": "같은 고양이 얼굴 클로즈업",
+        "captions": [
+          "돈은 잘 있으니까 걱정말구",
+          "너나 걱정해"
+        ]
+      }
+    ],
+    "evidence": "진지한 고양이 얼굴과 돈이 사람을 걱정하지 않는다는 듯한 반전 자막이 우스운 대비를 이룬다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

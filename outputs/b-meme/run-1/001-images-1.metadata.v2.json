@@ -2,7 +2,7 @@
   "schema_version": 2,
   "taxonomy_version": "verdict-meme-v1",
   "asset_path": "001-images-1.png",
-  "asset_sha256": "80222f5a935bfe37a6ea7d7783db4bf8fe147ee5a4796357b68eee82610652ec",
+  "asset_sha256": "20d4616a37d6349bb5ec98591705f5482155bed89199f50cfc7f2caab3d8825b",
   "classification": {
     "emotions": [
       "RESIGNATION"
@@ -30,7 +30,7 @@
   "generated_by": "b-meme/codex-visual-v2",
   "generated_at": "2026-09-12T08:32:34+00:00",
   "needs_review": false,
-  "tag": null,
+  "tag": "GUILTY_HEAVY",
   "strategies": [],
   "is_active": false,
   "description": "안경을 쓰고 귀마개와 보라색 털목도리를 두른 인물이 정면을 응시하며, 하단에 '지금 거의 거렁뱅이에요'라는 자막이 표시된다.",

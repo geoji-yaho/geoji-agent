@@ -25,6 +25,8 @@ generation_failed`.
   `REGENERATE`(TEXT_RETRY) 는 repair 하지 않는다(05 §1 "round 안 보정 없음")
 - repair 대상은 검수관이 `pass=false` 로 판정한 AI 강도다. 보고서에서 빠졌거나 형식이 틀린 강도는
   피할 위반이 없어 바로 TEMPLATE
+- 새 카드 생성 형식(20자 제목·1항목 30자 본문) 위반은 join에서 같은 repair 예산을 사용한다.
+  검수 시간을 예약할 수 없거나 TEXT_RETRY이면 재작성하지 않는다.
 - repair 뒤 검수는 바뀐 강도만 보낸다. 바뀌지 않은 강도는 직전 통과 항목을 이어 붙인다. hash 는
   언제나 전체 draft 기준이다
 - 검수 뒤 TEMPLATE·D-19 치환으로 draft 가 바뀌면 전체를 한 번 더 검수한다(코디네이터 9/14,
@@ -43,8 +45,8 @@ generation_failed`.
   `검수 라운드×2 + (hell 별도면 1)`, 양형·조서 0. 검수 라운드는 state `eval_round` 로 센다
 - 게이트웨이 경로의 timeout·재시도는 게이트웨이가 시도마다 건다(그래프 `wait_for` 가 재시도를 자르지
   않게). 세마포어는 재시도 대기 동안에도 쥐고 있다
-- `node_results` 는 검증을 통과한 출력만: 양형은 `parse_sentencing` 뒤, 서기는 `TextDraft`·강도·각도
-  검사 뒤, 검수는 보고서에 전역 형식 실패가 없을 때(`remember`)
+- `node_results` 는 검증을 통과한 출력만: 양형은 `parse_sentencing` 뒤,
+  서기는 `CardTextDraft`·강도·각도 검사 뒤, 검수는 보고서에 전역 형식 실패가 없을 때(`remember`)
 - `db_now` 는 핸들러가 준다(`application.sentence_case`: `job.updated_at` + 경과 monotonic)
 
 `REGENERATE`(TEXT_RETRY, 08 §3.2):
@@ -89,7 +91,7 @@ from geoji_ai.contracts.finalize import FinalizeRequest, ModelIds
 from geoji_ai.contracts.jobs import Job, SentencePayload, TextRetryPayload, parse_payload
 from geoji_ai.contracts.llm_schemas import evaluator_schema, sentencing_schema, writer_schema
 from geoji_ai.contracts.sentencing import SentencingDecision
-from geoji_ai.contracts.writer import MemeHints, TextDraft, WriterDraft
+from geoji_ai.contracts.writer import CardTextDraft, MemeHints, TextDraft, WriterDraft
 from geoji_ai.domain.attack_angles import ANGLE_GUIDES, pick
 from geoji_ai.domain.budget import (
     EVALUATOR,
@@ -180,6 +182,7 @@ _ROUTE_PREP = "prep"
 _ROUTE_INLINE = "inline_context"
 _ROUTE_MINIMAL = "minimal_dossier"
 _ROUTE_REPAIR = "writer_repair"
+_ROUTE_EVALUATOR = "evaluator"
 _ROUTE_FINALIZE = "finalize"
 _ROUTE_END = "end"
 
@@ -198,6 +201,8 @@ class SentenceGraphState(SentenceState, total=False):
     meme_hints: MemeHints | None
     #: 예산이 없어 서기 호출을 시작하지 않은 강도가 있다.
     writer_budget_skipped: bool
+    #: 캐시에 넣지 않은 카드 형식 오류. 원문 대신 강도만 보관한다.
+    writer_invalid: list[Intensity]
     #: `writer_repair` 가 다시 쓸 강도.
     repair_targets: list[Intensity]
     #: 강도별 "피할 것"(위반 코드·문제 문장).
@@ -210,6 +215,8 @@ class SentenceGraphState(SentenceState, total=False):
     eval_round: int
     #: 검수 실패로 `writer_repair` 에 보낸 강도(중복 없음). `evaluation_repair_rate` 분모.
     eval_repaired: list[Intensity]
+    #: finalize 결과. `SAVED`(200) · `DISCARDED`(409 폐기). 핸들러의 `sentence_summary` 가 읽는다.
+    finalize_outcome: str
 
 
 class ValidPrepLike(Protocol):
@@ -268,6 +275,7 @@ def initial_state(
         writer_draft=None,
         meme_hints=None,
         writer_budget_skipped=False,
+        writer_invalid=[],
         repair_targets=[],
         repair_avoid={},
         eval_kept={},
@@ -407,11 +415,77 @@ def _key(value: Any) -> str | None:
         return None
 
 
+def _rule_avoid(codes: Sequence[str], messages: Sequence[str]) -> dict[str, list[str]]:
+    """서버 검증 ⑤ 위반 → 서기에게 줄 "피할 것"(9/16).
+
+    검수관 경로(`_avoid`)와 달리 문제 문장 원문이 없다. 규칙 메시지에 걸린 단어가 들어 있어
+    그대로 준다(예: "hell 에 비속어 ['씨발']").
+    """
+    return {
+        "violations": list(dict.fromkeys(str(code) for code in codes)),
+        "rule_messages": list(dict.fromkeys(str(message) for message in messages)),
+    }
+
+
 def _avoid(entry: Mapping[str, Any]) -> dict[str, list[str]]:
     """검수 항목 → 서기에게 줄 "피할 것"."""
     codes = [str(v.get("code")) for v in entry.get("violations") or [] if isinstance(v, Mapping)]
     sentences = [str(s) for s in entry.get("problem_sentences") or []]
     return {"violations": list(dict.fromkeys(codes)), "problem_sentences": sentences}
+
+
+def _merge_same_intensity(entries: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """같은 강도 항목이 여러 개면 하나로 합친다(9/16).
+
+    검수관이 강도마다 한 항목을 내야 하는데, 실측에서 luna 가 지옥맛 하나를 위반별로 쪼개
+    같은 강도를 여러 번 냈다. 그러면 `validate_evaluation` 이 `DUPLICATE_INTENSITY` 를 내고
+    그 코드는 강도별 코드가 아니라 전역 실패라 판결문이 통째로 사라졌다(15 §6 6회차).
+    합치는 규칙은 `_merge_reports` 와 같다. `pass` 는 AND(하나라도 false 면 false, 하나라도
+    불리언이 아니면 미완), 위반과 문제 문장은 순서를 지켜 이어 붙이고 중복만 뺀다.
+    """
+    merged: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    extras: list[dict[str, Any]] = []
+    for entry in entries:
+        key = _key(entry.get("intensity"))
+        if key is None:
+            # 모르는 강도는 합치지 않는다. `validate_evaluation` 이 그대로 잡아야 한다.
+            extras.append(dict(entry))
+            continue
+        if key not in merged:
+            merged[key] = dict(entry)
+            order.append(key)
+            continue
+        target = merged[key]
+        first, second = target.get("pass"), entry.get("pass")
+        if isinstance(first, bool) and isinstance(second, bool):
+            target["pass"] = first and second
+        elif not isinstance(first, bool):
+            target["pass"] = first
+        else:
+            target["pass"] = second
+        target["violations"] = _dedup_dicts(
+            [*(target.get("violations") or []), *(entry.get("violations") or [])]
+        )
+        target["problem_sentences"] = list(
+            dict.fromkeys(
+                str(s)
+                for s in [
+                    *(target.get("problem_sentences") or []),
+                    *(entry.get("problem_sentences") or []),
+                ]
+            )
+        )
+    return [merged[key] for key in order] + extras
+
+
+def _dedup_dicts(items: Sequence[Any]) -> list[Any]:
+    """순서를 지키며 중첩 배열(evidence_labels)을 포함한 동일 위반도 제거한다."""
+    out: list[Any] = []
+    for item in items:
+        if item not in out:
+            out.append(item)
+    return out
 
 
 def _merge_reports(outputs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -423,9 +497,11 @@ def _merge_reports(outputs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
     for name in _EVALUATION_CHECKS:
         checks = [output.get(name) for output in outputs]
-        broken = next((check for check in checks if not isinstance(check, Mapping)), None)
-        if broken is not None or any(not isinstance(c.get("pass"), bool) for c in checks):
-            merged[name] = broken if broken is not None else {"pass": None, "violations": []}
+        if any(not isinstance(check, Mapping) for check in checks):
+            merged[name] = None
+            continue
+        if any(not isinstance(check.get("pass"), bool) for check in checks):
+            merged[name] = {"pass": None, "violations": []}
             continue
         merged[name] = {
             "pass": all(check["pass"] for check in checks),
@@ -473,6 +549,46 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
 
     gateway = deps.llm if isinstance(deps.llm, ScopedLLM) else None
 
+    # --- 단계별·역할별 기록(9/16, 08 §3.3) --------------------------------------
+    # 세 이벤트로 "어느 역할이 어디서 왜" 를 남긴다. 원문 없음, 코드·시간·개수만.
+    # - `sentence_call`: 모델 호출 1회마다. 받은 timeout, 남은 마감, 지연, 오류 kind
+    # - `sentence_fallback`: 실패가 결과를 바꾼 지점. RULE·TEMPLATE·writer_repair·generation_failed
+    # - `sentence_summary`: 실행 1회 요약(핸들러, `application/sentence_case.py`)
+
+    def _ids(state: Mapping[str, Any]) -> dict[str, Any]:
+        job = state.get("job")
+        return {
+            "trace_id": getattr(job, "trace_id", None),
+            "job_id": getattr(job, "id", None),
+            "generation_id": deps.generation_id,
+            "graph_name": "sentencing",
+            "prompt_bundle_version": deps.prompt_version,
+            "guardrail_policy_version": settings.GUARDRAIL_POLICY_VERSION,
+        }
+
+    def default_model(role: str) -> str:
+        return settings.MODEL_WRITER if role in ("writer", "banter") else settings.MODEL_JUDGMENT
+
+    def fallback_log(
+        state: Mapping[str, Any],
+        *,
+        node: str,
+        role: str,
+        outcome: str,
+        reason: str | None,
+        intensity: Intensity | str | None = None,
+    ) -> None:
+        """역할 하나의 실패가 결과를 어떻게 바꿨는지. `outcome` 은 코드값이다."""
+        instrument.node_log(
+            "sentence_fallback",
+            **_ids(state),
+            node=node,
+            role=role,
+            intensity=getattr(intensity, "value", intensity),
+            outcome=outcome,
+            fallback_reason=reason,
+        )
+
     async def call_model(
         state: Mapping[str, Any],
         node: str,
@@ -483,53 +599,100 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         max_output_tokens: int,
         call_index: int = 0,
         model_override: str | None = None,
+        intensity: Intensity | None = None,
     ) -> tuple[LLMResult, Commit] | None:
         """세마포어 안에서 예산을 계산한다. 예산이 없으면 호출하지 않고 None.
 
         (결과, 확정)을 돌려준다. 확정은 호출자가 출력 검증에 성공한 뒤 부른다.
+        호출마다 `sentence_call` 로그(받은 timeout·남은 마감·지연·오류 kind)를 남긴다.
         """
         deadline: Deadline = state["deadline"]
         async with deps.semaphore:
             timeout = deadline.node_timeout(node, settings)
+            base: dict[str, Any] = {
+                **_ids(state),
+                "node": node,
+                "role": role,
+                "intensity": intensity.value if intensity is not None else None,
+                "call_index": call_index,
+                "model_id": model_override or default_model(role),
+                "remaining_s": round(deadline.remaining_s(), 3),
+            }
             if timeout is None:
+                # 상한이 아니라 마감(뒤 단계 예약 포함)이 모자라 시작하지 않았다.
+                instrument.node_log(
+                    "sentence_call",
+                    **base,
+                    timeout_s=None,
+                    latency_ms=0,
+                    ok=False,
+                    fallback_reason="NO_BUDGET",
+                )
                 return None
-            if gateway is not None:
-                scope = case_scope(
-                    state["snapshot"],
-                    node=node,
-                    call_index=call_index,
-                    job_id=state["job"].id,
-                    generation_id=deps.generation_id,
-                    prompt_version=deps.prompt_version,
-                    policy_version=settings.GUARDRAIL_POLICY_VERSION,
-                    model_override=model_override,
-                    remaining_s=deadline.remaining_s,
-                    reserve_s=reserve_after(node, settings),
-                )
-                scoped = await gateway.scoped_call(
-                    scope,
-                    role=role,
-                    messages=messages,
-                    schema=schema,
-                    timeout_s=timeout,
-                    max_output_tokens=max_output_tokens,
-                )
+            started = time.monotonic()
+            try:
+                if gateway is not None:
+                    scope = case_scope(
+                        state["snapshot"],
+                        node=node,
+                        call_index=call_index,
+                        job_id=state["job"].id,
+                        generation_id=deps.generation_id,
+                        prompt_version=deps.prompt_version,
+                        policy_version=settings.GUARDRAIL_POLICY_VERSION,
+                        model_override=model_override,
+                        remaining_s=deadline.remaining_s,
+                        reserve_s=reserve_after(node, settings),
+                    )
+                    scoped = await gateway.scoped_call(
+                        scope,
+                        role=role,
+                        messages=messages,
+                        schema=schema,
+                        timeout_s=timeout,
+                        max_output_tokens=max_output_tokens,
+                    )
 
-                async def commit() -> None:
-                    await gateway.remember(scoped)
+                    async def commit() -> None:
+                        await gateway.remember(scoped)
 
-                return scoped.result, commit
-            result = await asyncio.wait_for(
-                deps.llm.structured_call(  # type: ignore[union-attr]
-                    role=role,
-                    messages=messages,
-                    schema=schema,
-                    timeout_s=timeout,
-                    max_output_tokens=max_output_tokens,
-                ),
-                timeout,
+                    result: LLMResult = scoped.result
+                    done: Commit = commit
+                else:
+                    result = await asyncio.wait_for(
+                        deps.llm.structured_call(  # type: ignore[union-attr]
+                            role=role,
+                            messages=messages,
+                            schema=schema,
+                            timeout_s=timeout,
+                            max_output_tokens=max_output_tokens,
+                        ),
+                        timeout,
+                    )
+                    done = _no_commit
+            except BaseException as exc:
+                instrument.node_log(
+                    "sentence_call",
+                    **base,
+                    timeout_s=round(timeout, 3),
+                    latency_ms=int((time.monotonic() - started) * 1000),
+                    ok=False,
+                    fallback_reason=_error_name(exc),
+                )
+                raise
+            usage = getattr(result, "usage", None)
+            no_output = result.output is None
+            instrument.node_log(
+                "sentence_call",
+                **{**base, "model_id": result.model_id or base["model_id"]},
+                timeout_s=round(timeout, 3),
+                latency_ms=int((time.monotonic() - started) * 1000),
+                ok=not no_output,
+                fallback_reason=f"NO_OUTPUT:{result.stop_reason}" if no_output else None,
+                prompt_tokens=getattr(usage, "prompt_tokens", None),
+                completion_tokens=getattr(usage, "completion_tokens", None),
             )
-            return result, _no_commit
+            return result, done
 
     def template_for(
         intensity: Intensity, jury: JurySnapshot, sentencing: SentencingDecision | None, post: str
@@ -546,13 +709,33 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             logger.warning("강도 %s 템플릿을 만들 수 없다: %s", intensity, exc)
             return None
 
+    def can_repair(state: Mapping[str, Any], targets: Iterable[Intensity]) -> bool:
+        """지금 `writer_repair` 를 한 번 더 태울 수 있는가(05 §3.3 조건, 검수 실패와 같은 표)."""
+        sources = state.get("draft_sources") or {}
+        return (
+            state["mode"] == "INITIAL"
+            and state.get("repair_count", 0) < settings.IMMEDIATE_REPAIR_MAX
+            and state["deadline"].remaining_s() >= REPAIR_MIN_REMAINING_S
+            and all(sources.get(i) == "AI" for i in targets)
+        )
+
     def assemble(
         state: Mapping[str, Any],
         drafts: dict[Intensity, TextDraft],
         sources: dict[Intensity, str],
         sentencing: SentencingDecision | None,
+        *,
+        allow_repair: bool = False,
     ) -> dict[str, Any]:
-        """서버 검증 ⑤. 걸린 AI 강도는 TEMPLATE 로 바꾸고 다시 검사한다."""
+        """서버 검증 ⑤. 걸린 AI 강도는 다시 쓰게 하고, 안 되면 TEMPLATE 로 바꾼다.
+
+        `allow_repair`(9/16): 규칙 위반은 "허용 목록 밖 단어를 썼다" 처럼 기계적으로 고칠 수 있는
+        것이라 검수 실패와 같은 조건에서 `writer_repair` 를 한 번 태운다. 옛 동작은 곧바로
+        TEMPLATE 치환이었는데, 대상 강도가 하나(= 공유 방이 하나인 보통 경우)면 그 하나가
+        TEMPLATE 이 되는 순간 `all(TEMPLATE)` 이라 검수관을 부르지도 못하고 `EVAL_FAILED` 로 끝났다.
+        같은 위반인데 방 개수에 따라 결과가 갈렸다(15 §6).
+        검수 실패 경로와 예산(`IMMEDIATE_REPAIR_MAX`)을 나눠 쓰므로 한 판결에서 재작성은 최대 1회다.
+        """
         jury = _jury(state)
         snapshot = state["snapshot"]
         dossier: Dossier = state["dossier"]
@@ -575,20 +758,53 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             }
             rules = apply_text_rules(body, dossier.label_map, sentencing, rule_jury)
             bad: dict[Intensity, list[str]] = {}
+            #: 강도별 위반 설명(재작성 때 "피할 것" 으로 준다). 원문 문장이 아니라 규칙 메시지다.
+            messages: dict[Intensity, list[str]] = {}
             for issue in rules.issues:
                 index = _text_index(issue.path)
                 if index is None or index >= len(targets):
                     logger.warning("서버 검증 전역 실패: %s %s", issue.code, issue.message)
+                    fallback_log(
+                        state,
+                        node="deterministic_validate",
+                        role="server_rules",
+                        outcome="generation_failed",
+                        reason=f"{SCHEMA_INVALID}:{issue.code}",
+                    )
                     return {"failure": SCHEMA_INVALID}
                 bad.setdefault(targets[index], []).append(issue.code)
+                messages.setdefault(targets[index], []).append(issue.message)
+            # 라벨·식별자 제거로 빈 제목/본문이 될 수 있으므로 정리한 뒤에도 카드 규격을 검사한다.
+            for intensity, text in zip(targets, rules.draft["texts"], strict=True):
+                try:
+                    CardTextDraft.model_validate(text)
+                except ValidationError:
+                    bad.setdefault(intensity, []).append(SCHEMA_INVALID)
+                    messages.setdefault(intensity, []).append(
+                        "제목·본문 정리 후 카드 규격 위반: 제목 1~20자, 본문 1항목 1~30자."
+                    )
             if not bad:
                 try:
                     writer_draft = WriterDraft.model_validate(rules.draft)
                 except ValidationError as exc:
                     logger.warning("재조립 초안이 계약에 맞지 않는다: %s", exc.error_count())
+                    fallback_log(
+                        state,
+                        node="deterministic_validate",
+                        role="server_rules",
+                        outcome="generation_failed",
+                        reason=f"{SCHEMA_INVALID}:CONTRACT",
+                    )
                     return {"failure": SCHEMA_INVALID}
                 rebuilt = {Intensity(t.intensity): t for t in writer_draft.texts}
                 if all(sources[i] == "TEMPLATE" for i in targets):
+                    fallback_log(
+                        state,
+                        node="deterministic_validate",
+                        role="server_rules",
+                        outcome="generation_failed",
+                        reason=f"{EVAL_FAILED}:ALL_TEMPLATE",
+                    )
                     return {"drafts": rebuilt, "draft_sources": sources, "failure": EVAL_FAILED}
                 return {
                     "drafts": rebuilt,
@@ -599,16 +815,72 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             if regenerate:
                 # round 안 보정·TEMPLATE 치환 없음. 다음 round 는 백엔드 몫이다.
                 logger.info("REGENERATE 서버 검증 실패 %s → 저장 없이 실패", sorted(bad))
+                fallback_log(
+                    state,
+                    node="deterministic_validate",
+                    role="server_rules",
+                    outcome="generation_failed",
+                    reason=f"{EVAL_FAILED}:REGENERATE",
+                )
                 return {"failure": EVAL_FAILED}
+            if allow_repair and can_repair(state, bad):
+                logger.info("서버 검증 실패 %s → writer_repair", sorted(i.value for i in bad))
+                for intensity in bad:
+                    fallback_log(
+                        state,
+                        node="deterministic_validate",
+                        role="server_rules",
+                        intensity=intensity,
+                        outcome=_ROUTE_REPAIR,
+                        reason=",".join(bad[intensity]),
+                    )
+                return {
+                    "failure": None,
+                    "route": _ROUTE_REPAIR,
+                    "repair_targets": list(bad),
+                    "repair_avoid": {i: _rule_avoid(bad[i], messages[i]) for i in bad},
+                    "eval_kept": {},
+                }
             for intensity, codes in bad.items():
                 logger.info("강도 %s 서버 검증 실패 %s → TEMPLATE", intensity, codes)
                 if sources.get(intensity) == "TEMPLATE":
+                    fallback_log(
+                        state,
+                        node="deterministic_validate",
+                        role="server_rules",
+                        intensity=intensity,
+                        outcome="generation_failed",
+                        reason=f"{SCHEMA_INVALID}:TEMPLATE_REJECTED",
+                    )
                     return {"failure": SCHEMA_INVALID}
                 template = template_for(intensity, jury, sentencing, snapshot.post_id)
                 if template is None:
+                    fallback_log(
+                        state,
+                        node="deterministic_validate",
+                        role="server_rules",
+                        intensity=intensity,
+                        outcome="generation_failed",
+                        reason=f"{EVAL_FAILED}:TEMPLATE_UNAVAILABLE",
+                    )
                     return {"failure": EVAL_FAILED}
+                fallback_log(
+                    state,
+                    node="deterministic_validate",
+                    role="server_rules",
+                    intensity=intensity,
+                    outcome="TEMPLATE",
+                    reason=",".join(codes),
+                )
                 drafts[intensity] = template
                 sources[intensity] = "TEMPLATE"
+        fallback_log(
+            state,
+            node="deterministic_validate",
+            role="server_rules",
+            outcome="generation_failed",
+            reason=f"{SCHEMA_INVALID}:RETRY_EXHAUSTED",
+        )
         return {"failure": SCHEMA_INVALID}
 
     async def save_dossier(dossier: Dossier) -> str | None:
@@ -637,6 +909,13 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         except Exception as exc:
             if getattr(exc, "status", None) == 409:
                 logger.info("begin-generation 409 %s — 폐기", getattr(exc, "code", None))
+                fallback_log(
+                    state,
+                    node="begin_generation",
+                    role="backend",
+                    outcome="DISCARDED",
+                    reason=f"409:{getattr(exc, 'code', None)}",
+                )
                 return {}
             raise
         deadline = Deadline.from_db(begin.deadline_at, await deps.db_now(), clock=deps.clock)
@@ -709,6 +988,13 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             )
         except Exception as exc:  # 그래프 B 와 같다: 빈 응답(F0 만)으로 계속.
             logger.warning("inline resolve-evidence 실패 %s → F0 만", type(exc).__name__)
+            fallback_log(
+                state,
+                node="inline_context",
+                role="backend",
+                outcome="F0_ONLY",
+                reason=type(exc).__name__,
+            )
             resolved = None
         dossier = dossier_from_resolved(snapshot, resolved, settings)
         reserve = inline_context_reserve(settings)
@@ -743,6 +1029,13 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             except Exception as exc:  # 코드 Evidence 만으로 계속(05 §5.2).
                 calls.append(CallRecord("context", None, settings.MODEL_JUDGMENT, _error_name(exc)))
                 logger.warning("inline 조서 실패 %s → 코드 Evidence 만", _error_name(exc))
+                fallback_log(
+                    state,
+                    node="inline_context",
+                    role="context",
+                    outcome="CODE_EVIDENCE_ONLY",
+                    reason=_error_name(exc),
+                )
             else:
                 calls.append(CallRecord("context", None, settings.MODEL_JUDGMENT, None))
         failure = await save_dossier(dossier)
@@ -842,6 +1135,9 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             )
             if called is None:
                 logger.info("양형 예산 없음 → RULE")
+                fallback_log(
+                    state, node=SENTENCING, role="sentencing", outcome="RULE", reason="NO_BUDGET"
+                )
                 return {**rule_sentencing(jury), "calls": calls}
             result, commit = called
             decision = parse_sentencing(result.output, jury)
@@ -849,8 +1145,20 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         except (LLMError, TimeoutError, ValueError) as exc:
             calls.append(CallRecord("sentencing", None, settings.MODEL_JUDGMENT, _error_name(exc)))
             logger.warning("양형관 실패 %s → RULE", _error_name(exc))
+            fallback_log(
+                state, node=SENTENCING, role="sentencing", outcome="RULE", reason=_error_name(exc)
+            )
             return {**rule_sentencing(jury), "calls": calls}
         calls.append(CallRecord("sentencing", None, result.model_id, None))
+        if decision.reason_source == "TEMPLATE":
+            # D-19: 형량은 AI, 이유만 길이 초과로 템플릿 치환.
+            fallback_log(
+                state,
+                node=SENTENCING,
+                role="sentencing",
+                outcome="TEMPLATE_REASON",
+                reason="REASON_TOO_LONG",
+            )
         return {"sentencing": decision, "sentencing_source": "AI", "calls": calls}
 
     # --- 노드: 서기 ----------------------------------------------------------
@@ -911,6 +1219,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 schema=schema,
                 max_output_tokens=settings.WRITER_MAX_OUTPUT_TOKENS,
                 call_index=writer_call_index(offset, _targets(jury).index(intensity)),
+                intensity=intensity,
             )
             if called is None:
                 return ("SKIPPED", None, None)
@@ -920,11 +1229,18 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             output = dict(result.output)
             hints_raw = output.pop("meme_hints", None)
             output.pop("meme_tag", None)
-            text = TextDraft.model_validate({**output, "source": "AI"})
+            text = CardTextDraft.model_validate({**output, "source": "AI"})
             if text.intensity != intensity or text.attack_angle != angle:
                 raise ValueError("서버 지정 강도·각도와 다르다")
             hints = MemeHints.model_validate(hints_raw) if hints_raw is not None else None
             await commit()
+        except ValidationError:
+            # 길이·항목 수·줄바꿈 등 형식 오류는 원문을 기록하거나 캐시하지 않는다.
+            return (
+                "INVALID_CARD",
+                None,
+                CallRecord("writer", intensity, settings.MODEL_WRITER, SCHEMA_INVALID),
+            )
         except (LLMError, TimeoutError, ValueError) as exc:
             record = CallRecord("writer", intensity, settings.MODEL_WRITER, _error_name(exc))
             return ("FAILED", None, record)
@@ -950,8 +1266,10 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         drafts: dict[Intensity, TextDraft] = dict(state.get("drafts") or {})
         sources: dict[Intensity, Literal["AI", "TEMPLATE"]] = dict(state.get("draft_sources") or {})
         hints: MemeHints | None = state.get("meme_hints")
+        invalid = set(state.get("writer_invalid") or [])
         skipped = False
         for intensity, (kind, value, record) in zip(intensities, outcomes, strict=True):
+            invalid.discard(intensity)
             if record is not None:
                 calls.append(record)
             if kind == "AI":
@@ -961,14 +1279,35 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 if intensity == jury.default_intensity:
                     hints = text_hints
                 continue
+            if kind == "INVALID_CARD":
+                invalid.add(intensity)
             skipped = skipped or kind == "SKIPPED"
             drafts.pop(intensity, None)
             sources.pop(intensity, None)
             if intensity == jury.default_intensity:
                 hints = None
+            reason = record.error if record is not None else "NO_BUDGET"
+            node_name = WRITER if offset == 0 else _ROUTE_REPAIR
             if _regenerate(state):
-                continue  # TEMPLATE 을 새로 만들지 않는다. join 이 실패로 보낸다.
+                # TEMPLATE 을 새로 만들지 않는다. join 이 실패로 보낸다.
+                fallback_log(
+                    state,
+                    node=node_name,
+                    role="writer",
+                    intensity=intensity,
+                    outcome="NONE",
+                    reason=reason,
+                )
+                continue
             template = template_for(intensity, jury, decision, post_id)
+            fallback_log(
+                state,
+                node=node_name,
+                role="writer",
+                intensity=intensity,
+                outcome="TEMPLATE" if template is not None else "NONE",
+                reason=reason,
+            )
             if template is not None:
                 drafts[intensity] = template
                 sources[intensity] = "TEMPLATE"
@@ -977,6 +1316,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             "draft_sources": sources,
             "meme_hints": hints,
             "writer_budget_skipped": skipped,
+            "writer_invalid": [i for i in _scope(state) if i in invalid],
             "calls": calls,
         }
 
@@ -985,6 +1325,39 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
 
     async def join(state: SentenceGraphState) -> dict[str, Any]:
         targets = _scope(state)
+        invalid = state.get("writer_invalid") or []
+        if (
+            invalid
+            and state["mode"] == "INITIAL"
+            and state.get("repair_count", 0) < settings.IMMEDIATE_REPAIR_MAX
+            and state["deadline"].remaining_s() >= REPAIR_MIN_REMAINING_S
+            and state["deadline"].node_timeout(WRITER, settings) is not None
+        ):
+            for intensity in invalid:
+                fallback_log(
+                    state,
+                    node="join",
+                    role="writer",
+                    intensity=intensity,
+                    outcome=_ROUTE_REPAIR,
+                    reason=SCHEMA_INVALID,
+                )
+            return {
+                "failure": None,
+                "route": _ROUTE_REPAIR,
+                "repair_targets": invalid,
+                "repair_avoid": {
+                    i: _rule_avoid(
+                        [SCHEMA_INVALID],
+                        [
+                            "headline 1~20자, statement 정확히 1항목, text 1~30자. "
+                            "줄바꿈·빈 문구 금지."
+                        ],
+                    )
+                    for i in invalid
+                },
+                "eval_kept": {},
+            }
         sources = state.get("draft_sources") or {}
         not_ai = [i for i in targets if sources.get(i) != "AI"]
         if len(not_ai) == len(targets) or (_regenerate(state) and not_ai):
@@ -992,18 +1365,43 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             code = writer_failure_code(
                 writer_errors, budget_skipped=bool(state.get("writer_budget_skipped"))
             )
+            if invalid and all(sources.get(i) == "AI" or i in invalid for i in targets):
+                code = SCHEMA_INVALID
+            kinds = ",".join(sorted({e for e in writer_errors if e})) or "NO_AI"
+            fallback_log(
+                state,
+                node="join",
+                role="writer",
+                outcome="generation_failed",
+                reason=f"{code}:{kinds}",
+            )
             return {"failure": code}
         missing = set(targets) - set(state.get("drafts") or {})
         if missing:
             # 서버 검증 5항(강도 집합 == target_intensities)을 join 에서 먼저 건다.
             logger.warning("강도 누락 %s → SCHEMA_INVALID", sorted(i.value for i in missing))
+            fallback_log(
+                state,
+                node="join",
+                role="writer",
+                outcome="generation_failed",
+                reason=f"{SCHEMA_INVALID}:MISSING_{'_'.join(sorted(i.value for i in missing))}",
+            )
             return {"failure": SCHEMA_INVALID}
-        return {"failure": None}
+        return {"failure": None, "route": "deterministic_validate"}
 
     async def deterministic_validate(state: SentenceGraphState) -> dict[str, Any]:
-        result = assemble(state, state["drafts"], state["draft_sources"], state.get("sentencing"))
+        result = assemble(
+            state,
+            state["drafts"],
+            state["draft_sources"],
+            state.get("sentencing"),
+            allow_repair=True,
+        )
         if "drafts" in result:
             result["validation"] = {i: [] for i in result["drafts"]}
+        # `route` 는 늘 덮어쓴다. 앞 노드가 남긴 값이 그대로 남으면 간선이 잘못 돈다.
+        result.setdefault("route", _ROUTE_EVALUATOR)
         return result
 
     # --- 노드: 검수·보정 -----------------------------------------------------
@@ -1072,6 +1470,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     max_output_tokens=settings.EVALUATOR_MAX_OUTPUT_TOKENS,
                     call_index=evaluator_call_index(eval_round, is_hell),
                     model_override=settings.MODEL_EVALUATOR_HELL if is_hell else None,
+                    intensity=tag,
                 )
                 if called is None:
                     skipped = CallRecord("evaluator", tag, model, "NO_BUDGET")
@@ -1112,7 +1511,14 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         post_id = state["snapshot"].post_id
         all_template = {i: "TEMPLATE" for i in targets}
 
-        def failed(code: str = EVAL_FAILED) -> dict[str, Any]:
+        def failed(code: str = EVAL_FAILED, *, why: str | None = None) -> dict[str, Any]:
+            fallback_log(
+                state,
+                node=EVALUATOR,
+                role="evaluator",
+                outcome="generation_failed",
+                reason=f"{code}:{why}" if why else code,
+            )
             return {"calls": calls, "draft_sources": all_template, "failure": code, "eval_kept": {}}
 
         for attempt in range(2):
@@ -1130,13 +1536,23 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             calls.extend(records)
             if kind == "SKIPPED":
                 logger.info("검수 예산 없음 → 검수 미시작")
+                fallback_log(
+                    state,
+                    node=EVALUATOR,
+                    role="evaluator",
+                    outcome="generation_failed",
+                    reason=f"{DEADLINE_EXCEEDED}:NO_BUDGET",
+                )
                 return {"calls": calls, "failure": DEADLINE_EXCEEDED, "eval_kept": {}}
             if kind == "FAILED" or output is None:
                 code = _vendor_failure_code(records, EVAL_FAILED)
+                kinds = ",".join(sorted({r.error for r in records if r.error})) or "NO_OUTPUT"
                 logger.warning("검수관 오류 %s → 전 강도 TEMPLATE", code)
-                return failed(code)
+                return failed(code, why=kinds)
 
-            fresh = [e for e in output.get("texts") or [] if isinstance(e, Mapping)]
+            fresh = _merge_same_intensity(
+                [e for e in output.get("texts") or [] if isinstance(e, Mapping)]
+            )
             _observe_violations(output, fresh)
             fresh_keys = {_key(e.get("intensity")) for e in fresh}
             entries_list = fresh + [e for k, e in reused.items() if k not in fresh_keys]
@@ -1166,11 +1582,11 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 }
             if attempt == 1:
                 logger.warning("재검수도 통과하지 못했다: %s", [i.code for i in issues])
-                return failed()
+                return failed(why="RECHECK:" + ",".join(sorted({i.code for i in issues})))
             if _regenerate(state):
                 # round 안 보정 없음: repair·TEMPLATE·D-19 이유 치환 없이 저장하지 않는다.
                 logger.info("REGENERATE 검수 실패 %s → EVAL_FAILED", [i.code for i in issues])
-                return failed()
+                return failed(why="REGENERATE:" + ",".join(sorted({i.code for i in issues})))
 
             entries = {_key(e.get("intensity")): e for e in entries_list}
             rejected = [i for i in targets if entries.get(i.value, {}).get("pass") is False]
@@ -1185,7 +1601,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     reason_failed = True
                 elif not (issue.path.startswith("texts") and issue.code in _PER_TEXT_CODES):
                     logger.warning("검수 전역 실패: %s %s", issue.code, issue.path)
-                    return failed()
+                    return failed(why=f"GLOBAL:{issue.code}")
             for commit in commits:
                 await commit()
             if reason_failed:
@@ -1195,9 +1611,16 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     else sentencing_reason_template(jury, decision.sentence, deps.templates)
                 )
                 if decision is None or substituted is None:
-                    return failed()
+                    return failed(why="REASON_CHECK:NO_TEMPLATE")
                 decision = decision.model_copy(
                     update={"sentencing_reason": substituted, "reason_source": "TEMPLATE"}
+                )
+                fallback_log(
+                    state,
+                    node=EVALUATOR,
+                    role="evaluator",
+                    outcome="TEMPLATE_REASON",
+                    reason="REASON_CHECK",
                 )
 
             repair = (
@@ -1208,15 +1631,33 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 and all(sources.get(i) == "AI" for i in rejected)
             )
             for intensity in incomplete if repair else [*rejected, *incomplete]:
+                why = "EVAL_REJECTED" if intensity in rejected else "EVAL_INCOMPLETE"
                 if sources.get(intensity) == "TEMPLATE":
-                    return failed()
+                    return failed(why=f"{why}:TEMPLATE_REJECTED:{intensity.value}")
                 template = template_for(intensity, jury, decision, post_id)
                 if template is None:
-                    return failed()
+                    return failed(why=f"{why}:TEMPLATE_UNAVAILABLE:{intensity.value}")
+                fallback_log(
+                    state,
+                    node=EVALUATOR,
+                    role="evaluator",
+                    intensity=intensity,
+                    outcome="TEMPLATE",
+                    reason=why,
+                )
                 drafts[intensity] = template
                 sources[intensity] = "TEMPLATE"
 
             if repair:
+                for intensity in rejected:
+                    fallback_log(
+                        state,
+                        node=EVALUATOR,
+                        role="evaluator",
+                        intensity=intensity,
+                        outcome=_ROUTE_REPAIR,
+                        reason="EVAL_REJECTED",
+                    )
                 changed = {*rejected, *incomplete}
                 keep = (
                     {}
@@ -1247,12 +1688,12 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
 
             rebuilt = assemble({**state, "drafts": drafts}, drafts, sources, decision)
             if rebuilt.get("failure") is not None:
-                return failed()
+                return failed(why=f"REASSEMBLE:{rebuilt.get('failure')}")
             writer_draft = rebuilt["writer_draft"]
             drafts = rebuilt["drafts"]
             sources = rebuilt["draft_sources"]
 
-        return failed()
+        return failed(why="ROUNDS_EXHAUSTED")
 
     async def evaluator(state: SentenceGraphState) -> dict[str, Any]:
         rounds = [state.get("eval_round", 0)]
@@ -1326,8 +1767,22 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 logger.info("finalize 409 %s — 폐기", code)
                 if code == _STALE_GENERATION:
                     instrument.count("stale_finalize_total", kind=state["job"].kind)
-                return {"failure": None, "route": _ROUTE_END}
+                fallback_log(
+                    state,
+                    node="finalize",
+                    role="backend",
+                    outcome="DISCARDED",
+                    reason=f"409:{code}",
+                )
+                return {"failure": None, "route": _ROUTE_END, "finalize_outcome": "DISCARDED"}
             if status == 409 and code == EVIDENCE_INVALIDATED:
+                fallback_log(
+                    state,
+                    node="finalize",
+                    role="backend",
+                    outcome="generation_failed",
+                    reason=f"409:{EVIDENCE_INVALIDATED}",
+                )
                 return {"failure": EVIDENCE_INVALIDATED}
             if status == 422:
                 sources = state.get("draft_sources") or {}
@@ -1340,6 +1795,13 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 )
                 if can_repair:
                     logger.info("finalize 422 %s → writer_repair %s", code, [i.value for i in ai])
+                    fallback_log(
+                        state,
+                        node="finalize",
+                        role="backend",
+                        outcome=_ROUTE_REPAIR,
+                        reason=f"422:{code}",
+                    )
                     return {
                         "failure": None,
                         "repair_targets": ai,
@@ -1347,6 +1809,13 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                         "eval_kept": {},
                         "route": _ROUTE_REPAIR,
                     }
+                fallback_log(
+                    state,
+                    node="finalize",
+                    role="backend",
+                    outcome="generation_failed",
+                    reason=f"{SCHEMA_INVALID}:422:{code}",
+                )
                 return {"failure": SCHEMA_INVALID}
             if not isinstance(status, int):
                 # 백엔드 4xx 거부가 아니다 — 5xx 재전송 소진·연결 불가 등 저장 경로 오류(08 §3.3
@@ -1356,9 +1825,15 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     deps.notifier,
                     finalize_db_error(job_kind=state["job"].kind, code=str(code_name)),
                 )
+            reason = (
+                f"{status}:{code}"
+                if isinstance(status, int)
+                else str(getattr(exc, "error_code", None) or type(exc).__name__)
+            )
+            fallback_log(state, node="finalize", role="backend", outcome="error", reason=reason)
             raise
         await observe_saved(state)
-        return {"failure": None, "route": _ROUTE_END}
+        return {"failure": None, "route": _ROUTE_END, "finalize_outcome": "SAVED"}
 
     async def generation_failed(state: SentenceGraphState) -> dict[str, Any]:
         payload = _payload(state)
@@ -1453,6 +1928,11 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 ok=failure is None,
                 fallback_reason=failure or (",".join(errors) if errors else None),
                 repair_count=update.get("repair_count", state.get("repair_count")),
+                # 이 노드가 고른 길(prep/inline/minimal, AI/RULE, repair/finalize, SAVED/DISCARDED)
+                outcome=update.get("finalize_outcome")
+                or update.get("route")
+                or update.get("dossier_source")
+                or update.get("sentencing_source"),
             )
             return update
 
@@ -1491,6 +1971,16 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             return "generation_failed" if state.get("failure") else next_node
 
         return route
+
+    def after_validate(state: SentenceGraphState) -> str:
+        if state.get("failure"):
+            return "generation_failed"
+        return _ROUTE_REPAIR if state.get("route") == _ROUTE_REPAIR else "evaluator"
+
+    def after_join(state: SentenceGraphState) -> str:
+        if state.get("failure"):
+            return "generation_failed"
+        return _ROUTE_REPAIR if state.get("route") == _ROUTE_REPAIR else "deterministic_validate"
 
     def after_evaluator(state: SentenceGraphState) -> str:
         if state.get("failure"):
@@ -1534,10 +2024,12 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
     graph.add_conditional_edges("sentencing", failed_or("writer"), ["writer", "generation_failed"])
     graph.add_conditional_edges("writer", failed_or("join"), ["join", "generation_failed"])
     graph.add_conditional_edges(
-        "join", failed_or("deterministic_validate"), ["deterministic_validate", "generation_failed"]
+        "join", after_join, ["deterministic_validate", "writer_repair", "generation_failed"]
     )
     graph.add_conditional_edges(
-        "deterministic_validate", failed_or("evaluator"), ["evaluator", "generation_failed"]
+        "deterministic_validate",
+        after_validate,
+        ["evaluator", "writer_repair", "generation_failed"],
     )
     graph.add_conditional_edges(
         "evaluator", after_evaluator, ["finalize", "writer_repair", "generation_failed"]

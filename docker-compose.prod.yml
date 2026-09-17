@@ -1,0 +1,42 @@
+# 운영(EC2) compose. ai-api·ai-worker 가 같은 이미지를 쓰고 command 로 갈린다(10 §16.1·§16.3).
+# DB 는 Supabase 관리형이라 여기 Postgres 는 없다(D-20).
+# 값은 같은 디렉터리의 .env 에서 읽는다(.env 는 커밋하지 않는다. 키 목록은 .env.example).
+services:
+  ai-api:
+    image: ${GEOJI_AI_IMAGE:-geoji-ai:local}
+    container_name: geoji-ai-api
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      APP_ENV: production
+      # production 은 환경에 직접 적어야 한다. 없으면 기동 실패(10 §16.1)
+      GUARDRAIL_POLICY_VERSION: ${GUARDRAIL_POLICY_VERSION:-guardrail-v2}
+    ports:
+      # 백엔드(EB)가 부르는 포트. 보안 그룹에서 백엔드 쪽만 열어 준다
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health/live').status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+
+  ai-worker:
+    image: ${GEOJI_AI_IMAGE:-geoji-ai:local}
+    container_name: geoji-ai-worker
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      APP_ENV: production
+      GUARDRAIL_POLICY_VERSION: ${GUARDRAIL_POLICY_VERSION:-guardrail-v2}
+    # 운영에서 reaper 는 백엔드 스케줄러가 돈다 — 워커 --reaper 는 끈다(10 §16.3)
+    command: ["geoji-ai", "worker"]
+    depends_on:
+      ai-api:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}

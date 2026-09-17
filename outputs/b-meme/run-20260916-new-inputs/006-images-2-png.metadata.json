@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "006-images-2-png.png",
+  "asset_sha256": "2a4f2109b6c3907365be7be2336cfadeea2af7b82732e625829e54f01cd922db",
+  "classification": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "거절",
+      "고집",
+      "흙"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "얼굴은 보이지 않음",
+        "pose": "두 손으로 펼쳐진 띠를 잡음",
+        "captions": [
+          "내",
+          "내 눈에 흙이 들어가기 전엔 안된다"
+        ]
+      }
+    ],
+    "evidence": "강한 거절 문구가 반대와 못마땅함을 나타낸다.",
+    "uncertainties": [
+      "중앙 '내'의 손글씨 형태가 약간 모호함"
+    ]
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": true,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

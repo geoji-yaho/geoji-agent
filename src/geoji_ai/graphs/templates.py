@@ -7,9 +7,7 @@
 
 해석(보고서 "질문"):
 
-- fixture 의 `statement[]` 는 결과마다 문자열 1개인데 `TextDraft.statement` 는 2~4문장이다.
-  문구를 새로 만들지 않고, 치환한 문자열을 문장 끝(`.`·`!`·`?` 뒤 공백)에서 나눠 문장 하나를
-  `Statement` 하나로 둔다. 나눠도 2문장이 안 되는 결과(`notGuilty`)는 `TemplateUnavailable`
+- fixture 의 `statement[]` 는 카드 규격에 맞는 문자열 1개다. 형량은 별도 필드로 전달한다.
 - 문장은 모두 `kind="opinion"`, `evidence_labels=[]`(근거 인용 없음)
 - `banter_strategy` 는 계약상 필수인데 템플릿에 값이 없다.
   `TEMPLATE_BANTER_STRATEGY` 한 곳에 둔다(미결정)
@@ -19,14 +17,13 @@
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from geoji_ai.contracts.case import JurySnapshot
-from geoji_ai.contracts.writer import BanterStrategy, Statement, TextDraft
+from geoji_ai.contracts.writer import BanterStrategy, CardStatement, CardTextDraft
 from geoji_ai.domain.attack_angles import pick
 from geoji_ai.domain.intensity import Intensity, parse_intensity
 
@@ -50,7 +47,6 @@ TEMPLATES_PATH = (
 TEMPLATE_BANTER_STRATEGY = BanterStrategy.PREMISE_REJECTION
 
 GUILTY = "guilty"
-_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
 
 class TemplateUnavailable(ValueError):
@@ -128,22 +124,19 @@ def template_text_draft(
     *,
     angle_offset: int = 0,
     templates: Mapping[str, Any] | None = None,
-) -> TextDraft:
-    """강도 하나의 TEMPLATE 초안. 계약(2~4문장)에 못 맞추면 `TemplateUnavailable`."""
+) -> CardTextDraft:
+    """강도 하나의 TEMPLATE 초안. 카드 생성 규격에 못 맞추면 `TemplateUnavailable`."""
     data = templates or load_templates()
     body = _result_body(str(jury.result), data)
-    sentences = [
-        part.strip()
-        for line in render_statement(jury, sentence, data)
-        for part in _SENTENCE_END.split(line)
-        if part.strip()
-    ]
+    if str(jury.result) == GUILTY and sentence is None:
+        raise TemplateUnavailable("유죄 템플릿에 형량이 없다")
+    sentences = render_statement(jury, sentence, data)
     try:
-        return TextDraft(
+        return CardTextDraft(
             intensity=parse_intensity(intensity),
             headline=body["headline"],
             statement=[
-                Statement(text=text, kind="opinion", evidence_labels=[]) for text in sentences
+                CardStatement(text=text, kind="opinion", evidence_labels=[]) for text in sentences
             ],
             banter_strategy=TEMPLATE_BANTER_STRATEGY,
             selected_candidate_id=None,
@@ -152,5 +145,5 @@ def template_text_draft(
         )
     except ValueError as exc:
         raise TemplateUnavailable(
-            f"결과 {jury.result} 템플릿이 TextDraft 계약에 맞지 않는다: 문장 {len(sentences)}개"
+            f"결과 {jury.result} 템플릿이 카드 규격에 맞지 않는다: 문장 {len(sentences)}개"
         ) from exc

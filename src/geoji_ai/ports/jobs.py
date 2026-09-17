@@ -16,6 +16,10 @@ class JobsPort(Protocol):
 
     async def complete(self, job_id: str, worker_id: str, generation_id: str) -> bool: ...
 
+    async def cancel(
+        self, job_id: str, worker_id: str, generation_id: str, *, error_code: str
+    ) -> bool: ...
+
     async def fail(
         self,
         job_id: str,

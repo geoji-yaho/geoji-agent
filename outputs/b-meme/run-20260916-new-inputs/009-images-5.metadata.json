@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "009-images-5.png",
+  "asset_sha256": "7f06e6c7765183cbefab84dc6db58850da9fe8ef00a8785ec28c0b1c26e89de8",
+  "classification": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "질색",
+      "미쳤나",
+      "대화"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "입을 벌리고 지친 눈으로 위를 봄",
+        "pose": "병을 쥔 채 다른 사람 옆에 앉음",
+        "captions": [
+          "형님",
+          "난 너 그런 얘기할 때마다 미쳤나~싶어"
+        ]
+      }
+    ],
+    "evidence": "상대 말을 들을 때마다 미쳤다고 여긴다는 자막과 지친 표정이 못마땅함을 나타낸다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

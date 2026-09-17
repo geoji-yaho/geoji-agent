@@ -18,8 +18,9 @@
 
 해석(보고서 "계획서에 반영할 것"):
 
-- 06 §3.3 hell "판결당 1회" 는 `lexicon.HELL_ONCE_PER_VERDICT`(새끼·ㅋㅋ)와
-  "같은 욕 2회 금지" 로 읽는다. `apply_text_rules` 가 이미 그렇게 검사한다
+- (원문) 06 §3.3 hell "판결당 1회" 는 `lexicon.HELL_ONCE_PER_VERDICT`(새끼·ㅋㅋ)와
+  "같은 욕 2회 금지" 로 읽는다. → 9/16 결정으로 hell 비속어 검사를 전부 껐다. `intensity_lexicon`
+  은 hell 에서 `INTENSITY_MISMATCH` 만 본다(`lexicon._RULE_INTENSITIES` 주석)
 - `expect` 의 `must_cite_any`·`strategy_in` 은 AI 텍스트마다 본다(TEMPLATE 은 사전 검수 문구라
   뺀다). `must_not_contain` 은 모든 텍스트
 - `meme_hints` 가 null 이면 emotion 검사는 통과로 본다(기본 강도 서기가 실패한 경우)

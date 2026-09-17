@@ -7,7 +7,7 @@
 
 ### 목적:
 - **장애 4종을 재현하고 정의된 폴백으로 끝나는지** 확인: 9초 시점 워커 종료(lease 만료 → reaper/watchdog), 템플릿 이후 늦은 성공(`STALE_GENERATION` 거부), retry 중 삭제(`EVIDENCE_INVALIDATED`·epoch), backend commit 후 네트워크 끊김(commit record 로 같은 결과, 모델 재호출 없음)
-- `TEXT_RETRY` 핸들러 완성 — round 예산 20초, round 안 보정 없음, 실패 강도만, 성공 시 `texts`·`source`·`text_version` 만 변경. UNKNOWN 비용 정리 배치
+- `TEXT_RETRY` 핸들러 완성 — round 예산 60초(9/16, 원문 20초), round 안 보정 없음, 실패 강도만, 성공 시 `texts`·`source`·`text_version` 만 변경. UNKNOWN 비용 정리 배치
 - **관측**(proposal2 §18): `trace_id`·graph·prompt·`guardrail_policy_version`·vendor·`model_id`·노드 지연·조회 개수·recall ID·Evidence 라벨·전략·`attack_angle`·위반 코드·재생성·폴백·토큰·비용. 메트릭 라벨에 개별 ID 금지. 알림 4종
 - 짤: 서기 `meme_tag`·`meme_hints`(감정 어휘 enum) → **백엔드 finalize 가 점수 선택**(10 §11). 우리는 점수 규칙 명세와 힌트 품질만
 - **데모 시드 · 리허설 A·B·C ×3 · 벤더 장애 2종 · 예산 초과 · 삭제 시연**, runbook, 9/20 동결
@@ -17,7 +17,7 @@
 [장애 리허설]  워커 kill@9s ─ lease 만료(15s) ─ reaper → QUEUED (마감 전) / watchdog → 템플릿 (마감 후) ─ 늦은 finalize → 409 STALE_GENERATION
               retry 중 삭제 ─ epoch +1 ─ 워커 finalize 직전 검사 → EVIDENCE_INVALIDATED ─ 백엔드 조회는 즉시 템플릿
               commit 후 네트워크 단절 ─ 같은 finalize 재전송 → commit record 200 ─ 모델 재호출 0
-[TEXT_RETRY]   round1 +5분 → round2 +10분 → round3 +20분 (백엔드 예약) ─ 워커: 고정 형량·이유, 실패 강도만, 20초, 보정 없음 ─ 성공: texts·source·text_version 만
+[TEXT_RETRY]   round1 +5분 → round2 +10분 → round3 +20분 (백엔드 예약) ─ 워커: 고정 형량·이유, 실패 강도만, 60초(원문 20초), 보정 없음 ─ 성공: texts·source·text_version 만
 [관측]         telemetry/logs.py (structlog JSON, hash·개수·코드) · telemetry/metrics.py (§18 표 9지표, 라벨 = kind/node/vendor/code) · 알림 4종
 [시드·리허설]  scripts/seed_agent_db.py (우리 DB) + 백엔드 시드(실제 파이프라인 통과) → 리허설 표 3회 기록 → runbook → 9/20 동결 태그
 ```
@@ -63,12 +63,18 @@
 - 추가: 벤더 한쪽 장애 2종(06 §4.2), 예산 초과(`WRITER_NODE_TIMEOUT_SECONDS=0.1`), 마지막 표 동시 도착(백엔드 테스트, 10 §13)
 
 ### 3.2 `TEXT_RETRY` 핸들러 · UNKNOWN 정리 (`application/sentence_case.py` `mode=REGENERATE`, proposal2 §11.2)
-- `begin-generation`(템플릿이 이미 노출된 `FINAL` 상태에서만 시작) → 고정 형량·이유 → `load_valid_prep`(삭제된 prep 읽지 않음) → 서기(**payload `intensities[]` 만**) → ⑤ → ⑥ → finalize. 예산 20초, **round 안 보정 없음**(실패 = 다음 round), 형량 필드가 기존과 다르면 finalize 가 거부
+- `begin-generation`(템플릿이 이미 노출된 `FINAL` 상태에서만 시작) → 고정 형량·이유 → `load_valid_prep`(삭제된 prep 읽지 않음) → 서기(**payload `intensities[]` 만**) → ⑤ → ⑥ → finalize. 예산 60초(9/16, 원문 20초), **round 안 보정 없음**(실패 = 다음 round), 형량 필드가 기존과 다르면 finalize 가 거부
 - 성공: `texts`·`source`·`text_version` 만 변경, 이미지·형량·양형 이유 유지. 마지막 round 실패·예산 초과 → 템플릿 유지 + 운영 알림(백엔드)
 - UNKNOWN 정리: `uv run geoji-ai ledger-sweep --older-than 24h` — `UNKNOWN` 호출의 예약액을 `spent` 로 확정(보수적)하고 리포트. 백엔드 스케줄러 또는 cron 하루 1회
 
 ### 3.3 관측 (`telemetry/logs.py`·`metrics.py`, proposal2 §18)
 - 로그(JSON): `trace_id`·`job_id`·`generation_id`·`dossier_id`·`graph_name/version`·`prompt_bundle_version`·`guardrail_policy_version`·`vendor`·`model_id`·노드별 `latency_ms`·`ok`·조회 결과 개수·recall memory ID·Evidence 라벨·`banter_strategy`·`attack_angle`·위반 코드·`repair_count`·폴백 원인·토큰·`micro_usd`. **원문 대신 hash·개수·코드.** 인증 헤더·사유·댓글 원문 금지
+- **(9/16 코드 대조) 단계별·역할별 기록** — 운영 화면이 템플릿일 때 "어느 역할이 어디서 왜" 를 로그만으로 되짚기 위해 그래프 C 에 이벤트 셋을 더했다(`telemetry/logs.py` 필드 `role`·`intensity`·`outcome`·`mode`·`source`·`timeout_s`·`remaining_s`·`call_index` 추가). 모두 `trace_id`·`job_id`·`generation_id` 를 달고 원문은 없다
+  - `sentence_call`: 모델 호출 1회마다. `role`(sentencing·writer·evaluator·context)·`intensity`·`model_id`·받은 `timeout_s`·호출 직전 `remaining_s`·`latency_ms`·`ok`·`fallback_reason`(오류 kind. 마감이 모자라 시작 못 하면 `NO_BUDGET`, 출력 없음은 `NO_OUTPUT:{stop_reason}`)·토큰
+  - `sentence_fallback`: 실패가 결과를 바꾼 지점. `node`·`role`(모델 역할 또는 `server_rules`·`backend`)·`intensity`·`outcome`(`RULE`·`TEMPLATE`·`TEMPLATE_REASON`·`writer_repair`·`generation_failed`·`DISCARDED`·`F0_ONLY`·`CODE_EVIDENCE_ONLY`·`NONE`·`error`)·`fallback_reason`(`코드:세부`, 예 `EVAL_FAILED:TIMEOUT`)
+  - `sentence_summary`: 실행 1회 한 줄(핸들러). `mode`·`outcome`(실패 코드 또는 `SAVED`·`DISCARDED`)·`source`(`조서출처|양형출처|강도=문구출처,…`)·`fallback_reason`(`role:intensity:kind` 목록)·`result_count`(호출 수)·`repair_count`·`latency_ms`
+  - `sentence_node` 에 `outcome`(그 노드가 고른 길: `prep`·`inline_context`·`minimal_dossier`·`AI`·`RULE`·`writer_repair`·`SAVED`·`DISCARDED`)을 더했다
+  - 그래프의 stdlib `logging` 결정 로그(예 "검수관 오류 TIMEOUT → 전 강도 TEMPLATE")를 같은 JSON 렌더러로 stderr 에 낸다(`core/logging.py` `_bridge_stdlib`). 전에는 INFO 가 버려지고 WARNING 만 평문으로 남았다
 - 지표(라벨에 개별 ID 금지):
 | 지표 | 라벨 | 해석 |
 |---|---|---|
@@ -97,8 +103,8 @@
 | A 무엇을 심문 | "감각적 쾌락 추구" 등록 → 솔직 팝업 → 수정(`FINAL_CHECK`) → 등록 | 팝업 1회, 중복 post 없음, PREPARE job 1개 | intake ≤ 2.5초 |
 | B 거지방식 판결 | 30분 방, 3명 투표 **`disagree`(부결)** → 판결 화면 → 공유 카드 | 양형 0호출·서기+검수, `texts` 방 강도 행, 짤 선택, 카드 `PUBLIC` 근거만 | 마지막 표 → 첫 저장 ≤ 6초 |
 | C 개인화 | 스타벅스 3번째 → 판결 → trace 화면 | `PRIOR`·반복 AGGREGATE 라벨 인용, recall 출처 표시 | ≤ 8초 |
-| 장애 1 xAI | `XAI_API_KEY` 무효 → 유죄 | 형량 AI 정상, 문구 TEMPLATE, `VENDOR_UNAVAILABLE`, round1 예약 | ≤ 10초 |
-| 장애 2 OpenAI | `OPENAI_API_KEY` 무효 | 양형 RULE, 문구 TEMPLATE(검수 불가) | ≤ 10초 |
+| 장애 1 xAI | `XAI_API_KEY` 무효 → 유죄 | 형량 AI 정상, 문구 TEMPLATE, `VENDOR_UNAVAILABLE`, round1 예약 | ≤ 90초(9/16, 원문 10초) |
+| 장애 2 OpenAI | `OPENAI_API_KEY` 무효 | 양형 RULE, 문구 TEMPLATE(검수 불가) | ≤ 90초(9/16, 원문 10초) |
 | 예산 초과 | `WRITER_NODE_TIMEOUT_SECONDS=0.1` | `DEADLINE_EXCEEDED`/TEMPLATE, 응답 ≤ deadline+0.5s | |
 | 삭제 | 판결 뒤 게시물 삭제 | 조회 즉시 차단·템플릿, retry 저장 0, `invalidated_evidence_total` +1 | 즉시 |
 - 시나리오 B 는 `dismissed`(정족수 미달)가 아니라 `disagree`(부결)다(proposal2 §3 #9)

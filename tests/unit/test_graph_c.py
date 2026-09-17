@@ -63,6 +63,17 @@ class Rejected(Exception):
         self.code = code
 
 
+#: 05 §3.1 스펙 단위 케이스가 쓴 "첫 결과 10초" 시절 노드 상한(3·6·4)과 TEXT_RETRY 20초.
+#: 9/16 luna 실측으로 제품 기본값은 12·10·30·60 이 됐다(01 §3.7). 여기 케이스는 timeout
+#: 산식(`min(상한, 남은 − 예약)`)을 고정하는 것이라 옛 상한을 명시해 두고 돈다.
+SPEC_CAPS: dict[str, Any] = {
+    "SENTENCING_NODE_TIMEOUT_SECONDS": 3,
+    "WRITER_NODE_TIMEOUT_SECONDS": 6,
+    "EVALUATOR_NODE_TIMEOUT_SECONDS": 4,
+    "TEXT_RETRY_TIMEOUT_SECONDS": 20,
+}
+
+
 class FakeClock:
     def __init__(self) -> None:
         self.now = 1000.0
@@ -355,7 +366,7 @@ def run(
         llm=llm,
         preparation=preparation or FakePreparation(make_prep() if prep == "default" else prep),
         semaphore=asyncio.Semaphore(8),
-        settings=settings or Settings(_env_file=None),
+        settings=settings or Settings(_env_file=None, **SPEC_CAPS),
         generation_id=GENERATION_ID,
         worker_id=WORKER_ID,
         notifier=notifier,
@@ -764,6 +775,67 @@ def report(intensities: Iterable[str], fail: Iterable[str] = ()) -> dict[str, An
     return base
 
 
+def test_31_evaluator_splits_one_intensity_into_two_entries() -> None:
+    """검수관이 같은 강도를 위반별로 쪼개 내도 하나로 합쳐 판정한다(9/16).
+
+    옛 동작: `validate_evaluation` 이 `DUPLICATE_INTENSITY` 를 내고, 그 코드는 강도별이 아니라
+    전역이라 재검수 없이 `EVAL_FAILED` 였다(15 §6 6회차).
+    """
+    split = report(["spicy", "hell"])
+    hell = split["texts"][1]
+    split["texts"] = [split["texts"][0], dict(hell), dict(hell)]
+    result = run(ScriptedLLM(sequences={"evaluator": [split, None]}))
+
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [("spicy", "AI"), ("hell", "AI")]
+    assert [t.intensity for t in req.evaluation.texts] == ["spicy", "hell"]
+    assert result.backend.failed == []
+
+
+def test_31b_splitted_entries_fail_if_any_says_false() -> None:
+    """쪼개진 항목 중 하나라도 `pass=false` 면 그 강도는 검수 실패로 본다."""
+    split = report(["spicy", "hell"])
+    failed_hell = report(["spicy", "hell"], fail=["hell"])["texts"][1]
+    split["texts"] = [split["texts"][0], dict(split["texts"][1]), failed_hell]
+    result = run(ScriptedLLM(sequences={"evaluator": [split, report(["hell"]), None]}))
+
+    # hell 만 재작성 대상이 된다.
+    assert result.state["repair_count"] == 1
+    assert [writer_intensity(c) for c in result.calls_of("writer")] == ["spicy", "hell", "hell"]
+
+
+@pytest.mark.parametrize("evidence_labels", [[], ["F1"]])
+def test_split_duplicate_violations_still_allow_repair(evidence_labels: list[str]) -> None:
+    """중복 위반 합계가 계약 상한을 넘어도 고유 위반만 남겨 재작성한다."""
+    split = report(["spicy", "hell"], fail=["hell"])
+    hell = split["texts"][1]
+    violation = {**hell["violations"][0], "evidence_labels": evidence_labels}
+    hell["violations"] = [dict(violation) for _ in range(11)]
+    split["texts"].append({**hell, "violations": [dict(violation) for _ in range(11)]})
+
+    result = run(ScriptedLLM(sequences={"evaluator": [split, report(["hell"])]}))
+
+    assert result.state["repair_count"] == 1
+    assert [t.source for t in result.finalize().draft.texts] == ["AI", "AI"]
+    assert result.backend.failed == []
+
+
+def test_split_distinct_violations_over_limit_are_not_discarded() -> None:
+    """서로 다른 위반은 중복 제거로 버리거나 계약 상한에 맞춰 잘라 내지 않는다."""
+    split = report(["spicy", "hell"], fail=["hell"])
+    hell = split["texts"][1]
+    violation = hell["violations"][0]
+    hell["violations"] = [{**violation, "explanation": f"위반 {i}"} for i in range(11)]
+    split["texts"].append(
+        {**hell, "violations": [{**violation, "explanation": f"위반 {i}"} for i in range(11, 22)]}
+    )
+
+    result = run(ScriptedLLM(sequences={"evaluator": [split]}))
+
+    assert result.backend.finalized == []
+    assert result.backend.failed == ["EVAL_FAILED"]
+
+
 def writer_angle(call: FakeCall) -> str:
     return call.schema["properties"]["attack_angle"]["enum"][0]
 
@@ -837,6 +909,93 @@ def test_18_no_repair_when_less_than_5s_remain() -> None:
         ("spicy", "AI"),
         ("hell", "TEMPLATE"),
     ]
+
+
+class RuleBreakingWriter(ScriptedLLM):
+    """주어진 강도의 서기 호출 `break_calls` 번만 서버 검증 ⑤ 규칙 6 위반 문장을 넣는다.
+
+    mild·spicy 는 비속어 0개라 "지랄" 하나로 `PROFANITY_OUT_OF_LIST` 가 난다(9/16 기준 hell 은
+    비속어를 검사하지 않는다).
+    """
+
+    def __init__(self, intensity: str = "spicy", break_calls: int = 1, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.break_intensity = intensity
+        self.break_calls = break_calls
+        self.broken = 0
+
+    async def structured_call(self, *, role: Any, messages: list[dict], schema: dict, **kw: Any):
+        result = await super().structured_call(role=role, messages=messages, schema=schema, **kw)
+        wanted = self._requested_intensity(schema)
+        if (
+            role == "writer"
+            and wanted == self.break_intensity
+            and self.broken < self.break_calls
+            and result.output is not None
+        ):
+            self.broken += 1
+            output = dict(result.output)
+            statement = [dict(item) for item in output["statement"]]
+            statement[-1] = {**statement[-1], "text": "지랄 같은 선택이다."}
+            output["statement"] = statement
+            result = replace(result, output=output)
+        return result
+
+
+def test_30_server_rule_violation_goes_to_writer_repair() -> None:
+    """서버 검증 ⑤ 위반 → 곧바로 TEMPLATE 이 아니라 재작성 1회(9/16).
+
+    재작성이 깨끗한 문구를 내면 그 강도는 AI 로 남는다.
+    """
+    result = run(RuleBreakingWriter())
+
+    assert result.roles()["writer"] == 3  # 최초 2 + spicy 재작성 1
+    assert result.state["repair_count"] == 1
+    assert result.state["draft_sources"] == {Intensity.spicy: "AI", Intensity.hell: "AI"}
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [("spicy", "AI"), ("hell", "AI")]
+    assert result.backend.failed == []
+
+
+def test_30b_single_intensity_room_recovers_by_repair() -> None:
+    """공유 방이 하나(대상 강도 1개)여도 규칙 위반 한 번으로 끝나지 않는다.
+
+    옛 동작: 그 하나가 TEMPLATE → `all(TEMPLATE)` → 검수관을 부르지도 못하고 `EVAL_FAILED`.
+    같은 위반인데 방 개수로 결과가 갈리던 것을 고쳤다(15 §6).
+    """
+    snapshot = make_snapshot(target_intensities=["spicy"], default_intensity="spicy")
+    result = run(RuleBreakingWriter(), snapshot=snapshot)
+
+    assert result.roles()["writer"] == 2  # 최초 1 + 재작성 1
+    assert result.roles()["evaluator"] == 1  # 검수관까지 갔다
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [("spicy", "AI")]
+    assert result.backend.failed == []
+
+
+def test_30c_repair_budget_exhausted_falls_back_to_template() -> None:
+    """재작성이 또 규칙을 어기면 예전처럼 TEMPLATE 이다. 재작성은 한 판결에 1회."""
+    snapshot = make_snapshot(target_intensities=["spicy"], default_intensity="spicy")
+    result = run(RuleBreakingWriter(break_calls=2), snapshot=snapshot)
+
+    assert result.roles()["writer"] == 2
+    assert result.state["repair_count"] == 1
+    assert result.backend.failed == ["EVAL_FAILED"]
+    assert result.backend.finalized == []
+
+
+def test_30d_regenerate_does_not_repair_on_rule_violation() -> None:
+    """REGENERATE(TEXT_RETRY)는 round 안 보정이 없다. 규칙 위반이면 저장 없이 실패한다."""
+    result = run(
+        RuleBreakingWriter(),
+        backend_kwargs={"fixed": FIXED, "remaining_s": 60.0},
+        kind="TEXT_RETRY",
+    )
+
+    assert result.roles()["writer"] == 2  # 재작성 없음
+    assert result.state["repair_count"] == 0
+    assert result.backend.failed == ["EVAL_FAILED"]
+    assert result.backend.finalized == []
 
 
 FIXED = {"sentence": "probation", "sentencing_reason": "고정된 이유", "reason_source": "AI"}
@@ -930,7 +1089,9 @@ def test_29_regenerate_budget_is_text_retry_timeout(
         backend_kwargs={"fixed": FIXED, "remaining_s": 60.0},
         kind="TEXT_RETRY",
         clock=clock,
-        settings=Settings(_env_file=None, TEXT_RETRY_TIMEOUT_SECONDS=retry_timeout_s),
+        settings=Settings(
+            _env_file=None, **{**SPEC_CAPS, "TEXT_RETRY_TIMEOUT_SECONDS": retry_timeout_s}
+        ),
     )
     assert result.backend.failed == failed
     if failed:
@@ -1001,6 +1162,28 @@ def test_21b_same_model_single_evaluator_call() -> None:
     assert [evaluator_intensities(c) for c in result.calls_of("evaluator")] == [["spicy", "hell"]]
 
 
+@pytest.mark.parametrize("check", ["sentence_check", "sentencing_reason_check"])
+@pytest.mark.parametrize("missing", [False, True])
+@pytest.mark.parametrize("broken_index", [0, 1])
+def test_split_evaluator_missing_check_reports_failure(
+    check: str, missing: bool, broken_index: int
+) -> None:
+    """분리 검수 응답이 불완전해도 핸들러 예외 대신 백엔드에 실패를 보고한다."""
+    outputs = [report(["spicy"]), report(["hell"])]
+    if missing:
+        outputs[broken_index].pop(check)
+    else:
+        outputs[broken_index][check] = None
+    result = run(
+        ScriptedLLM(sequences={"evaluator": outputs}),
+        settings=Settings(_env_file=None, MODEL_EVALUATOR_HELL="other-hell-model"),
+    )
+
+    assert result.backend.finalized == []
+    assert result.backend.failed == ["EVAL_FAILED"]
+    assert result.jobs.completed == ["job-1"]
+
+
 def test_22_epoch_mismatch_before_finalize() -> None:
     """finalize 직전 epoch 불일치 → finalize 0 · `generation_failed(EVIDENCE_INVALIDATED)`."""
     preparation = FakePreparation(make_prep(), stale=["room:room-ddegeoji-01"])
@@ -1033,3 +1216,113 @@ def test_24_minimal_dossier_is_saved() -> None:
     result = run(preparation=preparation, backend_kwargs={"remaining_s": 8.4})
     assert result.state["dossier_source"] == "MINIMAL"
     assert [d.dossier_id for d in preparation.saved] == [result.state["dossier"].dossier_id]
+
+
+def card_output(*, offset: int = 0, **changes: Any) -> dict[str, Any]:
+    """실제 호출 계약 모양의 짧은 카드. 의도적으로 FakeLLM의 보정에 의존하지 않는다."""
+    return {
+        "intensity": "spicy",
+        "headline": "지갑만 조기 퇴근",
+        "statement": [
+            {"text": "편한 건 몸이고 고생은 지갑 몫이다.", "kind": "opinion", "evidence_labels": []}
+        ],
+        "banter_strategy": "EXCUSE_STRIPPING",
+        "selected_candidate_id": None,
+        "attack_angle": pick(make_snapshot().post_id, offset).value,
+        "meme_tag": "GUILTY_LIGHT",
+        "meme_hints": {"emotion": "DISAPPROVAL", "keywords": ["택시", "지갑"]},
+        **changes,
+    }
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"headline": "가" * 21},
+        {"headline": "제목\n두 줄"},
+        {"headline": "F0"},  # 근거 라벨 제거 뒤 빈 제목이 되는 경우도 재작성한다.
+        {"statement": [{"text": "가" * 31, "kind": "opinion", "evidence_labels": []}]},
+        {"statement": [{"text": "줄\n바꿈", "kind": "opinion", "evidence_labels": []}]},
+        {"statement": [{"text": "   ", "kind": "opinion", "evidence_labels": []}]},
+        {"statement": [{"text": "첫 문장", "kind": "opinion", "evidence_labels": []}] * 2},
+    ],
+)
+def test_card_format_violation_repairs_once_before_evaluation(changes: dict[str, Any]) -> None:
+    llm = ScriptedLLM(sequences={"writer": [card_output(**changes), card_output(offset=1)]})
+    result = run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
+    assert result.roles() == Counter({"sentencing": 1, "writer": 2, "evaluator": 1})
+    assert result.state["repair_count"] == 1
+    req = result.finalize()
+    assert req.draft.texts[0].headline == "지갑만 조기 퇴근"
+    assert len(req.draft.texts[0].statement) == 1
+    assert req.draft.meme_hints.model_dump(mode="json") == card_output()["meme_hints"]
+    assert "SCHEMA_INVALID" in user_payload(result.calls_of("writer")[1])["avoid"]["violations"]
+    assert_finalize_hash_is_last_evaluated(result)
+
+
+def test_card_format_repair_does_not_loop_or_save_invalid_text() -> None:
+    llm = ScriptedLLM(
+        sequences={
+            "writer": [card_output(headline="가" * 21), card_output(offset=1, headline="가" * 21)]
+        }
+    )
+    result = run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
+    assert result.roles()["writer"] == 2
+    assert result.state["repair_count"] == 1
+    assert not result.backend.finalized
+    assert result.backend.failed == ["EVAL_FAILED"]
+    template = result.state["drafts"][Intensity.spicy]
+    assert template.source == "TEMPLATE"
+    assert len(template.headline) <= 20
+    assert len(template.statement) == 1
+    assert len(template.statement[0].text) <= 30
+
+
+def test_card_format_retry_round_does_not_repair() -> None:
+    result = run(
+        ScriptedLLM(outputs={"writer": card_output(headline="가" * 21)}),
+        snapshot=make_snapshot(target_intensities=["spicy"]),
+        kind="TEXT_RETRY",
+        backend_kwargs={"fixed": FIXED},
+    )
+    assert result.roles()["writer"] == 1
+    assert result.state["repair_count"] == 0
+    assert result.backend.failed == ["SCHEMA_INVALID"]
+    assert not result.backend.finalized
+
+
+def test_card_format_invalid_output_is_never_cached() -> None:
+    class RememberingLLM(ScriptedLLM):
+        def __init__(self) -> None:
+            super().__init__(
+                sequences={"writer": [card_output(headline="가" * 21), card_output(offset=1)]}
+            )
+            self.remembered: list[Any] = []
+
+        async def scoped_call(self, scope: Any, **kwargs: Any) -> Any:
+            return SimpleNamespace(scope=scope, result=await self.structured_call(**kwargs))
+
+        async def remember(self, scoped: Any) -> None:
+            self.remembered.append(scoped)
+
+    llm = RememberingLLM()
+    result = run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
+    assert len(result.backend.finalized) == 1
+    remembered = [s for s in llm.remembered if s.scope.node == "writer"]
+    assert len(remembered) == 1
+    assert remembered[0].scope.call_index == 3
+    assert remembered[0].result.output["headline"] == "지갑만 조기 퇴근"
+
+
+def test_card_format_repair_shares_budget_with_evaluator_repair() -> None:
+    llm = ScriptedLLM(
+        sequences={
+            "writer": [card_output(headline="가" * 21), card_output(offset=1)],
+            "evaluator": [report(["spicy"], fail=["spicy"])],
+        }
+    )
+    result = run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
+    assert result.roles()["writer"] == 2
+    assert result.state["repair_count"] == 1
+    assert result.backend.failed == ["EVAL_FAILED"]
+    assert not result.backend.finalized

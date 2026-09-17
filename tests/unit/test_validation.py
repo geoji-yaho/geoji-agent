@@ -1,6 +1,6 @@
 """구조 검증 2함수(01 §3.5, 스펙 테스트 표).
 
-`validate_writer_draft` 5규칙(강도 집합 일치·중복·길이·라벨·문장 수 2~4·`kind`),
+`validate_writer_draft` 5규칙(강도 집합 일치·중복·길이·라벨·문장 수 1~4·`kind`),
 `validate_evaluation` 4규칙(강도 완전성·검사 필드·`pass` 불리언·정책 버전),
 그리고 `false`·누락·파싱 실패는 모두 검수 실패.
 """
@@ -115,16 +115,16 @@ def test_label_map_에_없는_라벨은_거부():
     assert UNKNOWN_EVIDENCE_LABEL in _codes(issues)
 
 
-@pytest.mark.parametrize("count", [0, 1, 5])
-def test_문장_수는_2에서_4여야_한다(count: int):
+@pytest.mark.parametrize("count", [0, 5])
+def test_저장_문장_수는_1에서_4여야_한다(count: int):
     draft = _draft()
     draft["texts"][0]["statement"] = [_statement() for _ in range(count)]
     issues = validate_writer_draft(draft, ALL_THREE, LABEL_MAP)
     assert STATEMENT_COUNT in _codes(issues)
 
 
-@pytest.mark.parametrize("count", [2, 3, 4])
-def test_문장_수_2에서_4는_통과(count: int):
+@pytest.mark.parametrize("count", [1, 2, 3, 4])
+def test_저장_문장_수_1에서_4는_통과(count: int):
     draft = _draft()
     draft["texts"][0]["statement"] = [_statement() for _ in range(count)]
     assert validate_writer_draft(draft, ALL_THREE, LABEL_MAP) == []

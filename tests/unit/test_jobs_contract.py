@@ -125,3 +125,15 @@ def test_TEXT_RETRY_intensities_빈_목록과_모르는_값은_거부한다(bad)
 def test_TEXT_RETRY_payload_는_모르는_필드를_거부한다():
     with pytest.raises(ValidationError):
         TextRetryPayload.model_validate({**_RETRY_BASE, "extra": 1})
+
+
+def test_마감_규약이_백엔드_JobKind_와_같다():
+    """9/16: SENTENCE 90초(백엔드 `JobKind.SENTENCE`), TEXT_RETRY 60초(설정과 같은 값).
+
+    PREPARE·RETAIN 은 마감 없음. 10 §3 표.
+    """
+    assert JOB_ROUTES["verdict.confirmed"].deadline_after_s == 90
+    assert JOB_ROUTES["verdict.text_retry"].deadline_after_s == 60
+    assert JOB_ROUTES["post.created"].deadline_after_s is None
+    assert JOB_ROUTES["sentence.finalized"].deadline_after_s is None
+    assert JOB_ROUTES["comment.approved"].deadline_after_s is None

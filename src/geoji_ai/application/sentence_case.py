@@ -22,14 +22,15 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import datetime, timedelta
 from typing import Any, Protocol
 
+from geoji_ai.application import instrument
 from geoji_ai.application.llm_gateway import ScopedLLM
 from geoji_ai.contracts.jobs import Job, SentencePayload, TextRetryPayload, parse_payload
 from geoji_ai.graphs.sentencing import SentenceDeps, build_sentence_graph, initial_state
-from geoji_ai.ports.backend import BackendPort
+from geoji_ai.ports.backend import BackendPort, SnapshotNotFound
 from geoji_ai.ports.jobs import JobsPort
 from geoji_ai.ports.llm import LLMPort
 
@@ -155,12 +156,63 @@ class SentenceHandler:
                 notifier=getattr(ctx, "notifier", None),
             )
             graph = self._graph_factory(deps)
-            await graph.ainvoke(initial_state(job, mode, snapshot))
+            final = await graph.ainvoke(initial_state(job, mode, snapshot))
+            _log_summary(
+                job,
+                ctx.generation_id,
+                mode,
+                final,
+                latency_ms=int((self._clock() - started) * 1000),
+            )
+        except SnapshotNotFound as exc:
+            await ctx.jobs.cancel(
+                job.id, ctx.worker_id, ctx.generation_id, error_code=exc.error_code
+            )
+            return
         except Exception as exc:
             if not await _settle_backend_error(job, ctx, exc):
                 raise
             return
         await ctx.jobs.complete(job.id, ctx.worker_id, ctx.generation_id)
+
+
+def _log_summary(job: Job, generation_id: str, mode: str, state: Any, *, latency_ms: int) -> None:
+    """실행 1회 요약 `sentence_summary`(9/16, 08 §3.3). 어느 역할이 어디서 깨졌는지 한 줄.
+
+    `fallback_reason` 은 `role:intensity:kind` 목록, `source` 는 `조서출처|강도=문구출처,…`,
+    `outcome` 은 실패 코드 또는 `SAVED`·`DISCARDED`. 원문 없음.
+    """
+    if not isinstance(state, Mapping):
+        return
+    calls = state.get("calls") or []
+    errors = [
+        f"{c.role}:{getattr(c.intensity, 'value', c.intensity) or '-'}:{c.error}"
+        for c in calls
+        if getattr(c, "error", None)
+    ]
+    sources = state.get("draft_sources") or {}
+    failure = state.get("failure")
+    outcome = (
+        failure
+        or state.get("finalize_outcome")
+        or ("DISCARDED" if state.get("begin") is None else "UNKNOWN")
+    )
+    texts = ",".join(f"{getattr(k, 'value', k)}={v}" for k, v in sources.items())
+    instrument.node_log(
+        "sentence_summary",
+        trace_id=job.trace_id,
+        job_id=job.id,
+        generation_id=generation_id,
+        graph_name="sentencing",
+        mode=mode,
+        outcome=outcome,
+        ok=failure is None,
+        latency_ms=latency_ms,
+        result_count=len(calls),
+        repair_count=state.get("repair_count", 0),
+        fallback_reason=",".join(errors) or None,
+        source=f"{state.get('dossier_source', '-')}|{state.get('sentencing_source', '-')}|{texts}",
+    )
 
 
 async def _settle_backend_error(job: Job, ctx: StubContext, exc: Exception) -> bool:

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "002-Mnet-necklace.png",
+  "asset_sha256": "d70446c7430a284c87059023c315de51d02891268aa426dee0635d155d0b61f0",
+  "classification": {
+    "emotions": [
+      "CELEBRATION"
+    ],
+    "keywords": [
+      "합격",
+      "목걸이",
+      "인정"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "얼굴은 보이지 않음",
+        "pose": "금빛 목걸이를 손에 쥐고 늘어뜨림",
+        "captions": [
+          "그리고",
+          "그의 손에 쥐어지는 합격 목걸이"
+        ]
+      }
+    ],
+    "evidence": "합격 목걸이를 쥔 장면과 자막이 성취를 나타낸다.",
+    "uncertainties": []
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": false,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

@@ -36,6 +36,7 @@ from geoji_ai.ports.backend import (
     GenerationErrorCode,
     ResolveEvidenceRequest,
     ResolveEvidenceResponse,
+    SnapshotNotFound,
 )
 
 __all__ = [
@@ -143,13 +144,18 @@ class BackendHttp:
     # --- BackendPort ----------------------------------------------------------
 
     async def snapshot(self, job_id: str, generation_id: str) -> CaseSnapshot:
-        response = await self._send(
-            "snapshot",
-            "GET",
-            f"/internal/v1/ai-jobs/{job_id}/snapshot",
-            job_id=job_id,
-            generation_id=generation_id,
-        )
+        try:
+            response = await self._send(
+                "snapshot",
+                "GET",
+                f"/internal/v1/ai-jobs/{job_id}/snapshot",
+                job_id=job_id,
+                generation_id=generation_id,
+            )
+        except BackendRejected as exc:
+            if exc.status == 404 and exc.code == "NOT_FOUND":
+                raise SnapshotNotFound() from exc
+            raise
         return self._parse(response, CaseSnapshot)
 
     async def resolve_evidence(

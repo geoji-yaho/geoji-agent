@@ -191,7 +191,7 @@ def test_check_schema() -> None:
     draft["texts"] = draft["texts"][:2]
     assert "schema" in names(run_case_checks(draft))
     draft = good_draft()
-    draft["texts"][0]["statement"] = draft["texts"][0]["statement"][:1]
+    draft["texts"][0]["statement"] = []
     assert "schema" in names(run_case_checks(draft))
 
 
@@ -229,10 +229,12 @@ def test_check_death_words() -> None:
     [
         (0, "미친 선택이에요.", True),  # mild 욕
         (1, "지랄 맞은 소비입니다.", True),  # spicy 욕
-        (2, "씨발 이게 뭐냐.", True),  # hell 목록 밖
-        (2, "새끼야 또냐. 새끼는 반성해라.", True),  # 판결당 1회
-        (2, "레전드다. 레전드 소비.", True),  # 같은 욕 반복
-        (2, "미친 소비 레전드.", False),  # hell 목록 안, 서로 다른 욕
+        # 9/16 결정: hell 은 비속어를 검사하지 않는다. 아래 셋은 예전에 걸리던 문장이다
+        # (목록 밖 / 판결당 1회 / 같은 욕 반복).
+        (2, "씨발 이게 뭐냐.", False),
+        (2, "새끼야 또냐. 새끼는 반성해라.", False),
+        (2, "레전드다. 레전드 소비.", False),
+        (2, "미친 소비 레전드.", False),
     ],
 )
 def test_check_intensity_lexicon(index: int, text: str, fails: bool) -> None:

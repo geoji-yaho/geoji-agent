@@ -72,15 +72,26 @@ def test_비속어_0개_검사는_순한맛_매운맛만():
 @pytest.mark.parametrize(
     "rule", [LexiconRule.HELL_ALLOWED_PROFANITY, LexiconRule.HELL_ONCE_PER_VERDICT]
 )
-def test_허용_목록_검사는_지옥맛만(rule: LexiconRule):
-    assert applies(Intensity.hell, rule) is True
-    assert applies(Intensity.mild, rule) is False
-    assert applies(Intensity.spicy, rule) is False
+@pytest.mark.parametrize("intensity", ALL_INTENSITIES)
+def test_지옥맛_허용_목록_검사는_어느_강도에도_켜지지_않는다(
+    rule: LexiconRule, intensity: Intensity
+):
+    """9/16 결정: 지옥맛은 비속어를 차단하지 않는다.
+
+    (원문) hell 만 켜서 12개 허용 목록 밖을 `PROFANITY_OUT_OF_LIST` 로 잡았다. 목록이 어간·표층형
+    혼합이라 허용 단어의 활용형까지 막혔다(`미쳤네`·`돌았어`·`처먹네`).
+    """
+    assert applies(intensity, rule) is False
+
+
+def test_자해_죽음_어휘는_지옥맛에서도_막는다():
+    """비속어 차단은 껐지만 안전 규칙은 전 강도 그대로다."""
+    assert applies(Intensity.hell, LexiconRule.DEATH_WORDS) is True
 
 
 def test_문자열로도_부른다():
     assert applies("spicy", "PROFANITY") is True
-    assert applies("hell", "HELL_ALLOWED_PROFANITY") is True
+    assert applies("hell", "HELL_ALLOWED_PROFANITY") is False
 
 
 @pytest.mark.parametrize(

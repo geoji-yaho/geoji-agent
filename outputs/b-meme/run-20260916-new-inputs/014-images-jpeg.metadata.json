@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "014-images-jpeg.png",
+  "asset_sha256": "7c733b06711cfc8a209de817474c67073902f9e368a06e63ebb9f16055672656",
+  "classification": {
+    "emotions": [
+      "CELEBRATION"
+    ],
+    "keywords": [
+      "인정",
+      "펭귄",
+      "수긍"
+    ],
+    "expense_categories": [],
+    "subject": "animal",
+    "panels": [
+      {
+        "expression": "눈을 동그랗게 뜨고 부리를 벌림",
+        "pose": "노란 헤드폰을 쓰고 정면을 봄",
+        "captions": [
+          "인정"
+        ]
+      }
+    ],
+    "evidence": "큰 인정 자막과 열린 부리가 긍정적 수긍을 나타낸다.",
+    "uncertainties": [
+      "축하보다는 단순 수긍에 가까워 CELEBRATION과 완전히 일치하지 않을 수 있음"
+    ]
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": true,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}

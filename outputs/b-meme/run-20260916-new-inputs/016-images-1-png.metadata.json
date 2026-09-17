@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "taxonomy_version": "verdict-meme-v1",
+  "asset_path": "016-images-1-png.png",
+  "asset_sha256": "678851fa8f56f8a82f9d8636571951ed7fe059e600f1e0fc230f7d4d81c2d0a2",
+  "classification": {
+    "emotions": [
+      "DISAPPROVAL"
+    ],
+    "keywords": [
+      "팍",
+      "자기머리",
+      "짜증"
+    ],
+    "expense_categories": [],
+    "subject": "human",
+    "panels": [
+      {
+        "expression": "눈을 반쯤 감고 입을 다문 표정",
+        "pose": "손으로 머리를 반복해서 때림",
+        "captions": [
+          "팍!",
+          "팍!",
+          "팍!",
+          "팍!",
+          "팍!"
+        ]
+      }
+    ],
+    "evidence": "반복해서 머리를 때리는 동작과 짧은 팍 자막이 짜증 섞인 반응을 보인다.",
+    "uncertainties": [
+      "원본의 작은 손글씨 반복 횟수는 경계가 모호함"
+    ]
+  },
+  "generated_by": "b-meme/codex-visual-v1",
+  "generated_at": "2026-09-16T15:06:42+00:00",
+  "needs_review": true,
+  "tag": null,
+  "strategies": [],
+  "is_active": false
+}
