@@ -68,6 +68,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -91,7 +92,14 @@ from geoji_ai.contracts.finalize import FinalizeRequest, ModelIds
 from geoji_ai.contracts.jobs import Job, SentencePayload, TextRetryPayload, parse_payload
 from geoji_ai.contracts.llm_schemas import evaluator_schema, sentencing_schema, writer_schema
 from geoji_ai.contracts.sentencing import SentencingDecision
-from geoji_ai.contracts.writer import CardTextDraft, MemeHints, TextDraft, WriterDraft
+from geoji_ai.contracts.writer import (
+    CARD_HEADLINE_MAX,
+    CARD_STATEMENT_MAX,
+    CardTextDraft,
+    MemeHints,
+    TextDraft,
+    WriterDraft,
+)
 from geoji_ai.domain.attack_angles import ANGLE_GUIDES, pick
 from geoji_ai.domain.budget import (
     EVALUATOR,
@@ -202,12 +210,13 @@ class SentenceGraphState(SentenceState, total=False):
     meme_hints: MemeHints | None
     #: 예산이 없어 서기 호출을 시작하지 않은 강도가 있다.
     writer_budget_skipped: bool
-    #: 캐시에 넣지 않은 카드 형식 오류. 원문 대신 강도만 보관한다.
-    writer_invalid: list[Intensity]
+    #: 캐시에 넣지 않은 카드 형식 오류. 강도 → 재작성에 줄 직전 제목·본문·글자 수(`_card_preview`).
+    #: 로그·원장에는 넣지 않는다(9/18).
+    writer_invalid: dict[Intensity, dict[str, Any]]
     #: `writer_repair` 가 다시 쓸 강도.
     repair_targets: list[Intensity]
-    #: 강도별 "피할 것"(위반 코드·문제 문장).
-    repair_avoid: dict[Intensity, dict[str, list[str]]]
+    #: 강도별 "피할 것"(위반 코드·문제 문장. 카드 형식이면 직전 제목·본문·글자 수도).
+    repair_avoid: dict[Intensity, dict[str, Any]]
     #: repair 뒤 재사용할 직전 통과 항목. 강도 값 → (그때의 TextDraft JSON, 보고서 항목).
     eval_kept: dict[str, tuple[dict[str, Any], dict[str, Any]]]
     #: 조건 간선이 읽는 다음 노드.
@@ -276,7 +285,7 @@ def initial_state(
         writer_draft=None,
         meme_hints=None,
         writer_budget_skipped=False,
-        writer_invalid=[],
+        writer_invalid={},
         repair_targets=[],
         repair_avoid={},
         eval_kept={},
@@ -381,7 +390,7 @@ def build_writer_request(
     *,
     offset: int = 0,
     banter: Mapping[Intensity, Sequence[Candidate]] | None = None,
-    avoid: Mapping[str, list[str]] | None = None,
+    avoid: Mapping[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """운영 그래프와 서기 실측이 공유하는 순수 요청 조립. 외부 호출·저장은 하지 않는다."""
     jury = snapshot.jury
@@ -478,6 +487,89 @@ def _rule_avoid(codes: Sequence[str], messages: Sequence[str]) -> dict[str, list
     return {
         "violations": list(dict.fromkeys(str(code) for code in codes)),
         "rule_messages": list(dict.fromkeys(str(message) for message in messages)),
+    }
+
+
+#: 문장 경계. 종결 부호 뒤 공백. "3.5 배" 처럼 부호 뒤가 공백이 아니면 경계가 아니다.
+_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?…])\s+")
+_CARD_LIMIT_MESSAGE = (
+    f"headline 1~{CARD_HEADLINE_MAX}자, statement 정확히 1항목, text 1~{CARD_STATEMENT_MAX}자. "
+    "줄바꿈·빈 문구 금지."
+)
+
+
+def _trim_card_tail(output: Mapping[str, Any]) -> tuple[dict[str, Any], int | None]:
+    """본문이 상한을 넘고 문장이 둘 이상이면 첫 문장만 남긴다(9/18).
+
+    실측(15 §6)에서 넘치는 본문은 거의 "찌르는 문장 + 조언 문장" 이었다. 첫 문장만으로
+    1~30자면 뒤 문장을 버린다. 문장 중간은 자르지 않고 제목은 건드리지 않는다.
+    돌려주는 정수는 잘랐을 때의 원래 글자 수, 아니면 None.
+    """
+    statement = output.get("statement")
+    if (
+        not isinstance(statement, list)
+        or len(statement) != 1
+        or not isinstance(statement[0], Mapping)
+    ):
+        return dict(output), None
+    text = statement[0].get("text")
+    if not isinstance(text, str) or len(text) <= CARD_STATEMENT_MAX:
+        return dict(output), None
+    stripped = text.strip()
+    first = _SENTENCE_BOUNDARY.split(stripped, maxsplit=1)[0].strip()
+    if not first or first == stripped or len(first) > CARD_STATEMENT_MAX:
+        return dict(output), None
+    return {**output, "statement": [{**statement[0], "text": first}]}, len(text)
+
+
+def _card_preview(output: Mapping[str, Any]) -> dict[str, Any]:
+    """카드 형식에 걸린 출력에서 재작성에 줄 것만 뽑는다. 제목·본문 원문과 글자 수.
+
+    상태에만 두고 로그·원장·캐시에는 넣지 않는다. 문자열이 아닌 값은 None.
+    """
+    headline = output.get("headline")
+    statement = output.get("statement")
+    items = [s for s in statement if isinstance(s, Mapping)] if isinstance(statement, list) else []
+    text = items[0].get("text") if items else None
+    if not isinstance(headline, str):
+        headline = None
+    if not isinstance(text, str):
+        text = None
+    return {
+        "previous_headline": headline,
+        "previous_headline_length": None if headline is None else len(headline),
+        "previous_text": text,
+        "previous_text_length": None if text is None else len(text),
+        "previous_statement_count": len(items),
+    }
+
+
+def _card_avoid(preview: Mapping[str, Any]) -> dict[str, Any]:
+    """카드 형식 위반 → 서기에게 줄 "피할 것"(9/18).
+
+    9/17 배포에서 서기·재작성이 둘 다 `SCHEMA_INVALID` 였다. 규칙 문장만 주면 자기가 몇 자를
+    썼는지 몰라 같은 길이로 다시 쓴다. 직전 제목·본문과 글자 수를 주고 "압축" 을 시킨다.
+    """
+    messages = [_CARD_LIMIT_MESSAGE]
+    headline_length = preview.get("previous_headline_length")
+    text_length = preview.get("previous_text_length")
+    count = preview.get("previous_statement_count")
+    if isinstance(headline_length, int) and headline_length > CARD_HEADLINE_MAX:
+        messages.append(
+            f"직전 제목이 {headline_length}자라 상한 {CARD_HEADLINE_MAX}자를 넘었다. "
+            f"뜻을 유지하고 {CARD_HEADLINE_MAX}자 이내로 압축한다."
+        )
+    if isinstance(text_length, int) and text_length > CARD_STATEMENT_MAX:
+        messages.append(
+            f"직전 본문이 {text_length}자라 상한 {CARD_STATEMENT_MAX}자를 넘었다. "
+            f"같은 각도·같은 뜻을 한 문장 {CARD_STATEMENT_MAX}자 이내로 압축한다. "
+            "설명·대안·두 번째 동작은 뺀다."
+        )
+    if isinstance(count, int) and count != 1:
+        messages.append(f"본문 항목이 {count}개다. 정확히 1항목이어야 한다.")
+    return {
+        **_rule_avoid([SCHEMA_INVALID], messages),
+        **{key: value for key, value in preview.items() if value is not None},
     }
 
 
@@ -1221,7 +1313,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         state: Mapping[str, Any],
         intensity: Intensity,
         offset: int,
-        avoid: Mapping[str, list[str]] | None,
+        avoid: Mapping[str, Any] | None,
     ) -> tuple[str, Any, CallRecord | None]:
         jury = _jury(state)
         snapshot = state["snapshot"]
@@ -1252,19 +1344,31 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             result, commit = called
             if result.output is None:
                 raise ValueError(f"서기 출력 없음({result.stop_reason})")
-            output = dict(result.output)
-            hints_raw = output.pop("meme_hints", None)
-            output.pop("meme_tag", None)
+            raw = dict(result.output)
+            hints_raw = raw.pop("meme_hints", None)
+            raw.pop("meme_tag", None)
+            # 9/18: "찌르는 문장 + 조언 문장" 으로 넘친 본문은 첫 문장만 남긴다(호출 없음).
+            output, original_length = _trim_card_tail(raw)
             text = CardTextDraft.model_validate({**output, "source": "AI"})
             if text.intensity != intensity or text.attack_angle != angle:
                 raise ValueError("서버 지정 강도·각도와 다르다")
             hints = MemeHints.model_validate(hints_raw) if hints_raw is not None else None
             await commit()
+            if original_length is not None:
+                fallback_log(
+                    state,
+                    node=WRITER if offset == 0 else _ROUTE_REPAIR,
+                    role="writer",
+                    intensity=intensity,
+                    outcome="TRIMMED",
+                    reason=f"{SCHEMA_INVALID}:TAIL_DROPPED:{original_length}",
+                )
         except ValidationError:
             # 길이·항목 수·줄바꿈 등 형식 오류는 원문을 기록하거나 캐시하지 않는다.
+            # 재작성에 줄 직전 제목·본문·글자 수만 상태로 넘긴다(9/18).
             return (
                 "INVALID_CARD",
-                None,
+                _card_preview(raw),
                 CallRecord("writer", intensity, settings.MODEL_WRITER, SCHEMA_INVALID),
             )
         except (LLMError, TimeoutError, ValueError) as exc:
@@ -1276,7 +1380,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         state: Mapping[str, Any],
         intensities: Sequence[Intensity],
         offset: int,
-        avoid: Mapping[Intensity, Mapping[str, list[str]]],
+        avoid: Mapping[Intensity, Mapping[str, Any]],
     ) -> dict[str, Any]:
         """강도마다 서기 1호출. 실패·예산 없음 강도는 TEMPLATE(없으면 비워 둔다)."""
         jury = _jury(state)
@@ -1292,10 +1396,10 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         drafts: dict[Intensity, TextDraft] = dict(state.get("drafts") or {})
         sources: dict[Intensity, Literal["AI", "TEMPLATE"]] = dict(state.get("draft_sources") or {})
         hints: MemeHints | None = state.get("meme_hints")
-        invalid = set(state.get("writer_invalid") or [])
+        invalid = dict(state.get("writer_invalid") or {})
         skipped = False
         for intensity, (kind, value, record) in zip(intensities, outcomes, strict=True):
-            invalid.discard(intensity)
+            invalid.pop(intensity, None)
             if record is not None:
                 calls.append(record)
             if kind == "AI":
@@ -1306,7 +1410,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     hints = text_hints
                 continue
             if kind == "INVALID_CARD":
-                invalid.add(intensity)
+                invalid[intensity] = value
             skipped = skipped or kind == "SKIPPED"
             drafts.pop(intensity, None)
             sources.pop(intensity, None)
@@ -1342,7 +1446,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             "draft_sources": sources,
             "meme_hints": hints,
             "writer_budget_skipped": skipped,
-            "writer_invalid": [i for i in _scope(state) if i in invalid],
+            "writer_invalid": {i: invalid[i] for i in _scope(state) if i in invalid},
             "calls": calls,
         }
 
@@ -1351,7 +1455,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
 
     async def join(state: SentenceGraphState) -> dict[str, Any]:
         targets = _scope(state)
-        invalid = state.get("writer_invalid") or []
+        invalid = state.get("writer_invalid") or {}
         if (
             invalid
             and state["mode"] == "INITIAL"
@@ -1371,17 +1475,8 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             return {
                 "failure": None,
                 "route": _ROUTE_REPAIR,
-                "repair_targets": invalid,
-                "repair_avoid": {
-                    i: _rule_avoid(
-                        [SCHEMA_INVALID],
-                        [
-                            "headline 1~20자, statement 정확히 1항목, text 1~30자. "
-                            "줄바꿈·빈 문구 금지."
-                        ],
-                    )
-                    for i in invalid
-                },
+                "repair_targets": list(invalid),
+                "repair_avoid": {i: _card_avoid(invalid[i]) for i in invalid},
                 "eval_kept": {},
             }
         sources = state.get("draft_sources") or {}

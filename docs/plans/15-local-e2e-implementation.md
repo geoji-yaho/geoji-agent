@@ -195,6 +195,7 @@ PYTHONPATH=src .venv/bin/python scripts/run_local_live_e2e.py --execute-approved
 | 6 | FALLBACK `EVAL_FAILED` | ⑤ 는 통과(지옥맛 어휘 검사 해제가 먹었다). 검수관이 지옥맛 하나를 위반별로 쪼개 `texts` 에 같은 강도를 여러 항목으로 냄 → `DUPLICATE_INTENSITY`. 이 코드는 강도별이 아니라 전역이라 재검수 없이 끝 | 같은 강도 항목을 하나로 합친다(`_merge_same_intensity`, `pass` 는 AND). 검수관 strict 스키마의 `texts` 에 "강도마다 정확히 한 항목" 설명 추가 |
 | 7 | FALLBACK `SCHEMA_INVALID` | 서기·검수관 전부 AI 통과(`source=PREP\|AI\|hell=AI`), finalize 에서 백엔드 **422 `INVALID_DRAFT`** 2회 → 재작성 1회 뒤 실패. 원인은 문구가 아니라 정책 버전 문자열: 백엔드 `FinalizeRequestParser.GUARDRAIL_VERSIONS = Set.of("guardrail-v1", "guardrail-v2")` 가 `guardrail-v3` 을 거부 | 정책 버전을 `guardrail-v2` 로 되돌리고 검사표만 제자리 개정. 백엔드 허용 목록 확장은 선반영 요청으로 10 §0.1 |
 | 8~10 | **`AI_READY`** (hell·spicy·mild 각 1회) | 실패 없음. 양형·서기·검수 모두 AI, 재작성 0회, 판결까지 약 20초 | — |
+| 11 (9/18) | 운영 보고: 서기 `SCHEMA_INVALID` (writer·writer_repair 둘 다) | 9/17 카드 규격(제목 20·본문 30) 배포 뒤. `probe_verdict_cards.py --execute`(v5.6, 합성 택시 사건) 3/3 실패: 제목 12~14자는 통과, 본문 34·40·48자. 넘친 본문은 전부 "찌르는 문장 + 조언·명령 문장" 꼴. xAI strict 스키마의 `maxLength: 30` 은 강제되지 않는다. 재작성은 규칙 문장만 받아 직전 길이를 모른 채 다시 쓴다 | 실험(각 3회): 시스템 프롬프트 길이 절 2/3(hell 37자) · 시스템+사용자 4/6 · **직전 본문과 글자 수를 주고 압축 3/3**(34→27·40→30·48→30). 조치: 서기 v5.7 길이 절(06 §3.3) + 첫 문장만 남기는 구제 + 재작성에 직전 본문 전달(05 §3.4). 상한 30 은 백엔드가 이미 배포해 올리지 않는다. v5.7 재측정 5회×3강도: 원본 14/15 통과, 남은 1건(hell 36자 "…택시 타? 이제부터 무조건 뛰어라.")은 구제로 22자 |
 
 **위 세 건의 조치(9/16, 같은 날 반영).** 사용자 결정 "지옥맛은 일단 다 허용하고 차단하지마".
 

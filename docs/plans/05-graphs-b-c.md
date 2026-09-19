@@ -133,6 +133,18 @@ class SentenceState(TypedDict):
 규칙 메시지를 "피할 것"(`repair_avoid`)으로 준다. 재작성이 또 걸리면 그때 TEMPLATE 이다. `REGENERATE`
 (TEXT_RETRY)는 예전처럼 round 안 보정이 없다.
 
+**9/18 — 카드 형식(`CardTextDraft`, 제목 20자·본문 1항목 30자) 위반의 처리.** 9/17 운영에서 서기가 본문을
+34~48자로 넘기고 재작성도 같은 길이로 다시 써 `writer`·`writer_repair` 둘 다 `SCHEMA_INVALID` 였다.
+xAI strict 스키마는 `maxLength` 를 강제하지 않는다(실측 15 §6). 처리는 셋이다.
+1. **꼬리 문장 구제**(`_trim_card_tail`): 본문이 30자를 넘는데 종결 부호 뒤 공백으로 나눈 첫 문장이 1~30자면
+   뒤 문장을 버리고 통과시킨다. 호출 0회. 문장 중간은 자르지 않고 제목은 손대지 않는다. `sentence_fallback`
+   `outcome=TRIMMED`, `reason=SCHEMA_INVALID:TAIL_DROPPED:<원래 글자 수>`
+2. **재작성에 직전 제목·본문·글자 수 전달**(`_card_preview`·`_card_avoid`): 규칙 문장만 주면 서기는 자기가 몇 자를
+   썼는지 몰라 같은 길이로 다시 쓴다. `repair_avoid` 에 `previous_headline`·`previous_text`·`previous_*_length`
+   ·`previous_statement_count` 와 "N자라 상한 30자를 넘었다. 한 문장 30자 이내로 압축한다" 를 넣는다. 원문은
+   상태와 서기 요청에만 있고 로그·원장·캐시에는 없다(`writer_invalid` 는 강도 → preview)
+3. 서기 프롬프트 v5.7 에 길이 절(06 §3.3)
+
 (원문) 걸린 AI 강도는 곧바로 TEMPLATE 로 바꾸고 다시 검사했다. **이유**: 대상 강도가 하나일 때
 (= 공유 방이 하나. 보통의 경우다) 그 하나가 TEMPLATE 이 되는 순간 `all(TEMPLATE)` 이라 검수관을 부르지도
 못하고 `EVAL_FAILED` 로 끝났다. 같은 위반인데 방이 둘이면 살아남고 하나면 판결문이 통째로 사라졌다

@@ -79,7 +79,7 @@ docker compose -f docker-compose.prod.yml logs --since 30m ai-worker \
 | `AUTH`·`TRANSPORT`·`TIMEOUT` | 해당 역할의 벤더 키·연결·시간 제한 확인. 키 원문은 공유하지 않는다 |
 | `BUDGET_EXCEEDED` | `llm_budget_exceeded`의 예약액과 사건 상한을 확인. 별도 검수 모델을 고가 모델로 바꾸면 기본 출력 토큰 상한에서도 호출 전에 차단될 수 있다 |
 | `EVAL_FAILED` | `sentence_fallback`의 상세 이유 확인. 검수 거부, 불완전 응답, 전 강도 템플릿을 구분한다 |
-| 서기 `SCHEMA_INVALID` | v5.6 카드 규격은 제목 20자·본문 1항목 30자이며 줄바꿈·공백값을 금지한다. INITIAL은 남은 시간·기존 재작성 예산 안에서 1회 보정하며, 불합격 응답은 캐시하지 않는다. TEXT_RETRY 회차 안 보정은 없다 |
+| 서기 `SCHEMA_INVALID` | 카드 규격은 제목 20자·본문 1항목 30자이며 줄바꿈·공백값을 금지한다. xAI 는 스키마 `maxLength` 를 강제하지 않으므로 길이는 프롬프트(v5.7 `## 길이` 절)로만 잡힌다. 9/18부터 ① 본문이 "찌르는 문장 + 조언 문장" 이면 첫 문장만 남긴다(`sentence_fallback outcome=TRIMMED`, 호출 없음) ② INITIAL 은 남은 시간·기존 재작성 예산 안에서 1회 보정하되 서기에게 직전 제목·본문·글자 수를 주고 압축시킨다. 불합격 응답은 캐시하지 않는다. TEXT_RETRY 회차 안 보정은 없다(구제 ①은 적용). 재현은 `probe_verdict_cards.py --execute`(구제·재작성 없이 원본 통과율) |
 | finalize `422`·`SCHEMA_INVALID` | 백엔드의 계약·정책 버전과 AI 설정을 비교한다 |
 
 9/17 카드 규격 배포 전에는 백엔드 본문 최소 개수 2→1과 공유 템플릿 갱신이 필요하다(10 §5·§10).
