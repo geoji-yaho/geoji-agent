@@ -105,7 +105,9 @@
 | [작업 7 — 심문관 · 프론트](archive/07-intake-frontend.md) | Intake | 9/15 | #26 | AI 파트 · **프론트** · 백엔드(submissions) |
 | [작업 8 — 장애 복구 · 관측 · 리허설 · 동결](archive/08-failure-recovery-rehearsal.md) | M4 | 9/18 | #28~#30 | AI 파트 · 백엔드(watchdog·round·시드·짤) · 프론트 |
 | [P1 로드맵](archive/09-p1-roadmap.md) | P1 | 10/6~ | #31 | 아키텍트 · 팀 |
-| [백엔드 계약서](10-backend-contract.md) | Contract | 9/8~9/17 | #1, #9, #27 + 각 절 | **백엔드 담당 필독** |
+| [백엔드 계약서](10-backend-contract.md) | Contract — 상시 계약만(9/20 정리판) | — | #1, #9, #27 + 각 절 | **백엔드 담당 필독** |
+| [백엔드 계약서 9/19 판](archive/10-backend-contract-2026-09-19.md) | 9/14~9/19 전달 21건·미결 27건·날짜별 결정 기록 원문 | — | 전부 반영됨 | 참조만 |
+| [백엔드 전달 19 — 데모 AI 배심원](19-backend-handoff-ai-juror.md) | `JURY_VOTE` · jury-votes · ai-member · 006 | 9/20 | 백엔드 할 일 6개 | **백엔드 담당** |
 | [로컬 전체 흐름 검증](archive/14-local-e2e-validation.md) | 9/15 검증·후속 계획 | — | 실제 연결의 기준선 | AI 파트 |
 | [로컬 구현·재실행](15-local-e2e-implementation.md) | 9/16 검증·증거·참고 패치 | — | 무료 E2E, PNG, 이미지 등록 | AI 파트 |
 | [프론트 반영 요청](archive/16-frontend-handoff.md) | 신규 posts·저장 PNG·관리자 파일 등록 | — | 프론트 인수인계 | 프론트 담당 |

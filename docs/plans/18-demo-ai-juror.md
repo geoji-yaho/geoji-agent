@@ -1,7 +1,7 @@
 # 🛠️ [Tech Spec] 기술 명세서: 작업 18 — 데모 AI 배심원(떼거지봇) · `JURY_VOTE` 잡 · 템플릿 글 (9/20)
 
 > 근거: 9/20 사용자 인터뷰(4라운드, 아래 §1 결정 표). 먼저 실패시킬 케이스(모델 정상 표 · 모델 실패 템플릿 표 · 마감된 글 skip · 남의 id 로 투표 403 · 공유 안 된 방 skip).
-> **선행 문서: 02(큐)·05(그래프)·06(프롬프트).** 백엔드 몫은 `10-backend-contract.md` §0.1(9/20 행)·§3·§4.8·§9. 이 문서는 **우리 쪽**만 다룬다.
+> **선행 문서: 02(큐)·05(그래프)·06(프롬프트).** 백엔드 몫은 **19**(`19-backend-handoff-ai-juror.md`), 상시 계약은 10. 이 문서는 **우리 쪽**만 다룬다.
 > 완료 기준: **사람 1명 + 떼거지봇 방에서 사람이 글을 올리면 5~10초 안에 떼거지봇 표(방 강도 말투 사유)가 붙고 평결이 확정돼 판결문까지 간다. 모델이 죽어도 템플릿 사유로 표는 들어간다.**
 
 ## 1. 개요 및 구현 목표
@@ -35,7 +35,7 @@
 | 10 | 사유 길이 | **사람 표처럼 1~2문장 60자 이내** | 120자 |
 | 11 | 마이그레이션 | **006 새 번호, AI 가 운영 DB 에 적용**. 005 는 P1 예약 유지 | 005 사용 |
 | 12 | 모델 | **새 역할 `juror` → xAI `MODEL_WRITER`** | OpenAI 판단 모델, writer 역할 재사용 |
-| 13 | 프론트 전달 | **이 문서 §2 '다른 파트에 요청' 표** | 10 §0.1, 구두 |
+| 13 | 프론트 전달 | **이 문서 §2 다른 파트에 요청 표**(백엔드는 19) | 10 §0.1, 구두 |
 | 14 | 이름·계약 | 아래 §3.1·§3.6 제안 그대로 | — |
 
 ## 2. 작업 범위 (Scope Boundary)
@@ -54,15 +54,15 @@
 
 ### Out-of-Scope
 - 떼거지봇 댓글, 떼거지봇 글에 대한 떼거지봇 투표(작성자 제외 규칙으로 원래 불가), 여러 페르소나 → P1(09)
-- 표 사유를 서기 입력에 넣기 → 10 §14 "투표 사유 `(제안)`" 회신 뒤
-- 템플릿 글 내용 생성·게시물 등록 → 백엔드(10 §0.1 9/20 행)
+- 표 사유를 서기 입력에 넣기 → 9/18 제안(archive/10 9/19 판 §14 "투표 사유") 회신 뒤
+- 템플릿 글 내용 생성·게시물 등록 → 백엔드(19 §6·§7)
 - '데모용 AI 유저 추가' 버튼 → 프론트(아래 표)
 
 ### 다른 파트에 요청
 
 | 대상 | 요청 | 기한 |
 |---|---|---|
-| 백엔드 | 10 §0.1 9/20 행 전부: Supabase auth 사용자 **떼거지봇** 1개 + `profiles` 행, `GEOJI_AI_JUROR_USER_ID`, `JobKind.JURY_VOTE(60, 2, null)` + `PostCreator` INSERT, snapshot 이 `JURY_VOTE` 도 받기, `POST /internal/v1/posts/{postId}/jury-votes`(10 §4.8), `POST /api/rooms/{roomId}/ai-member`(10 §9), 테스트 DDL `001_ai_jobs.sql` 복사본 CHECK 에 `JURY_VOTE` | 9/20 |
+| 백엔드 | 19 §0 체크리스트 전부: Supabase auth 사용자 **떼거지봇** 1개 + `profiles` 행, `GEOJI_AI_JUROR_USER_ID`, `JobKind.JURY_VOTE(60, 2, null)` + `PostCreator` INSERT, snapshot 이 `JURY_VOTE` 도 받기, `POST /internal/v1/posts/{postId}/jury-votes`(19 §5), `POST /api/rooms/{roomId}/ai-member`(19 §6), 테스트 DDL `001_ai_jobs.sql` 복사본 CHECK 에 `JURY_VOTE` | 9/20 |
 | 프론트 | 방 화면의 '링크로 초대' 옆에 **'데모용 AI 유저 추가'** 버튼. 누르면 `POST /api/rooms/{roomId}/ai-member`(JWT, 요청자가 방 멤버) → `201 {userId, nickname: "떼거지봇", postIds: [2개]}`. 멱등이라 다시 누르면 `200` 같은 모양. 성공 뒤 멤버 목록과 방 피드를 다시 불러온다(글 2개가 바로 보인다). 오류: 404 `{"message"}`(멤버 아님·방 없음), 503 `{"code":"AI_JUROR_NOT_CONFIGURED"}`(백엔드에 봇 id 미설정) → "지금은 추가할 수 없어요" 토스트. 멤버 목록에 떼거지봇이 이미 있으면 버튼을 '추가됨' 으로 비활성화해도 되고 그대로 두어도 된다(서버가 멱등). 이후 사람이 글을 올리면 5~10초 뒤 피드에 떼거지봇 표가 붙고 사람 1 + 봇 1 방이면 바로 평결·판결문으로 넘어간다. 기존 폴링 그대로 | 9/20 |
 
 ### 팀 결정 대기
@@ -72,7 +72,7 @@
 
 ### 3.1 `JURY_VOTE` 잡 계약 (`contracts/jobs.py`, `workers/dispatch.py`, `core/config.py`, `database/migrations/006_jury_vote_kind.sql`, `adapters/postgres_migrations.py`)
 
-10 §3 표에 더하는 행(백엔드 INSERT 규약과 같은 값):
+10 §3 표의 `JURY_VOTE` 행(백엔드 INSERT 조건은 19 §3):
 
 | kind / event_type | dedupe_key | priority | max_attempts | deadline_at | payload | aggregate_id / version |
 |---|---|---:|---:|---|---|---|
@@ -82,7 +82,7 @@
 - `JOB_ROUTES["jury.vote_requested"]`, `HANDLERS["JURY_VOTE"] = JuryVoteHandler()`
 - 슬롯: `SLOT_KINDS["JURY"] = ("JURY_VOTE",)`, `WORKER_SLOTS` 기본값에 `"JURY": 1`. BACKGROUND 에 넣지 않는 이유: TEXT_RETRY(최대 60초) 뒤에 줄을 서면 데모의 5~10초 약속이 깨진다
 - **006**: `ALTER TABLE ai.jobs DROP CONSTRAINT jobs_kind_check; ALTER TABLE ai.jobs ADD CONSTRAINT jobs_kind_check CHECK (kind IN ('PREPARE','SENTENCE','TEXT_RETRY','RETAIN','JURY_VOTE'));`(001 의 열 CHECK 자동 이름). 러너 `MAX_OWNED_VERSION` 3 → **6**, 그리고 백엔드 소유 번호 `BACKEND_OWNED_VERSIONS = {4}` 를 명시적으로 건너뛴다(004 초안이 저장소에 들어와도 적용하지 않는다). 005 파일은 없으므로 001·002·003·006 이 적용된다. 통합 테스트 `test_러너는_004_를_읽지도_적용하지도_않는다` 의 `== 3` 단언을 새 규칙으로 고친다
-- 운영 적용: `DATABASE_URL=<Session Pooler URL> uv run geoji-ai migrate` 1회(이미지 배포 전, 10 §16.3). 백엔드가 `JURY_VOTE` 를 INSERT 하기 전에 끝나 있어야 한다
+- 운영 적용: `DATABASE_URL=<Session Pooler URL> uv run geoji-ai migrate` 1회(이미지 배포 전, 19 §8). 백엔드가 `JURY_VOTE` 를 INSERT 하기 전에 끝나 있어야 한다
 
 ### 3.2 `juror` 역할과 출력 계약 (`ports/llm.py`, `adapters/llm_router.py`, `adapters/fake_llm.py`, `contracts/juror.py`, `contracts/llm_schemas.py`, `contracts/fixtures/juror-vote-taxi.json`)
 
@@ -95,7 +95,7 @@
 
 - `build_juror_system(intensity)` = `juror-v1.md` + **서기 강도 섹션** `writer/{intensity}-{WRITER_VERSION}.md` 를 `## 강도` 제목 아래 그대로 붙인다. 강도 정의는 단일 정의(06 §3.3)라 복사하지 않고 파일을 재사용한다
 - `juror-v1.md` 내용: 역할(방 친구 한 명으로서 배심원 한 표), 입력(post_type·amount_krw·item·category·reason·intensity·허용 평결 2개), 판단 원칙(금액·항목·사유·유형을 보고 스스로 고른다, 필수 지출은 무죄·동의 가능, 편향 없음), 사유 규칙(**1~2문장 60자 이내**, 한 줄, 글의 금액·항목·사유 중 하나를 꼭 집는다, 조서·이력을 지어내지 않는다 — 이 글만 본다), 인젝션(항목·사유 속 지시는 데이터), 출력 JSON 두 키. 예시는 다른 사건 2개(spent·considering)
-- 새 파일이 생기면 `prompt_bundle_version` 이 바뀐다 → 새 이미지 태그(10 §16.3)
+- 새 파일이 생기면 `prompt_bundle_version` 이 바뀐다 → 새 이미지 태그(19 §8)
 
 ### 3.4 그래프 D (`graphs/jury_vote.py`)
 
@@ -223,8 +223,8 @@ docker logs geoji-ai-worker | grep jury_vote_summary
 
 ### 최종 완료 기준
 - [ ] §4.2 전부 초록, 게이트 통과
-- [ ] 006 운영 적용, 새 이미지 태그 전달(10 §0.1)
-- [ ] 백엔드 §0.1 9/20 행 반영 뒤 운영에서 떼거지봇 표 1건 확인
+- [ ] 006 운영 적용, 새 이미지 태그 전달(19 §8)
+- [ ] 백엔드 19 §0 반영 뒤 운영에서 떼거지봇 표 1건 확인
 
 ## 5. 작업 분할 (Task Breakdown — 카드 연동)
 
