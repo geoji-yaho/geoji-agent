@@ -230,7 +230,7 @@ def filter_banter(
     2. `REPEAT_OFFENSE`·`ROOM_RULE_CALLBACK` 인데 (1 뒤) `evidence_labels` 가 비면 후보 삭제
     3. `DEATH_WORDS` 가 들어 있으면 삭제(모든 강도)
     4. `mild`·`spicy` 에 `PROFANITY` 가 들어 있으면 삭제
-    5. (9/19) 비었거나 카드 본문 상한(`CARD_STATEMENT_MAX`)을 넘는 후보 삭제 — 서기가 30자 카드에
+    5. (9/19) 비었거나 카드 본문 상한(`CARD_STATEMENT_MAX`)을 넘는 후보 삭제 — 서기가 카드에
        쓸 수 없는 후보는 넘겨도 고르지 않는다(15 §6 13회차: 60~90자 후보 5개 중 0개 채택)
     """
     allowed = frozenset(allowed_labels)
