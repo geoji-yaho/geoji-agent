@@ -25,7 +25,8 @@ generation_failed`.
   `REGENERATE`(TEXT_RETRY) 는 repair 하지 않는다(05 §1 "round 안 보정 없음")
 - repair 대상은 검수관이 `pass=false` 로 판정한 AI 강도다. 보고서에서 빠졌거나 형식이 틀린 강도는
   피할 위반이 없어 바로 TEMPLATE
-- 새 카드 생성 형식(20자 제목·1항목 30자 본문) 위반은 join에서 같은 repair 예산을 사용한다.
+- 새 카드 생성 형식(20자 제목·1항목 100자 본문, 9/19 30→100) 위반은 join에서 같은 repair 예산을
+  사용한다.
   검수 시간을 예약할 수 없거나 TEXT_RETRY이면 재작성하지 않는다.
 - repair 뒤 검수는 바뀐 강도만 보낸다. 바뀌지 않은 강도는 직전 통과 항목을 이어 붙인다. hash 는
   언제나 전체 draft 기준이다
@@ -541,7 +542,7 @@ def _trim_card_tail(output: Mapping[str, Any]) -> tuple[dict[str, Any], int | No
     """본문이 상한을 넘고 문장이 둘 이상이면 첫 문장만 남긴다(9/18).
 
     실측(15 §6)에서 넘치는 본문은 거의 "찌르는 문장 + 조언 문장" 이었다. 첫 문장만으로
-    1~30자면 뒤 문장을 버린다. 문장 중간은 자르지 않고 제목은 건드리지 않는다.
+    1~`CARD_STATEMENT_MAX`자면 뒤 문장을 버린다. 문장 중간은 자르지 않고 제목은 건드리지 않는다.
     돌려주는 정수는 잘랐을 때의 원래 글자 수, 아니면 None.
     """
     statement = output.get("statement")
@@ -601,8 +602,8 @@ def _card_avoid(preview: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(text_length, int) and text_length > CARD_STATEMENT_MAX:
         messages.append(
             f"직전 본문이 {text_length}자라 상한 {CARD_STATEMENT_MAX}자를 넘었다. "
-            f"같은 각도·같은 뜻을 한 문장 {CARD_STATEMENT_MAX}자 이내로 압축한다. "
-            "설명·대안·두 번째 동작은 뺀다."
+            f"같은 각도·같은 뜻을 두 문장 이내 {CARD_STATEMENT_MAX}자 이내로 압축한다. "
+            "설명·도입·마무리는 뺀다."
         )
     if isinstance(count, int) and count != 1:
         messages.append(f"본문 항목이 {count}개다. 정확히 1항목이어야 한다.")
@@ -966,7 +967,8 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 except ValidationError:
                     bad.setdefault(intensity, []).append(SCHEMA_INVALID)
                     messages.setdefault(intensity, []).append(
-                        "제목·본문 정리 후 카드 규격 위반: 제목 1~20자, 본문 1항목 1~30자."
+                        "제목·본문 정리 후 카드 규격 위반: "
+                        f"제목 1~{CARD_HEADLINE_MAX}자, 본문 1항목 1~{CARD_STATEMENT_MAX}자."
                     )
             if not bad:
                 try:

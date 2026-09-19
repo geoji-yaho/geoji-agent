@@ -19,7 +19,7 @@ def card_text() -> dict:
 def test_card_exact_length_boundaries_preserve_metadata() -> None:
     text = card_text()
     text["headline"] = "가" * 20
-    text["statement"][0]["text"] = "나" * 30
+    text["statement"][0]["text"] = "나" * 100
     assert CardTextDraft.model_validate(text).model_dump(mode="json") == text
 
 
@@ -35,7 +35,7 @@ def test_card_rejects_blank_or_multiline_text(field: str, value: str) -> None:
         CardTextDraft.model_validate(text)
 
 
-@pytest.mark.parametrize(("field", "limit"), [("headline", 20), ("statement", 30)])
+@pytest.mark.parametrize(("field", "limit"), [("headline", 20), ("statement", 100)])
 def test_card_rejects_overlength_text(field: str, limit: int) -> None:
     text = card_text()
     if field == "headline":
@@ -66,7 +66,7 @@ def test_writer_schema_enforces_card_limits_and_keeps_metadata() -> None:
     assert props["headline"]["maxLength"] == 20
     assert props["statement"]["minItems"] == props["statement"]["maxItems"] == 1
     body = props["statement"]["items"]["properties"]
-    assert body["text"]["maxLength"] == 30
+    assert body["text"]["maxLength"] == 100
     assert body["text"]["minLength"] == 1
     assert {"kind", "evidence_labels"} <= body.keys()
     assert {"banter_strategy", "selected_candidate_id", "meme_tag", "meme_hints"} <= props.keys()
