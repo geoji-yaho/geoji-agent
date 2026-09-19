@@ -94,8 +94,13 @@ log = get_logger(__name__)
 CONTEXT_PROMPT = "context-v1.md"
 BANTER_PROMPT = "banter-v1.md"
 
-#: recall 전체 상한(05 §3.2 `recall_candidates` "0.5초 wait_for").
-RECALL_TIMEOUT_S = 0.5
+#: recall 전체 상한. 05 §3.2 는 0.5초지만 운영에서 그 예산으로는 왕복이 안 끝난다.
+#: EB 는 서울(ap-northeast-2), Postgres 는 싱가포르(ap-southeast-1)라 왕복 하나가 68ms 다.
+#: `recall_room` 은 규칙 위반과 말투 예시를 순차로 두 번 조회하고, 풀에 커넥션이 없으면
+#: TLS 핸드셰이크(3~4 왕복 ≈ 270ms)가 앞에 붙는다. 그래서 따뜻할 때는 0.3초에 끝나지만
+#: 차가우면 0.5초를 넘겨 `recall_failed` 로 빈손이 되고 조서에 과거 기록이 빠진다(9/17~18 운영 로그).
+#: PREPARE 전체가 17~23초라 3초는 상한이지 대기 시간이 아니다.
+RECALL_TIMEOUT_S = 3.0
 
 #: 조서 출력 kind 중 허용하는 것(05 §3.2 `analyze_reason`).
 ALLOWED_FACT_KINDS: frozenset[str] = frozenset({"RULE_HIT", "MITIGATION", "REASON_ANALYSIS"})
