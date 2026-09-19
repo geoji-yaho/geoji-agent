@@ -215,6 +215,9 @@ def validate_intake_output(
     """
     del hint
     data = dict(output)
+    # strict 스키마에는 `schema_version` 이 없다(`_derive` 가 뺀다). 실제 모델은 그 키 없이 답하므로
+    # 서버가 채운다. 9/19 전에는 빠져서 실제 호출이 전부 INVALID_OUTPUT → FALLBACK 이었다.
+    data.setdefault("schema_version", 1)
     data["mode"] = req.mode
     data["intake_source"] = "AI"
 

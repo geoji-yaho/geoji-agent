@@ -137,6 +137,22 @@ uv run python scripts/probe_verdict_cards.py --execute --out /tmp/cards-live.jso
 `--fake`는 고정 fixture이며 실제 생성 결과가 아니다.
 기존 `probe_writer_latency.py`는 과거 고정 프롬프트 비교용이므로 현재 카드 검증에는 이 도구를 쓴다.
 
+### 역할 간 핸드오프 추적 (9/19)
+
+판결문이 이상할 때 어느 역할이 무엇을 받고 무엇을 넘겼는지 한 파일로 본다. 심문관 → 조서·드립 →
+양형관·서기·검수관·finalize 를 같은 사건으로 잇고 호출마다 시스템 프롬프트·입력·출력을 적는다.
+백엔드·DB 는 메모리 fake(`tests/fakes/pipeline.py`)라 아무것도 저장하지 않는다.
+
+```bash
+uv run scripts/trace_pipeline.py --out trace.md                          # FakeLLM, 무료
+uv run scripts/trace_pipeline.py --execute --out trace.md                # 실제 모델, 약 8~10회 호출
+uv run scripts/trace_pipeline.py --execute --case 5 --first-spend --intensity hell --out trace.md
+```
+
+같은 러너로 도는 단위 테스트가 `tests/unit/test_agent_handoff.py` 다. 역할마다 "받는 것"과 "넘기는 것"을
+단언하고, 알려진 끊김(심문관 결과·조서 사유 분석이 어디에도 안 감, 드립이 방 강도로만 생성)은
+`test_gap_*` 로 못박아 두었다. `GEOJI_HANDOFF_TRACE=경로` 를 주면 fake 추적 마크다운을 저장한다.
+
 ### 게이트
 
 ```bash
