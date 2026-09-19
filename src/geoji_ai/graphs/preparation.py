@@ -42,7 +42,7 @@ from geoji_ai.application.llm_gateway import CallScope, ScopedLLM, case_scope
 from geoji_ai.contracts.case import CaseSnapshot, VerdictResult
 from geoji_ai.contracts.jobs import Job, PreparePayload, parse_payload
 from geoji_ai.contracts.llm_schemas import banter_schema, context_schema, with_enums
-from geoji_ai.contracts.writer import BanterStrategy
+from geoji_ai.contracts.writer import CARD_STATEMENT_MAX, BanterStrategy
 from geoji_ai.core.config import Settings
 from geoji_ai.core.logging import get_logger
 from geoji_ai.domain import dossier_rules
@@ -92,7 +92,7 @@ __all__ = [
 log = get_logger(__name__)
 
 CONTEXT_PROMPT = "context-v1.md"
-BANTER_PROMPT = "banter-v1.md"
+BANTER_PROMPT = "banter-v2.md"
 
 #: recall 전체 상한. 05 §3.2 는 0.5초지만 운영에서 그 예산으로는 왕복이 안 끝난다.
 #: EB 는 서울(ap-northeast-2), Postgres 는 싱가포르(ap-southeast-1)라 왕복 하나가 68ms 다.
@@ -224,17 +224,22 @@ def merge_inferred_facts(
 def filter_banter(
     candidates: Iterable[Candidate], intensity: Intensity, allowed_labels: Iterable[str]
 ) -> list[Candidate]:
-    """드립 필터 4규칙(05 §3.2 `validate_banter`).
+    """드립 필터 5규칙(05 §3.2 `validate_banter`).
 
     1. 입력에 없는 라벨은 후보에서 지운다
     2. `REPEAT_OFFENSE`·`ROOM_RULE_CALLBACK` 인데 (1 뒤) `evidence_labels` 가 비면 후보 삭제
     3. `DEATH_WORDS` 가 들어 있으면 삭제(모든 강도)
     4. `mild`·`spicy` 에 `PROFANITY` 가 들어 있으면 삭제
+    5. (9/19) 비었거나 카드 본문 상한(`CARD_STATEMENT_MAX`)을 넘는 후보 삭제 — 서기가 30자 카드에
+       쓸 수 없는 후보는 넘겨도 고르지 않는다(15 §6 13회차: 60~90자 후보 5개 중 0개 채택)
     """
     allowed = frozenset(allowed_labels)
     check_profanity = applies(intensity, LexiconRule.PROFANITY)
     kept: list[Candidate] = []
     for candidate in candidates:
+        stripped = candidate.text.strip()
+        if not stripped or len(stripped) > CARD_STATEMENT_MAX:
+            continue
         labels = tuple(label for label in candidate.evidence_labels if label in allowed)
         if candidate.strategy in _LABEL_REQUIRED and not labels:
             continue

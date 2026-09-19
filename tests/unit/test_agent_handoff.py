@@ -25,6 +25,7 @@ from geoji_ai.contracts.case import CaseSnapshot
 from geoji_ai.core.config import Settings
 from geoji_ai.domain.attack_angles import NEEDS_EVIDENCE, pick
 from geoji_ai.graphs.intake import run_intake
+from geoji_ai.graphs.preparation import BANTER_PROMPT
 from geoji_ai.prompts import WRITER_VERSION, build_writer_system, load_prompt, prompt_bundle_version
 from tests.fakes.pipeline import (
     PipelineTrace,
@@ -220,7 +221,7 @@ def test_banter_receives_usable_evidence_and_approved_examples_but_no_jury(
     trace: PipelineTrace,
 ) -> None:
     call = trace.call("banter")
-    assert call.system == load_prompt("banter-v1.md")
+    assert call.system == load_prompt(BANTER_PROMPT)
     assert set(call.user) == {"post_type", "category", "intensity", "evidence", "approved_examples"}
     assert call.user["intensity"] == "spicy"
     assert call.user["approved_examples"] == ["승인 예시 문장"]
@@ -270,6 +271,12 @@ def test_banter_output_is_filtered_and_relabeled_before_writer() -> None:
             },
             {
                 "text": "자살 언급",
+                "strategy": "EXCUSE_STRIPPING",
+                "fits": ["guilty"],
+                "evidence_labels": [],
+            },
+            {
+                "text": "서른 자를 넘기는 후보는 서기가 카드 본문에 쓸 수 없으니 서버가 버린다.",
                 "strategy": "EXCUSE_STRIPPING",
                 "fits": ["guilty"],
                 "evidence_labels": [],

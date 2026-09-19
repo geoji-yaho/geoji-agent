@@ -1,4 +1,4 @@
-"""드립 필터 4규칙(05 §3.2 `validate_banter`)과 조서 fact 병합."""
+"""드립 필터 5규칙(05 §3.2 `validate_banter`)과 조서 fact 병합."""
 
 from __future__ import annotations
 
@@ -66,6 +66,15 @@ def test_규칙4_PROFANITY_는_mild_spicy_에서만_삭제():
     assert filter_banter([rude], Intensity.mild, LABELS) == []
     assert filter_banter([rude], Intensity.spicy, LABELS) == []
     assert filter_banter([rude], Intensity.hell, LABELS) == [rude]
+
+
+def test_규칙5_카드_본문_상한을_넘거나_빈_후보는_삭제():
+    """9/19: 서기는 30자 카드에 못 쓰는 후보를 고르지 않는다. 넘겨 봐야 비용만 든다."""
+    short = _c(text="가" * 30)
+    kept = filter_banter(
+        [short, _c(text="가" * 31), _c(text="   "), _c(text="")], Intensity.hell, LABELS
+    )
+    assert kept == [short]
 
 
 def test_merge_inferred_facts_는_라벨_밖_fact_와_허용_밖_kind_를_지운다():
