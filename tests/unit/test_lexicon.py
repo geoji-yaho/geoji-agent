@@ -31,9 +31,9 @@ def test_목록이_계획서_그대로다():
         "손목",
         "극단적 선택",
     )
-    assert len(PROFANITY) == 24
+    assert len(PROFANITY) == 28
     assert PROFANITY[0] == "미친"
-    assert PROFANITY[-1] == "멍청"
+    assert PROFANITY[23] == "멍청"
     assert set(PROFANITY) >= {"씨발", "ㅅㅂ", "ㅂㅅ", "존나", "ㅈㄴ", "좆", "또라이", "등신"}
     assert HELL_ALLOWED_PROFANITY == (
         "미친",

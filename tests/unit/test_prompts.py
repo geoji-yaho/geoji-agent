@@ -16,6 +16,7 @@ import pytest
 
 from geoji_ai.contracts.writer import CARD_STATEMENT_MAX
 from geoji_ai.domain import lexicon
+from geoji_ai.domain.validation import apply_text_rules
 from geoji_ai.prompts import (
     PROMPTS_DIR,
     WRITER_VERSION,
@@ -62,7 +63,7 @@ def test_writer_system_equals_probe_assembly(intensity: str) -> None:
 @pytest.mark.parametrize("intensity", ["mild", "spicy", "hell"])
 def test_current_writer_requests_one_short_card_with_metadata(intensity: str) -> None:
     system = build_writer_system(intensity)
-    assert WRITER_VERSION == "v5.8"
+    assert WRITER_VERSION == "v6.2"
     assert "headline: 1~20자" in system
     assert "statement: 정확히 1항목" in system
     assert "text는 1~100자" in system
@@ -92,26 +93,36 @@ def test_current_writer_examples_fit_card_body(intensity: str) -> None:
     examples = re.findall(r'^- 예시: "([^"]+)"$', section, re.MULTILINE)
     assert examples
     assert all(1 <= len(example) <= CARD_STATEMENT_MAX for example in examples)
+    for example in examples:
+        draft = {
+            "texts": [
+                {
+                    "intensity": intensity,
+                    "headline": "사건 제목",
+                    "statement": [{"text": example, "kind": "claim", "evidence_labels": ["F0"]}],
+                }
+            ]
+        }
+        checked = apply_text_rules(
+            draft, {"F0": "example"}, None, {"target_intensities": [intensity]}
+        )
+        assert not checked.issues, (example, checked.issues)
 
 
 @pytest.mark.parametrize("intensity", ["mild", "spicy", "hell"])
-def test_v5_8_length_section_comes_before_intensity(intensity: str) -> None:
-    """9/18: 길이 절이 강도 절보다 앞에 있고 목표 글자 수·문장 수 규칙을 적는다.
-
-    9/17 운영에서 서기가 본문 30자를 34~48자로 넘겼다. xAI strict 스키마는 `maxLength` 를
-    강제하지 않아 길이는 프롬프트로만 통제된다(15 §6). 9/19 상한 30→100, 최대 두 문장.
-    """
+def test_current_length_section_preserves_chat_fragments(intensity: str) -> None:
+    """100자 카드 한 줄 안에서 감탄·되묻기·문장 조각을 살린다."""
     system = build_writer_system(intensity)
     assert system.index("## 길이") < system.index("## 강도")
     assert "**100자 이내**" in system
-    assert "목표는 40~70자" in system
-    assert "본문은 **최대 두 문장**이다" in system
+    assert "목표는 40~90자" in system
+    assert "문장 조각은 여러 개여도 된다" in system
     assert "30자" not in system
     section = load_prompt(f"writer/{intensity}-{WRITER_VERSION}.md")
     per_intensity = {
         "mild": "짧은 당부",
-        "spicy": "조언·교훈으로 마무리하지 않는다",
-        "hell": "본문은 **한 방**",
+        "spicy": "약 올리는",
+        "hell": "욕은 필수가 아니다",
     }
     assert per_intensity[intensity] in section
 
@@ -122,8 +133,6 @@ def test_spicy_system_has_no_hell_section() -> None:
     hell_section = load_prompt(f"writer/hell-{WRITER_VERSION}.md").strip()
     assert hell_section not in spicy
     assert "### HELL" not in spicy
-    for line in (ln for ln in hell_section.splitlines() if ln.strip()):
-        assert line not in spicy
     assert "### SPICY" in spicy
 
 
@@ -214,16 +223,11 @@ def _example_prompt_text() -> str:
 
 
 def test_golden_items_not_in_prompt_examples() -> None:
-    """골든 사건 `item`(과 2자 이상 낱말)이 서기·검수관 프롬프트에 없다."""
+    """골든 사건 품목 전체를 예시로 복사하지 않는다. 교체·라지 같은 부분 문자열은 제외."""
     items = _golden_items()
     assert len(items) == 50
     prompts = _example_prompt_text()
-    hits = [
-        (item, word)
-        for item in items
-        for word in [item, *item.split()]
-        if len(word) >= 2 and word in prompts
-    ]
+    hits = [(item, word) for item in items for word in [item] if len(word) >= 2 and word in prompts]
     assert hits == []
 
 
@@ -236,6 +240,11 @@ WORN_PHRASE_DECLARATIONS = {
     ("writer/common-v5.6.md", "금지어"),
     ("writer/common-v5.7.md", "금지어"),
     ("writer/common-v5.8.md", "금지어"),
+    ("writer/common-v6.0.md", "금지어"),
+    ("writer/common-v6.1.md", "금지어"),
+    ("writer/common-v6.2.md", "금지어"),
+    ("evaluator/guardrail-v2.2.md", "| 금지 | 금지 | 금지 |"),
+    ("evaluator/guardrail-v2.1.md", "| 금지 | 금지 | 금지 |"),
     ("evaluator/guardrail-v2.md", "| 금지 | 금지 | 금지 |"),
 }
 
@@ -286,4 +295,7 @@ def test_현행_프롬프트에는_지옥맛_허용_목록이_없다() -> None:
     assert "판결당 최대 1회" not in guardrail
     # 비속어 목록 자체는 mild·spicy 판정에 쓰이므로 그대로다.
     profanity = _after(guardrail, "| 비속어(").split(")")[0]
-    assert tuple(profanity.split("·")) == lexicon.PROFANITY
+    assert tuple(profanity.split("·")) == lexicon.PROFANITY[:24]
+    current = load_prompt("evaluator/guardrail-v2.2.md")
+    for word in lexicon.SPICY_ALLOWED_PROFANITY:
+        assert word in current

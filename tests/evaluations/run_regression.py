@@ -50,7 +50,7 @@ from geoji_ai.graphs.states import Candidate
 from geoji_ai.ports.backend import BeginGenerationResult, FinalizeResult, FixedSentencing
 from geoji_ai.ports.llm import LLMPort, LLMResult
 from geoji_ai.ports.preparation import EVIDENCE_TEXT_MAX, Dossier, EvidenceFact
-from geoji_ai.prompts import load_prompt, prompt_bundle_version
+from geoji_ai.prompts import build_evaluator_system, prompt_bundle_version
 from tests.evaluations import checks, judge
 from tests.evaluations.report import (
     PolicyCheck,
@@ -591,7 +591,7 @@ def policy_fixture_messages(policy: str) -> list[dict[str, str]]:
         "evidence": {},
     }
     return [
-        {"role": "system", "content": load_prompt(f"evaluator/{policy}.md")},
+        {"role": "system", "content": build_evaluator_system(policy)},
         {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
     ]
 

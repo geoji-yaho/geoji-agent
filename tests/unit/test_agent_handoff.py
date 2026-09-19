@@ -23,10 +23,17 @@ import pytest
 from geoji_ai.adapters.fake_llm import FakeLLM
 from geoji_ai.contracts.case import CaseSnapshot
 from geoji_ai.core.config import Settings
-from geoji_ai.domain.attack_angles import NEEDS_EVIDENCE, pick
+from geoji_ai.domain.attack_angles import NEEDS_EVIDENCE
 from geoji_ai.graphs.intake import run_intake
-from geoji_ai.graphs.preparation import BANTER_PROMPT
-from geoji_ai.prompts import WRITER_VERSION, build_writer_system, load_prompt, prompt_bundle_version
+from geoji_ai.prompts import (
+    SENTENCING_PROMPT,
+    WRITER_VERSION,
+    build_banter_system,
+    build_evaluator_system,
+    build_writer_system,
+    load_prompt,
+    prompt_bundle_version,
+)
 from tests.fakes.pipeline import (
     PipelineTrace,
     intake_request_for,
@@ -221,14 +228,21 @@ def test_banter_receives_usable_evidence_and_approved_examples_but_no_jury(
     trace: PipelineTrace,
 ) -> None:
     call = trace.call("banter")
-    assert call.system == load_prompt(BANTER_PROMPT)
-    assert set(call.user) == {"post_type", "category", "intensity", "evidence", "approved_examples"}
+    assert call.system == build_banter_system("spicy")
+    assert set(call.user) == {
+        "case",
+        "post_type",
+        "category",
+        "intensity",
+        "evidence",
+        "approved_examples",
+    }
     assert call.user["intensity"] == "spicy"
     assert call.user["approved_examples"] == ["승인 예시 문장"]
     assert [e["label"] for e in call.user["evidence"]] == [f.label for f in trace.dossier.facts]  # type: ignore[union-attr]
     # 평결·표 수는 드립 후보가 모른다(fits 로 양쪽 계열을 다 내게 한다).
     assert "jury" not in call.user
-    assert "reason" not in call.user  # 사유 원문은 F0 문장 안에서만 본다
+    assert call.user["case"]["reason"] == trace.snapshot.reason
 
 
 def test_gap_banter_is_generated_per_room_intensity_not_per_jury_target(
@@ -309,7 +323,7 @@ def test_banter_output_is_filtered_and_relabeled_before_writer() -> None:
 
 def test_sentencing_receives_case_jury_policy_and_full_dossier(trace: PipelineTrace) -> None:
     call = trace.call("sentencing")
-    assert call.system == load_prompt("sentencing-v1.md")
+    assert call.system == load_prompt(SENTENCING_PROMPT)
     assert set(call.user) == {"case", "jury", "dossier"}
     assert set(call.user["jury"]) == {"result", "vote_counts", "guilty_ratio", "policy"}
     assert call.user["jury"]["policy"]["allowed_sentences"] == [
@@ -352,7 +366,7 @@ def test_writer_receives_one_intensity_section_and_the_shared_context(trace: Pip
         )
         assert set(call.user) == {
             "intensity",
-            "attack_angle",
+            "attack_angles",
             "case",
             "jury",
             "sentencing",
@@ -366,19 +380,15 @@ def test_writer_receives_one_intensity_section_and_the_shared_context(trace: Pip
         # 서버가 고정하는 값은 enum 하나짜리다.
         assert call.schema["properties"]["intensity"]["enum"] == [intensity]
         assert call.schema["properties"]["attack_angle"]["enum"] == [
-            call.user["attack_angle"]["code"]
+            *[a["code"] for a in call.user["attack_angles"]]
         ]
-    other = [
-        ln for ln in load_prompt(f"writer/hell-{WRITER_VERSION}.md").splitlines() if ln.strip()
-    ]
-    assert not any(ln in calls[0].system for ln in other)  # mild 에 hell 섹션 없음
+    assert "### HELL" not in calls[0].system  # 공통 사건은 같아도 hell 문체는 없음
 
 
-def test_writer_angle_is_shared_across_intensities_and_grounded(trace: PipelineTrace) -> None:
-    angles = {c.user["attack_angle"]["code"] for c in trace.calls("writer")}
-    assert len(angles) == 1
-    # 조서에 지난 판결·방 규칙이 있으니 건너뛰는 각도가 없다 → 해시 그대로.
-    assert angles == {pick(trace.snapshot.post_id).value}
+def test_writer_angle_options_are_shared_across_intensities(trace: PipelineTrace) -> None:
+    options = [c.user["attack_angles"] for c in trace.calls("writer")]
+    assert options[0] == options[1] == options[2]
+    assert len(options[0]) == 6
 
 
 def test_writer_output_becomes_draft_then_validation_then_evaluator_input(
@@ -408,8 +418,8 @@ def test_writer_output_becomes_draft_then_validation_then_evaluator_input(
 def test_evaluator_receives_policy_jury_sentencing_draft_and_evidence(trace: PipelineTrace) -> None:
     call = trace.call("evaluator")
     policy = trace.settings.GUARDRAIL_POLICY_VERSION
-    assert call.system == load_prompt(f"evaluator/{policy}.md")
-    assert set(call.user) == {"policy_version", "jury", "sentencing", "draft", "evidence"}
+    assert call.system == build_evaluator_system(policy)
+    assert set(call.user) == {"policy_version", "case", "jury", "sentencing", "draft", "evidence"}
     assert call.user["policy_version"] == policy
     assert set(call.user["jury"]) == {"result", "vote_counts", "guilty_ratio", "policy"}
     assert call.user["evidence"] == {f.label: f.text for f in trace.dossier.facts}  # type: ignore[union-attr]
@@ -439,6 +449,7 @@ def test_evaluator_splits_hell_when_a_separate_model_is_configured() -> None:
 def test_finalize_carries_dossier_hashes_versions_and_models(trace: PipelineTrace) -> None:
     req = trace.finalize_request
     assert req is not None
+    assert "case_reading" not in req.model_dump_json()
     assert req.dossier_id == trace.preparation.dossier.dossier_id  # type: ignore[union-attr]
     assert req.draft_hash == req.evaluation_draft_hash == trace.sentence_state["draft_hash"]
     assert req.prompt_bundle_version == prompt_bundle_version()
@@ -472,17 +483,11 @@ def test_first_spend_every_role_sees_only_f0(first_spend: PipelineTrace) -> None
 
 
 def test_first_spend_skips_history_and_rule_angles(first_spend: PipelineTrace) -> None:
-    """첫 호출 3건(강도별)은 이력·규칙 각도를 건너뛴 같은 각도다. 재작성은 다음 각도(offset+1)."""
-    first_round = first_spend.calls("writer")[:3]
-    angles = {c.user["attack_angle"]["code"] for c in first_round}
-    assert angles == {pick(first_spend.snapshot.post_id, skip=NEEDS_EVIDENCE).value}
-    assert not angles & {a.value for a in NEEDS_EVIDENCE}
-    repairs = first_spend.calls("writer")[3:]
-    for call in repairs:
-        assert (
-            call.user["attack_angle"]["code"]
-            == pick(first_spend.snapshot.post_id, 1, skip=NEEDS_EVIDENCE).value
-        )
+    calls = first_spend.calls("writer")
+    for call in calls:
+        allowed = {a["code"] for a in call.user["attack_angles"]}
+        assert not allowed & {a.value for a in NEEDS_EVIDENCE}
+    for call in calls[3:]:
         assert "avoid" in call.user
 
 

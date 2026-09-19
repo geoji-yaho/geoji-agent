@@ -224,6 +224,18 @@ def writer_schema(
     draft = _derive(WriterDraft)
     for key in ("meme_tag", "meme_hints"):
         schema["properties"][key] = draft["properties"][key]
+    # 짧은 사유 정리부터 생성한다. 표현 보조이며 외부 계약·판단 근거로 저장하지 않는다.
+    reading = {
+        "type": "object",
+        "properties": {
+            "reason_quote": {"type": "string", "maxLength": 120},
+            "acknowledged_context": {"type": "string", "maxLength": 120},
+            "roast_target": {"anyOf": [{"type": "string", "maxLength": 80}, {"type": "null"}]},
+        },
+        "required": ["reason_quote", "acknowledged_context", "roast_target"],
+        "additionalProperties": False,
+    }
+    schema["properties"] = {"case_reading": reading, **schema["properties"]}
     schema["required"] = list(schema["properties"])
     if candidate_ids is not None:
         schema["properties"]["selected_candidate_id"] = {

@@ -138,7 +138,7 @@ def test_5_mild_spicy는_욕이_없으면_통과(intensity):
 
 @pytest.mark.parametrize("intensity", [Intensity.mild, Intensity.spicy])
 def test_5_mild_spicy는_hell_허용_욕도_제외(intensity):
-    text = "미친 이걸 또 샀다고 진짜 실화냐 지갑 괜찮은 거 맞냐고"
+    text = "씨발 이걸 또 샀다고 진짜 실화냐 지갑 괜찮은 거 맞냐고"
     assert Reason.PROFANITY in _check(_comment(text), intensity)
 
 

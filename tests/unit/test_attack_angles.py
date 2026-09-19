@@ -30,18 +30,10 @@ def test_각도는_6종이고_순서가_스크립트와_같다():
     assert set(ANGLE_GUIDES) == set(AttackAngle)
 
 
-def test_마무리_방식_문장이_스크립트_원문이다():
-    assert ANGLE_GUIDES[AttackAngle.CONVERSION].label_ko == "환산"
-    assert ANGLE_GUIDES[AttackAngle.CONVERSION].instruction == (
-        "금액을 다른 물건·횟수·시간으로 바꿔 비교한다(F0 인용). 마무리도 환산으로 끝낸다."
-    )
-    assert ANGLE_GUIDES[AttackAngle.ALTERNATIVE_MOCKERY].label_ko == "대안 조롱"
-    assert ANGLE_GUIDES[AttackAngle.ALTERNATIVE_MOCKERY].instruction == (
-        "무료·더 싼 대안을 과장되게 구체적으로 제시한다. 마무리는 그 대안을 명령한다."
-    )
-    for guide in ANGLE_GUIDES.values():
-        assert guide.label_ko
-        assert guide.instruction.endswith(".")
+def test_각도는_사유와_근거에_맞을_때만_선택한다():
+    assert "입력에 비교 단가·단위" in ANGLE_GUIDES[AttackAngle.CONVERSION].instruction
+    assert "타당한 사정은 인정" in ANGLE_GUIDES[AttackAngle.EXCUSE_DISSECTION].instruction
+    assert "추측하지 않는다" in ANGLE_GUIDES[AttackAngle.ALTERNATIVE_MOCKERY].instruction
 
 
 @pytest.mark.parametrize("post_id", POST_IDS)
@@ -74,7 +66,7 @@ def test_각도_값은_대문자_식별자_그대로():
 
 
 def test_근거_필요_각도는_반복과_규칙_의인화():
-    assert HISTORY_ANGLES == {AttackAngle.REPETITION}
+    assert HISTORY_ANGLES == {AttackAngle.REPETITION, AttackAngle.FUTURE_PROPHECY}
     assert RULE_ANGLES == {AttackAngle.RULE_PERSONIFICATION}
     assert NEEDS_EVIDENCE == HISTORY_ANGLES | RULE_ANGLES
 
@@ -87,19 +79,19 @@ def test_skip_이_비면_예전과_같다(post_id: str):
 
 @pytest.mark.parametrize("post_id", POST_IDS)
 def test_skip_한_각도는_나오지_않고_나머지_5종을_돈다(post_id: str):
-    picked = [pick(post_id, offset, skip=HISTORY_ANGLES) for offset in range(5)]
+    picked = [pick(post_id, offset, skip=HISTORY_ANGLES) for offset in range(4)]
     assert AttackAngle.REPETITION not in picked
     assert set(picked) == set(AttackAngle) - HISTORY_ANGLES
-    assert pick(post_id, 5, skip=HISTORY_ANGLES) is picked[0]
+    assert pick(post_id, 4, skip=HISTORY_ANGLES) is picked[0]
 
 
 def test_skip_은_해시_자리에서_다음_근거_있는_각도로_민다():
     # "post-graph-c" 는 해시가 REPETITION(1) 이다. 이력이 없으면 바로 다음인 변명 해부.
     assert pick("post-graph-c") is AttackAngle.REPETITION
     assert pick("post-graph-c", skip=NEEDS_EVIDENCE) is AttackAngle.EXCUSE_DISSECTION
-    assert pick("post-graph-c", 1, skip=NEEDS_EVIDENCE) is AttackAngle.FUTURE_PROPHECY
+    assert pick("post-graph-c", 1, skip=NEEDS_EVIDENCE) is AttackAngle.ALTERNATIVE_MOCKERY
     # 규칙 의인화(4) 도 건너뛰어 대안 조롱(5) 으로.
-    assert pick("post-graph-c", 2, skip=NEEDS_EVIDENCE) is AttackAngle.ALTERNATIVE_MOCKERY
+    assert pick("post-graph-c", 2, skip=NEEDS_EVIDENCE) is AttackAngle.CONVERSION
 
 
 @pytest.mark.parametrize("post_id", POST_IDS)

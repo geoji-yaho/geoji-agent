@@ -38,7 +38,7 @@ __all__ = [
 ]
 
 JUDGE_PROMPT_PATH = Path(__file__).resolve().with_name("judge.md")
-GUARDRAIL_SOURCE = "evaluator/guardrail-v2.md"
+GUARDRAIL_SOURCE = "evaluator/guardrail-v2.2.md"
 #: 인용할 검수관 프롬프트 절 제목(접두어).
 QUOTED_SECTIONS: tuple[str, ...] = ("## 검사표", "## 강도별 적용 표")
 SCORE_VALUES: tuple[int, ...] = (1, 2, 3, 4, 5)

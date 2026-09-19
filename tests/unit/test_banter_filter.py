@@ -64,7 +64,8 @@ def test_규칙3_DEATH_WORDS_는_모든_강도에서_삭제():
 def test_규칙4_PROFANITY_는_mild_spicy_에서만_삭제():
     rude = _c(text="미친 소비입니다")
     assert filter_banter([rude], Intensity.mild, LABELS) == []
-    assert filter_banter([rude], Intensity.spicy, LABELS) == []
+    assert filter_banter([rude], Intensity.spicy, LABELS) == [rude]
+    assert filter_banter([_c(text="씨발")], Intensity.spicy, LABELS) == []
     assert filter_banter([rude], Intensity.hell, LABELS) == [rude]
 
 
