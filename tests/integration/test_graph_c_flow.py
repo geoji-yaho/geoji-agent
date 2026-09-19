@@ -40,7 +40,7 @@ from geoji_ai.application.sentence_case import SentenceHandler
 from geoji_ai.contracts.case import CaseSnapshot
 from geoji_ai.contracts.finalize import FinalizeRequest
 from geoji_ai.core.config import Settings
-from geoji_ai.domain.attack_angles import pick
+from geoji_ai.domain.attack_angles import NEEDS_EVIDENCE, pick
 from geoji_ai.graphs.sentencing import build_sentence_graph
 from geoji_ai.ports.llm import LLMResult
 from geoji_ai.workers.dispatch import HandlerContext, handler_for
@@ -416,8 +416,11 @@ async def test_03_검수_실패_2회면_repair_1회_뒤_그_강도만_TEMPLATE(e
     repair_schema, repair_messages = writers[2][1], writers[2][2]
     assert _enum(repair_schema, "properties", "intensity") == ["hell"]
     repair_input = _user_payload(repair_messages)
-    assert repair_input["attack_angle"]["code"] == pick(POST_ID, 1).value
-    assert _enum(writers[0][1], "properties", "attack_angle") == [pick(POST_ID, 0).value]
+    # 9/18: 가짜 백엔드 조서에는 이력·규칙이 없어 반복·규칙 의인화 각도를 건너뛴다.
+    assert repair_input["attack_angle"]["code"] == pick(POST_ID, 1, skip=NEEDS_EVIDENCE).value
+    assert _enum(writers[0][1], "properties", "attack_angle") == [
+        pick(POST_ID, 0, skip=NEEDS_EVIDENCE).value
+    ]
     assert "PERSONAL_ATTACK" in json.dumps(repair_input["avoid"], ensure_ascii=False)
     assert "문제 문장 마커" in json.dumps(repair_input["avoid"], ensure_ascii=False)
 
@@ -501,7 +504,7 @@ async def test_06_finalize_422_이면_repair_1회_뒤_성공(env: Env):
     repair_angles = [
         _enum(schema, "properties", "attack_angle") for _, schema, _ in llm.of("writer")[2:]
     ]
-    assert repair_angles == [[pick(POST_ID, 1).value]] * 2
+    assert repair_angles == [[pick(POST_ID, 1, skip=NEEDS_EVIDENCE).value]] * 2
     first, second = env.backend.finalized
     assert first.sentencing == second.sentencing  # 형량 불변
     assert _sources(second) == [("spicy", "AI"), ("hell", "AI")]

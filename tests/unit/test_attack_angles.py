@@ -7,6 +7,9 @@ import pytest
 from geoji_ai.domain.attack_angles import (
     ANGLE_GUIDES,
     ANGLE_ORDER,
+    HISTORY_ANGLES,
+    NEEDS_EVIDENCE,
+    RULE_ANGLES,
     AttackAngle,
     pick,
 )
@@ -65,3 +68,40 @@ def test_6종_순환(post_id: str):
 
 def test_각도_값은_대문자_식별자_그대로():
     assert [member.name for member in AttackAngle] == [member.value for member in AttackAngle]
+
+
+# --- skip (9/18) -----------------------------------------------------------
+
+
+def test_근거_필요_각도는_반복과_규칙_의인화():
+    assert HISTORY_ANGLES == {AttackAngle.REPETITION}
+    assert RULE_ANGLES == {AttackAngle.RULE_PERSONIFICATION}
+    assert NEEDS_EVIDENCE == HISTORY_ANGLES | RULE_ANGLES
+
+
+@pytest.mark.parametrize("post_id", POST_IDS)
+def test_skip_이_비면_예전과_같다(post_id: str):
+    for offset in range(7):
+        assert pick(post_id, offset, skip=()) is pick(post_id, offset)
+
+
+@pytest.mark.parametrize("post_id", POST_IDS)
+def test_skip_한_각도는_나오지_않고_나머지_5종을_돈다(post_id: str):
+    picked = [pick(post_id, offset, skip=HISTORY_ANGLES) for offset in range(5)]
+    assert AttackAngle.REPETITION not in picked
+    assert set(picked) == set(AttackAngle) - HISTORY_ANGLES
+    assert pick(post_id, 5, skip=HISTORY_ANGLES) is picked[0]
+
+
+def test_skip_은_해시_자리에서_다음_근거_있는_각도로_민다():
+    # "post-graph-c" 는 해시가 REPETITION(1) 이다. 이력이 없으면 바로 다음인 변명 해부.
+    assert pick("post-graph-c") is AttackAngle.REPETITION
+    assert pick("post-graph-c", skip=NEEDS_EVIDENCE) is AttackAngle.EXCUSE_DISSECTION
+    assert pick("post-graph-c", 1, skip=NEEDS_EVIDENCE) is AttackAngle.FUTURE_PROPHECY
+    # 규칙 의인화(4) 도 건너뛰어 대안 조롱(5) 으로.
+    assert pick("post-graph-c", 2, skip=NEEDS_EVIDENCE) is AttackAngle.ALTERNATIVE_MOCKERY
+
+
+@pytest.mark.parametrize("post_id", POST_IDS)
+def test_전부_skip_이면_무시한다(post_id: str):
+    assert pick(post_id, skip=set(AttackAngle)) is pick(post_id)

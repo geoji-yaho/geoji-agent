@@ -9,7 +9,7 @@ from scripts import probe_verdict_cards as probe
 from geoji_ai.adapters.fake_llm import FakeLLM, FakeScenario
 from geoji_ai.contracts.writer import BanterStrategy
 from geoji_ai.core.config import Settings
-from geoji_ai.domain.attack_angles import pick
+from geoji_ai.domain.attack_angles import NEEDS_EVIDENCE, pick
 from geoji_ai.domain.intensity import Intensity
 from geoji_ai.graphs.sentencing import build_writer_request, minimal_dossier
 from geoji_ai.graphs.states import Candidate
@@ -185,7 +185,8 @@ def test_shared_request_filters_candidates_and_keeps_repair_data():
         avoid=avoid,
     )
     user = json.loads(messages[1]["content"])
-    assert user["attack_angle"]["code"] == pick(snapshot.post_id, 1).value
+    # 최소 조서(F0 만)라 반복·규칙 의인화 각도는 건너뛴다(9/18).
+    assert user["attack_angle"]["code"] == pick(snapshot.post_id, 1, skip=NEEDS_EVIDENCE).value
     assert user["avoid"] == avoid
     assert user["banter_candidates"] == [
         {

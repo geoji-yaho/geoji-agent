@@ -147,7 +147,7 @@ strict 규칙: 모든 키 `required`, `additionalProperties=false`. enum 주입 
 성적 표현(검수관 `IDENTITY_DEGRADATION`·`UNSAFE_CONTENT`), 닳은 문구다. 댓글 규칙(04 §3.5)도
 같은 표를 쓰므로 지옥맛 방 댓글의 비속어 필터가 함께 풀린다.
 
-| `attack_angles.py` | 6종 + 마무리 방식 문장(스크립트 `:235-242`). `pick(post_id, offset) = ANGLE_ORDER[(crc32(post_id) % 6 + offset) % 6]`(바깥 `% 6` 은 9/11 정정 — 6종 순환). 모델이 고르지 않는다 |
+| `attack_angles.py` | 6종 + 마무리 방식 문장(스크립트 `:235-242`). `pick(post_id, offset) = ANGLE_ORDER[(crc32(post_id) % 6 + offset) % 6]`(바깥 `% 6` 은 9/11 정정 — 6종 순환). 모델이 고르지 않는다. **9/18 `skip`:** 조서에 근거가 없는 각도(반복 `HISTORY_ANGLES` = 과거 지출·판결 기록이나 반복 집계 ≥ 1건 없음, 규칙 의인화 `RULE_ANGLES` = 방 규칙 없음)는 해시 자리에서 다음 각도로 민다. 판단은 `graphs/sentencing.ungrounded_angles(dossier)`. 이유: 첫 지출(F0 만)에 반복 각도를 시키면 서기가 "42번째 키보드" 를 지어내고 검수관이 반려한다(15 §6 12회차) |
 | `validation.py` (구조) | `validate_writer_draft(draft, target_intensities, label_map)`: 강도 집합 정확히 일치·중복 없음·길이·라벨 ∈ `label_map`·문장 수 2~4·`kind` enum. `validate_evaluation(report, intensities, policy_version)`: 강도 완전성·검사 필드 완전성·`pass` 불리언·정책 버전 일치. **`false`·누락·파싱 실패는 모두 검수 실패**(proposal2 §5.3 ⑥) |
 
 ### 3.6 ports 5종 + fake provider

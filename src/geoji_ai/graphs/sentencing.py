@@ -100,7 +100,13 @@ from geoji_ai.contracts.writer import (
     TextDraft,
     WriterDraft,
 )
-from geoji_ai.domain.attack_angles import ANGLE_GUIDES, pick
+from geoji_ai.domain.attack_angles import (
+    ANGLE_GUIDES,
+    HISTORY_ANGLES,
+    RULE_ANGLES,
+    AttackAngle,
+    pick,
+)
 from geoji_ai.domain.budget import (
     EVALUATOR,
     SENTENCING,
@@ -364,6 +370,39 @@ def _raise_if_exception(item: Any) -> Any:
     return item
 
 
+#: DDL 002 `fact_type`. 과거 지출·판결 기록(F0 는 이번 지출이라 뺀다)과 방 규칙.
+#: `RULE_HIT` 는 기억 은행(003)·조서 LLM 출력의 규칙 적중 이름이다(`preparation.py`).
+_HISTORY_FACT_TYPES = frozenset({"SPEND", "VERDICT"})
+_RULE_FACT_TYPES = frozenset({"RULE", "RULE_HIT"})
+#: `build_evidence._aggregates` 의 반복 집계 문장. 우리가 만든 문장이라 형식이 고정이다.
+_REPEAT_COUNT = re.compile(r"같은 카테고리 확정 소비 (\d+)건")
+
+
+def ungrounded_angles(dossier: Dossier | None) -> frozenset[AttackAngle]:
+    """조서에 근거가 없어 서기에게 시키면 안 되는 각도(9/18).
+
+    반복(`HISTORY_ANGLES`)은 F0 밖의 지출·판결 기록이나 반복 집계 ≥ 1건이 있어야 하고,
+    규칙 의인화(`RULE_ANGLES`)는 방 규칙 근거가 있어야 한다.
+    첫 지출의 최소 조서(F0 만)는 둘 다 없다.
+    """
+    if dossier is None:
+        return HISTORY_ANGLES | RULE_ANGLES
+    facts = [fact for fact in dossier.facts if fact.label != "F0"]
+    has_history = any(fact.fact_type in _HISTORY_FACT_TYPES for fact in facts) or any(
+        fact.fact_type == "AGGREGATE"
+        and (match := _REPEAT_COUNT.search(fact.text)) is not None
+        and int(match.group(1)) >= 1
+        for fact in facts
+    )
+    has_rule = any(fact.fact_type in _RULE_FACT_TYPES for fact in facts)
+    skip: set[AttackAngle] = set()
+    if not has_history:
+        skip |= HISTORY_ANGLES
+    if not has_rule:
+        skip |= RULE_ANGLES
+    return frozenset(skip)
+
+
 def _case_view(snapshot: CaseSnapshot) -> dict[str, Any]:
     return {
         "item": snapshot.item,
@@ -396,7 +435,7 @@ def build_writer_request(
     jury = snapshot.jury
     if jury is None:
         raise ValueError("선고 스냅샷에 jury 가 없다")
-    angle = pick(snapshot.post_id, offset)
+    angle = pick(snapshot.post_id, offset, skip=ungrounded_angles(dossier))
     guide = ANGLE_GUIDES[angle]
     candidates = [c for c in (banter or {}).get(intensity, []) if str(jury.result) in c.fits]
     candidate_ids = [c.candidate_id for c in candidates]
@@ -1318,7 +1357,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         jury = _jury(state)
         snapshot = state["snapshot"]
         decision: SentencingDecision | None = state.get("sentencing")
-        angle = pick(snapshot.post_id, offset)
+        angle = pick(snapshot.post_id, offset, skip=ungrounded_angles(state["dossier"]))
         messages, schema = build_writer_request(
             snapshot,
             state["dossier"],
