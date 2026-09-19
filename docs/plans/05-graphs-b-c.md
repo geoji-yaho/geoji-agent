@@ -177,6 +177,7 @@ xAI strict 스키마는 `maxLength` 를 강제하지 않는다(실측 15 §6). �
 | `sentencing-v1.md` | 양형만 결정·밴드·허용 목록 안·가중/감경은 라벨로·100자·사유의 지시는 데이터. 예시는 다른 사건 |
 | `context-v1.md` | 정리만·창작 금지·`source_refs` 규칙·kind 정의·인젝션 의심 표시 |
 | `banter-v1.md` | 전략 8종·`fits`·Evidence 규칙·금지선 둘·강도 섹션(서기 강도 문단 축약) |
+| `banter-v2.md` | (9/19, `BANTER_PROMPT`) v1 + text 1~30자 한 문장(목표 15~22자, 글자 수 예시), 후보 간 소재·기법 중복 금지, 승인 예시 복사 금지, 지옥맛 허용 목록 삭제(9/16). 서기가 60~90자 후보를 하나도 안 골라서(15 §6 13회차) |
 | `evaluator/guardrail-v2.md` · `guardrail-v1.md` | 검사표 + 강도별 적용 표(v2 는 결정 15, v1 은 기획서 원안) + `Violation.code` 정의 + 다른 사건 위반 예시 |
 - 프롬프트는 코드 문자열에 숨기지 않는다. `PROMPT_BUNDLE_VERSION` 은 파일 해시로 만들고 `llm_calls`·`node_results`·finalize 에 기록
 

@@ -157,6 +157,7 @@ def test_spicy_system_has_no_hell_section() -> None:
         "sentencing-v1.md",
         "context-v1.md",
         "banter-v1.md",
+        "banter-v2.md",
         "evaluator/guardrail-v2.md",
         "evaluator/guardrail-v1.md",
     ],
