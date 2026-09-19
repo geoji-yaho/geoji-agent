@@ -13,7 +13,8 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 
-from geoji_ai.contracts.llm_schemas import context_schema
+from geoji_ai.contracts.juror import JUROR_REASON_MAX
+from geoji_ai.contracts.llm_schemas import context_schema, juror_schema
 from geoji_ai.contracts.writer import BanterStrategy
 from geoji_ai.domain.intensity import ALL_INTENSITIES
 from tests.conftest import FIXTURES_DIR, load_fixture, load_schema
@@ -53,8 +54,15 @@ SCHEMA_BY_PREFIX = (
     ("verdict-view-", ("verdict-view", "VerdictView")),
 )
 
-# 스키마가 없는 fixture — 구조만 본다.
-NO_SCHEMA = ("dossier-", "banter-", "context-", "templates-")
+# 스키마가 없는 fixture — 구조만 본다. `juror-vote-` 는 strict 스키마로 본다(정본 JSON 없음).
+NO_SCHEMA = (
+    "dossier-",
+    "banter-",
+    "context-",
+    "templates-",
+    "juror-templates-",
+    "juror-vote-",
+)
 RAW_FILES = ("taxi-hell-input", "taxi-hell-requested-output")
 
 
@@ -92,6 +100,8 @@ def test_every_fixture_validates(path: Path) -> None:
         if name.startswith(prefix):
             if prefix == "context-":
                 Draft202012Validator(context_schema()).validate(payload)
+            elif prefix == "juror-vote-":
+                Draft202012Validator(juror_schema("spent")).validate(payload)
             else:
                 assert isinstance(payload, dict)
             return
@@ -172,6 +182,29 @@ def test_jury_fixtures_cover_three_results() -> None:
         assert jury["policy"]["fallback_sentence"] == "oneDay"
 
     assert load_fixture("jury-guilty-75")["guilty_ratio"] == 0.75
+
+
+def test_juror_templates_cover_six_cells() -> None:
+    """18 §3.4 템플릿 표 6칸. 강도 3 × 유형 2, 모두 1~60자 한 줄이다."""
+    templates = load_fixture("juror-templates-v1")
+
+    assert templates["version"] == "juror-templates-v1"
+    reasons = templates["reasons"]
+    assert sorted(reasons) == sorted(i.value for i in ALL_INTENSITIES)
+    for intensity in ALL_INTENSITIES:
+        cells = reasons[intensity.value]
+        assert sorted(cells) == ["considering", "spent"]
+        for text in cells.values():
+            assert 1 <= len(text) <= JUROR_REASON_MAX
+            assert "\n" not in text and "\r" not in text
+
+
+def test_juror_vote_fixture_fits_the_contract() -> None:
+    vote = load_fixture("juror-vote-taxi")
+
+    assert set(vote) == {"verdict", "reason"}
+    assert vote["verdict"] == "guilty"
+    assert 1 <= len(vote["reason"]) <= JUROR_REASON_MAX
 
 
 def test_dossier_labels_match_label_map() -> None:

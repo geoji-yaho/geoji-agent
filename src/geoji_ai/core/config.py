@@ -69,13 +69,15 @@ class Settings(BaseSettings):
     SENTENCING_NODE_TIMEOUT_SECONDS: float = 12.0
     WRITER_NODE_TIMEOUT_SECONDS: float = 10.0
     EVALUATOR_NODE_TIMEOUT_SECONDS: float = 30.0
+    # 18 §3.7 데모 AI 배심원. 모델 1회 상한은 서기 노드와 같다.
+    JUROR_TIMEOUT_SECONDS: float = 10.0
 
     # 큐·워커 (작업 2)
     WORKER_POLL_MS: int = 250
     JOB_LEASE_SECONDS: int = 15
     HEARTBEAT_SECONDS: int = 5
     WORKER_SLOTS: dict[str, int] = Field(
-        default_factory=lambda: {"SENTENCE": 2, "PREPARE": 1, "BACKGROUND": 1}
+        default_factory=lambda: {"SENTENCE": 2, "PREPARE": 1, "BACKGROUND": 1, "JURY": 1}
     )
     WORKER_SHUTDOWN_DEADLINE_SECONDS: int = 10
     REAPER_INTERVAL_SECONDS: int = 5
@@ -111,6 +113,8 @@ class Settings(BaseSettings):
     WRITER_MAX_OUTPUT_TOKENS: int = 700  # 강도 1개당
     # OpenAI 는 이 상한에 reasoning 토큰을 포함한다. luna 검수 1회 reasoning 866~1,363(9/16 실측).
     EVALUATOR_MAX_OUTPUT_TOKENS: int = 3000
+    # 18 §3.7: 배심원 출력은 두 키 JSON 이다.
+    JUROR_MAX_OUTPUT_TOKENS: int = 120
 
     # 기능 플래그. hell 을 끄는 플래그는 없다 — 정책 버전으로 통제한다.
     ROOM_COMMENT_STYLE_ENABLED: bool = False

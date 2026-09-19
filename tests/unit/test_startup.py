@@ -58,7 +58,7 @@ def test_기본값이_계획서_표와_같다():
     assert settings.INTAKE_TIMEOUT_SECONDS == 4
     assert settings.MODEL_CONCURRENCY_LIMIT == 8
     assert settings.COST_ALERT_KRW_PER_DAY == 5000
-    assert settings.WORKER_SLOTS == {"SENTENCE": 2, "PREPARE": 1, "BACKGROUND": 1}
+    assert settings.WORKER_SLOTS == {"SENTENCE": 2, "PREPARE": 1, "BACKGROUND": 1, "JURY": 1}
     assert settings.ROOM_COMMENT_STYLE_ENABLED is False
     # 비밀값은 기본값이 없다.
     assert settings.DATABASE_URL.get_secret_value() == ""
@@ -159,7 +159,7 @@ def test_env_example_을_그대로_복사해도_설정이_뜬다(tmp_path):
     env.write_text(text, encoding="utf-8")
     settings = Settings(_env_file=env)
     assert settings.GUARDRAIL_POLICY_VERSION == "guardrail-v2"
-    assert settings.WORKER_SLOTS == {"SENTENCE": 2, "PREPARE": 1, "BACKGROUND": 1}
+    assert settings.WORKER_SLOTS == {"SENTENCE": 2, "PREPARE": 1, "BACKGROUND": 1, "JURY": 1}
     assert missing_keys(settings) == ["OPENAI_API_KEY", "XAI_API_KEY"]
     # 키 이름이 설정 필드와 1:1 이다.
     keys = {ln.split("=", 1)[0] for ln in text.splitlines() if ln and not ln.startswith("#")}

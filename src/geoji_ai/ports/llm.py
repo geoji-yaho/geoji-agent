@@ -8,8 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol, runtime_checkable
 
-# 역할 6종. 프롬프트·strict 스키마·원장 노드 이름이 이 값을 공유한다.
-LLMRole = Literal["intake", "context", "banter", "sentencing", "writer", "evaluator"]
+# 역할 7종. 프롬프트·strict 스키마·원장 노드 이름이 이 값을 공유한다.
+LLMRole = Literal["intake", "context", "banter", "sentencing", "writer", "evaluator", "juror"]
 
 StopReason = Literal["stop", "max_tokens", "refusal"]
 CostSource = Literal["usage", "table", "unknown"]

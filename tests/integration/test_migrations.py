@@ -16,7 +16,11 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from geoji_ai.adapters.postgres_jobs import make_engine
-from geoji_ai.adapters.postgres_migrations import MAX_OWNED_VERSION, migrate
+from geoji_ai.adapters.postgres_migrations import (
+    BACKEND_OWNED_VERSIONS,
+    MAX_OWNED_VERSION,
+    migrate,
+)
 
 #: 권한 부족(`InsufficientPrivilege`)의 SQLSTATE.
 INSUFFICIENT_PRIVILEGE = "42501"
@@ -52,15 +56,15 @@ async def test_001_을_적용하면_테이블과_인덱스와_적용기록이_�
     # `engine` fixture 가 `ai` 스키마를 지우고 러너로 001 을 적용한 직후 상태다.
     assert await _scalar(engine, "SELECT to_regclass('ai.jobs')") == "ai.jobs"
     assert {"jobs_claim_idx", "jobs_lease_idx"} <= await _index_names(engine)
-    # 002·003 이 생겨 fixture 가 셋을 모두 적용한다.
-    assert await _versions(engine) == [1, 2, 3]
+    # 002·003·006 이 생겨 fixture 가 넷을 모두 적용한다(004 는 백엔드, 005 는 파일 없음).
+    assert await _versions(engine) == [1, 2, 3, 6]
 
 
 async def test_재적용은_no_op_이다(engine: AsyncEngine) -> None:
     applied = await migrate(engine)
 
     assert applied == []
-    assert await _versions(engine) == [1, 2, 3]
+    assert await _versions(engine) == [1, 2, 3, 6]
 
 
 async def test_ai_worker_는_insert_가_막히고_select_update_는_된다(
@@ -113,12 +117,14 @@ async def test_빈_DB_에_migrate_를_동시에_두_번_돌려도_실패하지_�
             await first.dispose()
             await second.dispose()
 
-        assert sorted(results) == [[], [1, 2, 3]]
-        assert await _versions(engine) == [1, 2, 3]
+        assert sorted(results) == [[], [1, 2, 3, 6]]
+        assert await _versions(engine) == [1, 2, 3, 6]
 
 
 async def test_러너는_004_를_읽지도_적용하지도_않는다(engine: AsyncEngine, tmp_path: Path) -> None:
-    assert MAX_OWNED_VERSION == 3  # 004 부터는 백엔드 소유다(02 §3.6)
+    # 18 §3.1: 상한은 006, 004 만 백엔드 소유로 건너뛴다(005 는 P1 예약이라 파일이 없다).
+    assert MAX_OWNED_VERSION == 6
+    assert BACKEND_OWNED_VERSIONS == frozenset({4})
     async with engine.begin() as conn:
         await conn.execute(text("DROP SCHEMA IF EXISTS ai CASCADE"))
     (tmp_path / "001_fake.sql").write_text(
@@ -128,13 +134,33 @@ async def test_러너는_004_를_읽지도_적용하지도_않는다(engine: Asy
     (tmp_path / "004_backend.sql").write_text(
         "CREATE TABLE ai.fake_four (id integer PRIMARY KEY);\n", encoding="utf-8"
     )
+    (tmp_path / "006_ours.sql").write_text(
+        "CREATE TABLE ai.fake_six (id integer PRIMARY KEY);\n", encoding="utf-8"
+    )
 
     applied = await migrate(engine, migrations_dir=tmp_path)
 
-    assert applied == [1]
-    assert await _versions(engine) == [1]
+    assert applied == [1, 6]
+    assert await _versions(engine) == [1, 6]
     assert await _scalar(engine, "SELECT to_regclass('ai.fake_one')") == "ai.fake_one"
+    assert await _scalar(engine, "SELECT to_regclass('ai.fake_six')") == "ai.fake_six"
     assert await _scalar(engine, "SELECT to_regclass('ai.fake_four')") is None
+
+
+async def test_006_을_적용하면_JURY_VOTE_INSERT_가_통과한다(engine: AsyncEngine) -> None:
+    """18 §3.1 = 00 §8.1. 001 의 열 CHECK 를 006 이 갈아 끼운다."""
+    assert 6 in await _versions(engine)
+    inserted = await _execute(
+        engine,
+        "INSERT INTO ai.jobs (id, event_id, event_type, kind, dedupe_key,"
+        " aggregate_id, aggregate_version, payload, priority, max_attempts, trace_id)"
+        " VALUES (gen_random_uuid(), gen_random_uuid(), 'jury.vote_requested', 'JURY_VOTE',"
+        " 'jury-vote:p1:r1:bot1', 'p1', 1,"
+        """ '{"post_id":"p1","post_version":1,"room_id":"r1","voter_id":"bot1"}'::jsonb,"""
+        " 60, 2, 't')",
+    )
+    assert inserted == 1
+    assert await _scalar(engine, "SELECT count(*) FROM ai.jobs WHERE kind = 'JURY_VOTE'") == 1
 
 
 # --- 002·003 (04 §3.1·§4.1, grants 는 10 §1) ---------------------------------------------
@@ -193,7 +219,7 @@ async def test_001_003_을_적용하면_10_테이블이_생기고_재적용은_n
         assert await _scalar(engine, f"SELECT to_regclass('ai.{table}')") == f"ai.{table}"
 
     assert await migrate(engine) == []
-    assert await _scalar(engine, "SELECT count(*) FROM ai.schema_migrations") == 3
+    assert await _scalar(engine, "SELECT count(*) FROM ai.schema_migrations") == 4
 
 
 async def test_ai_worker_는_memory_facts_에_insert_할_수_있다(

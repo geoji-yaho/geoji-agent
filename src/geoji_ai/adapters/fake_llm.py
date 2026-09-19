@@ -40,6 +40,7 @@ FIXTURE_BY_ROLE: dict[str, str] = {
     "sentencing": "sentencing-taxi",
     "writer": "writer-draft-card-taxi",
     "evaluator": "evaluation-taxi-pass",
+    "juror": "juror-vote-taxi",
 }
 
 RATE_LIMIT_RETRY_AFTER_S = 1.0

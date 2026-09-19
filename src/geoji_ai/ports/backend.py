@@ -152,6 +152,27 @@ class FinalizeResult(_Model):
     committed_at: datetime
 
 
+class JuryVoteRequest(_Model):
+    """19 §5 요청 본문 7키(18 §3.6).
+
+    `voter_id` 는 job payload 의 값을 그대로 돌려보낸다. 봇 id 는 백엔드만 안다(19 §2).
+    """
+
+    job_id: str
+    generation_id: str
+    room_id: str
+    voter_id: str
+    verdict: str
+    reason: str
+    source: Literal["AI", "TEMPLATE"]
+
+
+class JuryVoteResult(_Model):
+    """19 §5 201 응답."""
+
+    vote_id: str
+
+
 @runtime_checkable
 class BackendPort(Protocol):
     async def snapshot(self, job_id: str, generation_id: str) -> CaseSnapshot: ...
@@ -182,3 +203,5 @@ class BackendPort(Protocol):
         generation_id: str,
         error_code: GenerationErrorCode,
     ) -> None: ...
+
+    async def cast_jury_vote(self, post_id: str, req: JuryVoteRequest) -> JuryVoteResult: ...

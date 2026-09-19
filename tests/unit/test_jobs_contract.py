@@ -12,7 +12,7 @@ import pytest
 from pydantic import ValidationError
 
 from geoji_ai.adapters.postgres_jobs import PostgresJobs
-from geoji_ai.contracts.jobs import TextRetryPayload
+from geoji_ai.contracts.jobs import JuryVotePayload, TextRetryPayload
 from geoji_ai.core.config import Settings
 from geoji_ai.domain.intensity import Intensity
 from geoji_ai.ports.jobs import JobsPort
@@ -22,9 +22,10 @@ from geoji_ai.workers.dispatch import (
     ROUTES_BY_KIND,
     SLOT_KINDS,
     build_dedupe_key,
+    handler_for,
 )
 
-KINDS = ("PREPARE", "SENTENCE", "TEXT_RETRY", "RETAIN")
+KINDS = ("PREPARE", "SENTENCE", "TEXT_RETRY", "RETAIN", "JURY_VOTE")
 
 
 def test_PostgresJobs_는_JobsPort_를_따른다():
@@ -46,19 +47,20 @@ def test_슬롯_이름이_설정과_dispatch_에서_같다():
     assert set(Settings(_env_file=None).WORKER_SLOTS) <= set(SLOT_KINDS)
 
 
-def test_슬롯이_네_kind_를_빠짐없이_한_번씩_덮는다():
+def test_슬롯이_다섯_kind_를_빠짐없이_한_번씩_덮는다():
     covered = [kind for kinds in SLOT_KINDS.values() for kind in kinds]
     assert sorted(covered) == sorted(KINDS)
     assert len(covered) == len(set(covered))
 
 
-def test_JOB_ROUTES_는_02_3_4_표_다섯_행이다():
+def test_JOB_ROUTES_는_02_3_4_표_다섯_행과_18_3_1_한_행이다():
     assert set(JOB_ROUTES) == {
         "post.created",
         "verdict.confirmed",
         "sentence.finalized",
         "verdict.text_retry",
         "comment.approved",
+        "jury.vote_requested",
     }
     for event_type, route in JOB_ROUTES.items():
         assert route.event_type == event_type
@@ -100,6 +102,55 @@ def test_dedupe_key_가_규약_문자열과_같다():
         build_dedupe_key(JOB_ROUTES["comment.approved"], {"comment_id": "c1", "version": 1})
         == "retain:comment:c1:1"
     )
+    assert (
+        build_dedupe_key(
+            JOB_ROUTES["jury.vote_requested"],
+            {"post_id": "p1", "post_version": 1, "room_id": "r1", "voter_id": "bot1"},
+        )
+        == "jury-vote:p1:r1:bot1"
+    )
+
+
+# --- JURY_VOTE(18 §3.1 = 10 §3 새 행) ---------------------------------------------
+
+_JURY_BASE = {"post_id": "p1", "post_version": 1, "room_id": "r1", "voter_id": "bot1"}
+
+
+def test_JURY_VOTE_payload_는_네_키를_그대로_받는다():
+    payload = JuryVotePayload.model_validate(_JURY_BASE)
+    assert (payload.post_id, payload.post_version, payload.room_id, payload.voter_id) == (
+        "p1",
+        1,
+        "r1",
+        "bot1",
+    )
+
+
+@pytest.mark.parametrize("missing", sorted(_JURY_BASE))
+def test_JURY_VOTE_payload_는_네_키가_모두_필수다(missing: str):
+    body = {key: value for key, value in _JURY_BASE.items() if key != missing}
+    with pytest.raises(ValidationError):
+        JuryVotePayload.model_validate(body)
+
+
+def test_JURY_VOTE_payload_는_모르는_필드를_거부한다():
+    with pytest.raises(ValidationError):
+        JuryVotePayload.model_validate({**_JURY_BASE, "extra": 1})
+
+
+def test_JURY_VOTE_규약이_18_3_1_표와_같다():
+    route = JOB_ROUTES["jury.vote_requested"]
+    assert (route.kind, route.priority, route.max_attempts) == ("JURY_VOTE", 60, 2)
+    assert route.deadline_after_s is None
+    assert route.aggregate_fields == ("post_id", "post_version")
+    assert DEFAULT_ROUTE_BY_KIND["JURY_VOTE"] is route
+
+
+def test_JURY_슬롯과_핸들러가_붙어_있다():
+    # BACKGROUND 에 넣지 않는다 — TEXT_RETRY 뒤에 줄을 서면 데모의 5~10초 약속이 깨진다.
+    assert SLOT_KINDS["JURY"] == ("JURY_VOTE",)
+    assert "JURY_VOTE" not in SLOT_KINDS["BACKGROUND"]
+    assert type(handler_for("JURY_VOTE")).__name__ == "JuryVoteHandler"
 
 
 # --- TEXT_RETRY payload `intensities[]`(10 §3 표, 10 §4.5 10번 제안) ----------------------
@@ -137,3 +188,4 @@ def test_마감_규약이_백엔드_JobKind_와_같다():
     assert JOB_ROUTES["post.created"].deadline_after_s is None
     assert JOB_ROUTES["sentence.finalized"].deadline_after_s is None
     assert JOB_ROUTES["comment.approved"].deadline_after_s is None
+    assert JOB_ROUTES["jury.vote_requested"].deadline_after_s is None

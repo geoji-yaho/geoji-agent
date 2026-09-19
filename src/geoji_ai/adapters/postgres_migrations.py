@@ -4,7 +4,9 @@
 이미 적용된 번호는 건너뛴다(재적용 no-op). 파일 하나가 한 트랜잭션이고, 같은 트랜잭션 안에서
 적용 기록을 남긴다.
 
-004 는 백엔드 소유라 **우리 러너는 001~003 만** 적용한다(02 §3.6, 00 §8.1).
+번호 소유는 00 §8.1 이다. 004 는 백엔드 소유라 읽지도 적용하지도 않고(`BACKEND_OWNED_VERSIONS`),
+005 는 P1 예약이라 파일이 없다. 우리 러너가 적용하는 것은 **001·002·003·006** 이다
+(18 §3.1 에서 006 `JURY_VOTE` 가 붙으면서 상한이 3 → 6 이 됐다).
 """
 
 from __future__ import annotations
@@ -15,13 +17,16 @@ from pathlib import Path
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
-__all__ = ["MAX_OWNED_VERSION", "MIGRATIONS_DIR", "migrate"]
+__all__ = ["BACKEND_OWNED_VERSIONS", "MAX_OWNED_VERSION", "MIGRATIONS_DIR", "migrate"]
 
 #: `<저장소 루트>/database/migrations`.
 MIGRATIONS_DIR: Path = Path(__file__).resolve().parents[3] / "database" / "migrations"
 
-#: 우리가 적용하는 마지막 번호. 004 부터는 백엔드 소유라 읽지도 적용하지도 않는다.
-MAX_OWNED_VERSION = 3
+#: 우리가 적용하는 마지막 번호. 이 번호를 넘는 파일은 목록에 넣지 않는다(18 §3.1: 006).
+MAX_OWNED_VERSION = 6
+
+#: 백엔드 소유 번호. 상한 안이어도 읽지도 적용하지도 않는다(004 초안이 저장소에 들어와도).
+BACKEND_OWNED_VERSIONS: frozenset[int] = frozenset({4})
 
 _FILENAME_RE = re.compile(r"^(\d{3})_.+\.sql$")
 
@@ -39,14 +44,18 @@ _BOOTSTRAP_SQL: tuple[str, ...] = (
 
 
 def _discover(migrations_dir: Path, max_version: int) -> list[tuple[int, Path]]:
-    """`NNN_*.sql` 을 번호 순으로. `max_version` 초과는 목록에 넣지 않는다."""
+    """`NNN_*.sql` 을 번호 순으로.
+
+    `max_version` 초과와 `BACKEND_OWNED_VERSIONS` 는 목록에 넣지 않는다. 건너뛰기를 여기에 두는
+    것은 호출자가 `migrate(max_version=...)` 를 덮어써도 004 가 새지 않게 하려는 것이다.
+    """
     found: dict[int, Path] = {}
     for path in sorted(migrations_dir.glob("*.sql")):
         matched = _FILENAME_RE.match(path.name)
         if matched is None:
             continue
         version = int(matched.group(1))
-        if version > max_version:
+        if version > max_version or version in BACKEND_OWNED_VERSIONS:
             continue
         if version in found:
             raise ValueError(f"마이그레이션 번호가 겹친다: {version}")

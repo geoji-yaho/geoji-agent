@@ -7,6 +7,7 @@ commit record 멱등을 본다. "먼저 실패시킬 케이스" — finalize 응
 
 from __future__ import annotations
 
+import json
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -26,7 +27,11 @@ from geoji_ai.adapters.backend_http import (
     bind_trace,
 )
 from geoji_ai.contracts.finalize import FinalizeRequest
-from geoji_ai.ports.backend import EvidenceCandidate, ResolveEvidenceRequest
+from geoji_ai.ports.backend import (
+    EvidenceCandidate,
+    JuryVoteRequest,
+    ResolveEvidenceRequest,
+)
 from tests.conftest import load_fixture
 from tests.fakes.backend_app import FAKE_SERVICE_TOKEN, create_fake_backend
 
@@ -35,6 +40,23 @@ BASE_URL = "http://backend.test"
 JOB_ID = "job-1"
 GENERATION_ID = "gen-1"
 VERDICT_ID = "7a1d9c40-3b52-4e18-9f0a-2c6d8b4e1f31"
+POST_ID = "post-taxi-20260907-0852"
+VOTE_ID = "11111111-2222-3333-4444-555555555555"
+
+
+def jury_vote_request(
+    *, verdict: str = "guilty", source: str = "AI", reason: str = "택시비 32,000원은 과했어"
+) -> JuryVoteRequest:
+    """18 §3.6 = 19 §5 요청 본문 7키."""
+    return JuryVoteRequest(
+        job_id=JOB_ID,
+        generation_id=GENERATION_ID,
+        room_id="room-ddegeoji-01",
+        voter_id="bot-ddegeoji",
+        verdict=verdict,
+        reason=reason,
+        source=source,  # type: ignore[arg-type]
+    )
 
 
 def finalize_request(
@@ -89,6 +111,8 @@ def _ok_body(path: str) -> dict[str, Any]:
         return {"fixed_sentencing": None, "text_version": 0, "deadline_at": "2026-09-07T09:30:00Z"}
     if path.endswith("/finalize"):
         return {"verdict_id": VERDICT_ID, "text_version": 1, "committed_at": "2026-09-07T09:21:00Z"}
+    if path.endswith("/jury-votes"):
+        return {"vote_id": VOTE_ID}
     return {"verdict_id": VERDICT_ID}
 
 
@@ -140,6 +164,7 @@ CALLS: dict[str, Call] = {
     "generation_failed": lambda b: b.generation_failed(
         VERDICT_ID, job_id=JOB_ID, generation_id=GENERATION_ID, error_code="AI_NOT_READY"
     ),
+    "cast_jury_vote": lambda b: b.cast_jury_vote(POST_ID, jury_vote_request()),
 }
 
 
@@ -271,6 +296,8 @@ EXPECTED_TIMEOUTS = {
     "begin_generation": 1.0,
     "finalize": 3.0,
     "generation_failed": 1.0,
+    # 18 §3.6 = 19 §5.
+    "cast_jury_vote": 2.0,
 }
 
 
@@ -358,4 +385,204 @@ async def test_finalize_같은_generation_다른_본문은_409_IDEMPOTENCY_CONFL
         await backend.finalize(VERDICT_ID, finalize_request(draft_hash="b" * 64))
 
     assert (caught.value.status, caught.value.code) == (409, "IDEMPOTENCY_CONFLICT")
+    await backend.aclose()
+
+
+# --- ⑧ cast_jury_vote(18 §3.6 = 19 §5) ---------------------------------------------
+
+
+async def test_cast_jury_vote_는_경로와_본문_7키와_헤더_5종을_보낸다():
+    backend, recorder = make_backend(_ok)
+
+    result = await backend.cast_jury_vote(POST_ID, jury_vote_request())
+
+    assert result.vote_id == VOTE_ID
+    assert len(recorder.requests) == 1
+    request = recorder.requests[0]
+    assert request.method == "POST"
+    assert request.url.path == f"/internal/v1/posts/{POST_ID}/jury-votes"
+    body = json.loads(request.content)
+    assert body == {
+        "job_id": JOB_ID,
+        "generation_id": GENERATION_ID,
+        "room_id": "room-ddegeoji-01",
+        "voter_id": "bot-ddegeoji",
+        "verdict": "guilty",
+        "reason": "택시비 32,000원은 과했어",
+        "source": "AI",
+    }
+    for header in ("authorization", "x-trace-id", "x-request-id", "x-job-id", "x-generation-id"):
+        assert request.headers[header]
+    assert request.headers["content-type"] == "application/json"
+    assert request.headers["x-job-id"] == JOB_ID
+    assert request.headers["x-generation-id"] == GENERATION_ID
+
+
+@pytest.mark.parametrize(
+    ("status", "code"),
+    [
+        (409, "VOTING_CLOSED"),
+        (409, "ALREADY_VOTED"),
+        (409, "STALE_GENERATION"),
+        (404, "NOT_FOUND"),
+        (403, "NOT_AI_JUROR"),
+        (401, "UNAUTHORIZED"),
+        (422, "INVALID_REQUEST"),
+    ],
+)
+async def test_cast_jury_vote_의_4xx_는_재전송하지_않는다(status: int, code: str):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(status, json={"code": code})
+
+    backend, recorder = make_backend(handler)
+    with pytest.raises(BackendRejected) as caught:
+        await backend.cast_jury_vote(POST_ID, jury_vote_request())
+
+    assert (caught.value.status, caught.value.code) == (status, code)
+    assert len(recorder.requests) == 1
+    assert recorder.sleeps == []
+
+
+async def test_cast_jury_vote_의_5xx_는_같은_바이트로_2회_재전송한다():
+    statuses = iter([500, 503])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        status = next(statuses, None)
+        return httpx.Response(status) if status is not None else _ok(request)
+
+    backend, recorder = make_backend(handler)
+    result = await backend.cast_jury_vote(POST_ID, jury_vote_request(source="TEMPLATE"))
+
+    assert result.vote_id == VOTE_ID
+    assert len(recorder.requests) == 3
+    assert len({request.content for request in recorder.requests}) == 1
+    assert recorder.sleeps == list(RETRY_BACKOFF_S) == [0.2, 0.6]
+    # X-Request-Id 는 시도마다 새로 만든다.
+    request_ids = [r.headers["x-request-id"] for r in recorder.requests]
+    assert len(set(request_ids)) == 3
+
+
+async def test_cast_jury_vote_가_다_실패하면_BackendUnavailable():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("slow")
+
+    backend, recorder = make_backend(handler)
+    with pytest.raises(BackendUnavailable) as caught:
+        await backend.cast_jury_vote(POST_ID, jury_vote_request())
+
+    assert caught.value.retry_after_s == 5
+    assert len(recorder.requests) == 3
+
+
+# --- ⑨ 가짜 백엔드 jury-votes 의 거부 순서(18 §3.6 = 19 §5) --------------------------
+
+AI_JUROR_USER_ID = "bot-ddegeoji"
+
+
+def _on_fake_backend(**kwargs: Any) -> tuple[Any, BackendHttp]:
+    app = create_fake_backend(**kwargs)
+    backend = BackendHttp(
+        "http://fake-backend",
+        FAKE_SERVICE_TOKEN,
+        client=httpx.AsyncClient(transport=httpx.ASGITransport(app=app)),
+        sleep=Recorder().sleep,
+    )
+    return app.state.fake, backend
+
+
+async def test_가짜_백엔드는_201_과_vote_id_를_돌려주고_표를_남긴다():
+    fake, backend = _on_fake_backend(ai_juror_user_id=AI_JUROR_USER_ID)
+    fake.seed_post(POST_ID, post_type="spent")
+
+    result = await backend.cast_jury_vote(
+        POST_ID, jury_vote_request(verdict="guilty", source="TEMPLATE")
+    )
+
+    assert result.vote_id
+    assert len(fake.jury_votes) == 1
+    assert fake.jury_votes[0]["voter_id"] == AI_JUROR_USER_ID
+    assert fake.jury_votes[0]["source"] == "TEMPLATE"
+    await backend.aclose()
+
+
+async def test_봇_id_를_주지_않은_가짜는_503_AI_JUROR_NOT_CONFIGURED_다():
+    """계획서에 봇 id 값이 없다(10 §14 회신 대기). 가짜가 값을 지어내지 않는다."""
+    fake, backend = _on_fake_backend()
+    fake.seed_post(POST_ID)
+
+    # 503 은 5xx 라 어댑터가 2회 재전송한 뒤 BackendUnavailable 이다.
+    with pytest.raises(BackendUnavailable):
+        await backend.cast_jury_vote(POST_ID, jury_vote_request())
+    assert fake.jury_votes == []
+    await backend.aclose()
+
+
+async def test_남의_id_로_투표하면_403_NOT_AI_JUROR_다():
+    fake, backend = _on_fake_backend(ai_juror_user_id="someone-else")
+    fake.seed_post(POST_ID)
+
+    with pytest.raises(BackendRejected) as caught:
+        await backend.cast_jury_vote(POST_ID, jury_vote_request())
+
+    assert (caught.value.status, caught.value.code) == (403, "NOT_AI_JUROR")
+    assert fake.jury_votes == []
+    await backend.aclose()
+
+
+async def test_글이_없으면_404_NOT_FOUND_다():
+    _, backend = _on_fake_backend(ai_juror_user_id=AI_JUROR_USER_ID)
+
+    with pytest.raises(BackendRejected) as caught:
+        await backend.cast_jury_vote(POST_ID, jury_vote_request())
+
+    assert (caught.value.status, caught.value.code) == (404, "NOT_FOUND")
+    await backend.aclose()
+
+
+async def test_마감된_글은_409_VOTING_CLOSED_다():
+    fake, backend = _on_fake_backend(ai_juror_user_id=AI_JUROR_USER_ID)
+    fake.seed_post(POST_ID, voting_closed=True)
+
+    with pytest.raises(BackendRejected) as caught:
+        await backend.cast_jury_vote(POST_ID, jury_vote_request())
+
+    assert (caught.value.status, caught.value.code) == (409, "VOTING_CLOSED")
+    assert fake.jury_votes == []
+    await backend.aclose()
+
+
+async def test_같은_봇이_두_번_던지면_409_ALREADY_VOTED_다():
+    fake, backend = _on_fake_backend(ai_juror_user_id=AI_JUROR_USER_ID)
+    fake.seed_post(POST_ID)
+    await backend.cast_jury_vote(POST_ID, jury_vote_request())
+
+    with pytest.raises(BackendRejected) as caught:
+        await backend.cast_jury_vote(POST_ID, jury_vote_request())
+
+    assert (caught.value.status, caught.value.code) == (409, "ALREADY_VOTED")
+    assert len(fake.jury_votes) == 1
+    await backend.aclose()
+
+
+@pytest.mark.parametrize(
+    ("post_type", "verdict", "reason"),
+    [
+        ("spent", "agree", "택시비가 과했어"),
+        ("considering", "guilty", "지금은 참아"),
+        ("spent", "guilty", "가" * 61),
+        ("spent", "guilty", "   "),
+    ],
+    ids=["유형밖평결", "유형밖평결2", "61자", "공백뿐"],
+)
+async def test_유형_밖_평결과_사유_길이는_422_INVALID_REQUEST_다(
+    post_type: str, verdict: str, reason: str
+):
+    fake, backend = _on_fake_backend(ai_juror_user_id=AI_JUROR_USER_ID)
+    fake.seed_post(POST_ID, post_type=post_type)
+
+    with pytest.raises(BackendRejected) as caught:
+        await backend.cast_jury_vote(POST_ID, jury_vote_request(verdict=verdict, reason=reason))
+
+    assert (caught.value.status, caught.value.code) == (422, "INVALID_REQUEST")
+    assert fake.jury_votes == []
     await backend.aclose()

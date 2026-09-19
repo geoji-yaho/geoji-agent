@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from geoji_ai.domain.intensity import Intensity
 
-JobKind = Literal["PREPARE", "SENTENCE", "TEXT_RETRY", "RETAIN"]
+JobKind = Literal["PREPARE", "SENTENCE", "TEXT_RETRY", "RETAIN", "JURY_VOTE"]
 JobStatus = Literal["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"]
 RetainEvent = Literal["sentence.finalized", "comment.approved"]
 
@@ -59,13 +59,28 @@ class RetainPayload(BaseModel):
     version: int
 
 
-JobPayload = PreparePayload | SentencePayload | TextRetryPayload | RetainPayload
+class JuryVotePayload(BaseModel):
+    """18 §3.1 = 10 §3 새 행. 네 키 모두 필수다.
+
+    `voter_id` 는 백엔드가 넣는 떼거지봇 사용자 id 다. 워커는 값을 만들지 않고 그대로 돌려보낸다.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    post_id: str
+    post_version: int
+    room_id: str
+    voter_id: str
+
+
+JobPayload = PreparePayload | SentencePayload | TextRetryPayload | RetainPayload | JuryVotePayload
 
 _PAYLOAD_BY_KIND: dict[str, type[BaseModel]] = {
     "PREPARE": PreparePayload,
     "SENTENCE": SentencePayload,
     "TEXT_RETRY": TextRetryPayload,
     "RETAIN": RetainPayload,
+    "JURY_VOTE": JuryVotePayload,
 }
 
 
