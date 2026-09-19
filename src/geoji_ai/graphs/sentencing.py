@@ -467,8 +467,15 @@ def build_writer_request(
     if avoid:
         # repair: 검수에서 걸린 위반·문제 문장. 데이터로만 준다.
         user["avoid"] = dict(avoid)
+    if str(jury.result) == "agree":
+        # 승인은 필요성·상황에 맞는 반응을 쓴다. 부정적 각도 지시는 보내지 않되
+        # code는 기존 출력 스키마와 write_one의 검증을 위해 유지한다.
+        user["attack_angle"] = {"code": angle.value}
+        system = load_prompt("writer/approved-v1.md")
+    else:
+        system = build_writer_system(intensity)
     messages = [
-        {"role": "system", "content": build_writer_system(intensity)},
+        {"role": "system", "content": system},
         {"role": "user", "content": _dumps(user)},
     ]
     return messages, writer_schema([intensity.value], [angle.value], candidate_ids or None)
