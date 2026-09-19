@@ -48,7 +48,7 @@ from geoji_ai.core.logging import get_logger
 from geoji_ai.domain import dossier_rules
 from geoji_ai.domain.input_hash import dossier_key
 from geoji_ai.domain.intensity import ALL_INTENSITIES, Intensity
-from geoji_ai.domain.lexicon import DEATH_WORDS, PROFANITY, LexiconRule, applies
+from geoji_ai.domain.lexicon import death_word_hits, profanity_hits
 from geoji_ai.domain.visibility import Scope, Visibility
 from geoji_ai.graphs.states import Candidate, PrepareState
 from geoji_ai.ports.backend import (
@@ -69,7 +69,7 @@ from geoji_ai.ports.preparation import (
     EvidenceInvalidated,
     PreparationPort,
 )
-from geoji_ai.prompts import load_prompt, prompt_bundle_version
+from geoji_ai.prompts import BANTER_PROMPT, build_banter_system, load_prompt, prompt_bundle_version
 
 __all__ = [
     "ALLOWED_FACT_KINDS",
@@ -92,7 +92,6 @@ __all__ = [
 log = get_logger(__name__)
 
 CONTEXT_PROMPT = "context-v1.md"
-BANTER_PROMPT = "banter-v2.md"
 
 #: recall 전체 상한. 05 §3.2 는 0.5초지만 운영에서 그 예산으로는 왕복이 안 끝난다.
 #: EB 는 서울(ap-northeast-2), Postgres 는 싱가포르(ap-southeast-1)라 왕복 하나가 68ms 다.
@@ -229,12 +228,11 @@ def filter_banter(
     1. 입력에 없는 라벨은 후보에서 지운다
     2. `REPEAT_OFFENSE`·`ROOM_RULE_CALLBACK` 인데 (1 뒤) `evidence_labels` 가 비면 후보 삭제
     3. `DEATH_WORDS` 가 들어 있으면 삭제(모든 강도)
-    4. `mild`·`spicy` 에 `PROFANITY` 가 들어 있으면 삭제
+    4. 강도별 허용 범위 밖 비속어가 들어 있으면 삭제
     5. (9/19) 비었거나 카드 본문 상한(`CARD_STATEMENT_MAX`)을 넘는 후보 삭제 — 서기가 카드에
        쓸 수 없는 후보는 넘겨도 고르지 않는다(15 §6 13회차: 60~90자 후보 5개 중 0개 채택)
     """
     allowed = frozenset(allowed_labels)
-    check_profanity = applies(intensity, LexiconRule.PROFANITY)
     kept: list[Candidate] = []
     for candidate in candidates:
         stripped = candidate.text.strip()
@@ -243,9 +241,9 @@ def filter_banter(
         labels = tuple(label for label in candidate.evidence_labels if label in allowed)
         if candidate.strategy in _LABEL_REQUIRED and not labels:
             continue
-        if any(word in candidate.text for word in DEATH_WORDS):
+        if death_word_hits(candidate.text):
             continue
-        if check_profanity and any(word in candidate.text for word in PROFANITY):
+        if profanity_hits(candidate.text, intensity):
             continue
         kept.append(replace(candidate, evidence_labels=labels))
     return kept
@@ -321,6 +319,11 @@ def _banter_messages(
 ) -> list[dict]:
     """드립 입력 = 허용 Evidence(라벨)·사건 타입·강도·승인 예시. 말투 예시는 플래그 꺼짐(D-04)."""
     user = {
+        "case": {
+            "item": snapshot.item,
+            "amount_krw": snapshot.amount_krw,
+            "reason": snapshot.reason,
+        },
         "post_type": snapshot.post_type,
         "category": snapshot.category,
         "intensity": intensity.value,
@@ -328,7 +331,7 @@ def _banter_messages(
         "approved_examples": list(examples),
     }
     return [
-        {"role": "system", "content": load_prompt(BANTER_PROMPT)},
+        {"role": "system", "content": build_banter_system(intensity)},
         {"role": "user", "content": _dumps(user)},
     ]
 

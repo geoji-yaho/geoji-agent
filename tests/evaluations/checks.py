@@ -13,7 +13,7 @@
 | `sentence_contradiction` | 유죄·지출 ⇔ 형량, 형량 ∈ `allowed_sentences`, 양형 계약 |
 | `expect` | 사건 데이터 `must_cite_any`·`must_not_contain`·`strategy_in` |
 | `headline_duplication` | 실행 전체 headline 중복률 ≤ 10% |
-| `attack_angles` | 실행 전체 `attack_angles.ANGLE_ORDER` 6/6 |
+| `attack_angles` | 허용된 기법 코드. 사건과 무관한 6종 순환은 강제하지 않음 |
 | `meme_emotion`(+1) | `meme_hints.emotion` ∈ 08 §3.4 어휘 |
 
 해석(보고서 "계획서에 반영할 것"):
@@ -456,9 +456,9 @@ def check_headline_duplication(headlines: Sequence[str]) -> list[CheckViolation]
 
 def check_attack_angles(angles: Iterable[str]) -> list[CheckViolation]:
     seen = {str(a) for a in angles}
-    missing = [a.value for a in ANGLE_ORDER if a.value not in seen]
-    if missing:
-        return [_v("attack_angles", None, None, f"각도 {6 - len(missing)}/6, 없음 {missing}")]
+    unknown = seen - {a.value for a in ANGLE_ORDER}
+    if unknown:
+        return [_v("attack_angles", None, None, f"알 수 없는 각도 {sorted(unknown)}")]
     return []
 
 

@@ -11,7 +11,7 @@
 - 문장은 모두 `kind="opinion"`, `evidence_labels=[]`(근거 인용 없음)
 - `banter_strategy` 는 계약상 필수인데 템플릿에 값이 없다.
   `TEMPLATE_BANTER_STRATEGY` 한 곳에 둔다(미결정)
-- `attack_angle` 은 서기와 같은 서버 지정값 `attack_angles.pick(post_id, offset)`
+- `attack_angle` 은 고정 문구의 메타데이터로 `pick(post_id, offset)` 사용. AI 서기는 직접 선택.
 """
 
 from __future__ import annotations

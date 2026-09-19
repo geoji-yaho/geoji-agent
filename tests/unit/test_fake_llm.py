@@ -113,7 +113,11 @@ async def test_default_writer_uses_card_fixture(intensity: str):
     result = await call(FakeLLM(), "writer", writer_schema([intensity], ["CONVERSION"]))
     assert result.output is not None
     metadata = {key: result.output[key] for key in ("meme_tag", "meme_hints")}
-    text = {key: value for key, value in result.output.items() if key not in metadata}
+    text = {
+        key: value
+        for key, value in result.output.items()
+        if key not in metadata and key != "case_reading"
+    }
     CardTextDraft.model_validate({**text, "source": "AI"})
     expected = load_fixture("writer-draft-card-taxi")
     assert metadata == {key: expected[key] for key in metadata}

@@ -310,7 +310,7 @@ def _with_sentence(intensity: str, sentence: str) -> dict[str, Any]:
 @pytest.mark.parametrize(
     ("intensity", "sentence", "code"),
     [
-        ("spicy", "미친 선택입니다.", PROFANITY_OUT_OF_LIST),
+        ("spicy", "씨발 같은 선택입니다.", PROFANITY_OUT_OF_LIST),
         ("mild", "지랄 같은 출근길이었겠어요.", PROFANITY_OUT_OF_LIST),
         ("mild", "통장이 죽어가고 있어요.", SELF_HARM_LEXICON),
         ("spicy", "지갑이 뒤져버렸습니다.", SELF_HARM_LEXICON),

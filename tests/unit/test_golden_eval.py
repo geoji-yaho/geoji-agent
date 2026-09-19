@@ -228,7 +228,7 @@ def test_check_death_words() -> None:
     ("index", "text", "fails"),
     [
         (0, "미친 선택이에요.", True),  # mild 욕
-        (1, "지랄 맞은 소비입니다.", True),  # spicy 욕
+        (1, "씨발 같은 소비입니다.", True),  # spicy 욕
         # 9/16 결정: hell 은 비속어를 검사하지 않는다. 아래 셋은 예전에 걸리던 문장이다
         # (목록 밖 / 판결당 1회 / 같은 욕 반복).
         (2, "씨발 이게 뭐냐.", False),
@@ -307,8 +307,9 @@ def test_check_headline_duplication() -> None:
 def test_check_attack_angles() -> None:
     all_angles = [a.value for a in ANGLE_ORDER]
     assert checks.check_attack_angles(all_angles) == []
-    missing = checks.check_attack_angles(all_angles[:5])
-    assert [v.check for v in missing] == ["attack_angles"]
+    assert checks.check_attack_angles(all_angles[:1]) == []
+    unknown = checks.check_attack_angles(["UNKNOWN"])
+    assert [v.check for v in unknown] == ["attack_angles"]
 
 
 def test_check_run_uses_all_drafts() -> None:
@@ -320,7 +321,7 @@ def test_check_run_uses_all_drafts() -> None:
             text["attack_angle"] = angle.value
         drafts.append(draft)
     assert checks.check_run(drafts) == []
-    assert names(checks.check_run(drafts[:1])) == {"attack_angles"}
+    assert checks.check_run(drafts[:1]) == []
 
 
 def test_check_names_are_ten_plus_one() -> None:

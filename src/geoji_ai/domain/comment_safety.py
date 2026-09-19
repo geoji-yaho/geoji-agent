@@ -16,11 +16,12 @@ from enum import StrEnum
 
 from geoji_ai.domain.intensity import Intensity, parse_intensity
 from geoji_ai.domain.lexicon import (
-    DEATH_WORDS,
     HELL_ALLOWED_PROFANITY,
     PROFANITY,
     LexiconRule,
     applies,
+    death_word_hits,
+    profanity_hits,
 )
 
 __all__ = [
@@ -96,7 +97,7 @@ def _has_profanity(content: str, intensity: Intensity) -> bool:
             content = content.replace(phrase, " ")
         return any(word in content for word in PROFANITY)
     if applies(intensity, LexiconRule.PROFANITY):
-        return any(word in content for word in PROFANITY)
+        return bool(profanity_hits(content, intensity))
     return False
 
 
@@ -111,7 +112,7 @@ def check(comment: Comment, *, defendant_id: str, room_intensity: Intensity | st
         reasons.append(Reason.LENGTH_OUT_OF_RANGE)
     if _has_contact(content):
         reasons.append(Reason.CONTACT_INFO)
-    if applies(intensity, LexiconRule.DEATH_WORDS) and any(w in content for w in DEATH_WORDS):
+    if applies(intensity, LexiconRule.DEATH_WORDS) and death_word_hits(content):
         reasons.append(Reason.DEATH_WORD)
     if _has_profanity(content, intensity):
         reasons.append(Reason.PROFANITY)

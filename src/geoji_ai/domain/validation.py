@@ -29,6 +29,7 @@ from geoji_ai.contracts.writer import (
     WriterDraft,
 )
 from geoji_ai.domain import lexicon
+from geoji_ai.domain.attack_angles import AttackAngle
 from geoji_ai.domain.intensity import Intensity, parse_intensity
 
 __all__ = [
@@ -545,12 +546,18 @@ def _lexicon_rules(
         issues.append(ValidationIssue(code, path, message))
 
     # 6
+    internal_codes = ["guilty", "notGuilty", "agree", "disagree", *[a.value for a in AttackAngle]]
+    if any(
+        re.search(r"(?<![A-Za-z_])" + re.escape(code) + r"(?![A-Za-z_])", blob)
+        for code in internal_codes
+    ):
+        add(SCHEMA_INVALID, "제목·본문에 내부 평결/기법 코드 노출")
     if lexicon.applies(intensity, rule.PROFANITY):
-        hits = [word for word in lexicon.PROFANITY if word in blob]
+        hits = lexicon.profanity_hits(blob, intensity)
         if hits:
             add(PROFANITY_OUT_OF_LIST, f"{intensity} 에 비속어 {hits}")
     if lexicon.applies(intensity, rule.DEATH_WORDS):
-        hits = [word for word in lexicon.DEATH_WORDS if word in blob]
+        hits = lexicon.death_word_hits(blob)
         if hits:
             add(SELF_HARM_LEXICON, f"자해·죽음 어휘 {hits}")
     if lexicon.applies(intensity, rule.HELL_ALLOWED_PROFANITY):

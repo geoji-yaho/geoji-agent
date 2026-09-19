@@ -26,12 +26,11 @@ from geoji_ai.contracts.jobs import Job
 from geoji_ai.contracts.sentencing import SentencingDecision
 from geoji_ai.contracts.writer import CARD_STATEMENT_MAX, BanterStrategy
 from geoji_ai.core.config import Settings
-from geoji_ai.domain.attack_angles import NEEDS_EVIDENCE, AttackAngle, pick
+from geoji_ai.domain.attack_angles import NEEDS_EVIDENCE, AttackAngle
 from geoji_ai.domain.draft_hash import draft_hash
 from geoji_ai.domain.intensity import Intensity
 from geoji_ai.domain.visibility import Scope
 from geoji_ai.graphs.sentencing import (
-    _trim_card_tail,
     build_sentence_graph,
     minimal_dossier,
     ungrounded_angles,
@@ -854,15 +853,15 @@ def evaluator_intensities(call: FakeCall) -> list[str]:
 
 
 def test_16_evaluator_failure_repairs_failed_intensity_only() -> None:
-    """검수 `hell` 실패 → repair(hell 만, 각도 +1, 피할 것) → hell 만 재검수 통과 → AI finalize."""
+    """검수 실패한 hell만 같은 기법 범위와 피할 문장을 받아 재작성·재검수한다."""
     llm = ScriptedLLM(
         sequences={"evaluator": [report(["spicy", "hell"], fail=["hell"]), report(["hell"])]}
     )
     result = run(llm)
     writers = result.calls_of("writer")
     assert [writer_intensity(c) for c in writers] == ["spicy", "hell", "hell"]
-    assert writer_angle(writers[0]) == pick(POST_ID, 0).value
-    assert writer_angle(writers[2]) == pick(POST_ID, 1).value
+    assert writer_angle(writers[0]) == "EXCUSE_DISSECTION"
+    assert writers[2].schema == writers[1].schema
     avoid = user_payload(writers[2])["avoid"]
     assert avoid == {"violations": ["PERSONAL_ATTACK"], "problem_sentences": ["문제 문장 마커"]}
     assert "avoid" not in user_payload(writers[1])
@@ -919,7 +918,7 @@ def test_18_no_repair_when_less_than_5s_remain() -> None:
 class RuleBreakingWriter(ScriptedLLM):
     """주어진 강도의 서기 호출 `break_calls` 번만 서버 검증 ⑤ 규칙 6 위반 문장을 넣는다.
 
-    mild·spicy 는 비속어 0개라 "지랄" 하나로 `PROFANITY_OUT_OF_LIST` 가 난다(9/16 기준 hell 은
+    mild·spicy 에 금지된 "씨발"로 `PROFANITY_OUT_OF_LIST` 가 난다(9/16 기준 hell 은
     비속어를 검사하지 않는다).
     """
 
@@ -941,7 +940,7 @@ class RuleBreakingWriter(ScriptedLLM):
             self.broken += 1
             output = dict(result.output)
             statement = [dict(item) for item in output["statement"]]
-            statement[-1] = {**statement[-1], "text": "지랄 같은 선택이다."}
+            statement[-1] = {**statement[-1], "text": "씨발 같은 선택이다."}
             output["statement"] = statement
             result = replace(result, output=output)
         return result
@@ -1121,7 +1120,7 @@ def test_20_finalize_422_repairs_once_then_succeeds() -> None:
     result = run(backend_kwargs={"finalize_errors": [Rejected(422, "INVALID_DRAFT")]})
     assert len(result.backend.finalized) == 2
     assert result.roles() == Counter({"sentencing": 1, "writer": 4, "evaluator": 2})
-    assert [writer_angle(c) for c in result.calls_of("writer")[2:]] == [pick(POST_ID, 1).value] * 2
+    assert [writer_angle(c) for c in result.calls_of("writer")[2:]] == ["EXCUSE_DISSECTION"] * 2
     assert result.state["repair_count"] == 1
     assert result.backend.failed == []
     first, second = result.backend.finalized
@@ -1233,7 +1232,7 @@ def card_output(*, offset: int = 0, **changes: Any) -> dict[str, Any]:
         ],
         "banter_strategy": "EXCUSE_STRIPPING",
         "selected_candidate_id": None,
-        "attack_angle": pick(make_snapshot().post_id, offset).value,
+        "attack_angle": "EXCUSE_DISSECTION",
         "meme_tag": "GUILTY_LIGHT",
         "meme_hints": {"emotion": "DISAPPROVAL", "keywords": ["택시", "지갑"]},
         **changes,
@@ -1349,54 +1348,15 @@ def body(text: str) -> dict[str, Any]:
     return {"statement": [{"text": text, "kind": "opinion", "evidence_labels": []}]}
 
 
-@pytest.mark.parametrize(
-    ("text", "expected"),
-    [
-        (TAIL, "편한 건 몸이고 고생은 지갑 몫이다."),
-        ("잔고가 먼저 퇴근했네!" + LONG_TAIL, "잔고가 먼저 퇴근했네!"),
-        ("지갑이 왜 우냐?" + LONG_TAIL, "지갑이 왜 우냐?"),
-    ],
-)
-def test_trim_card_tail_keeps_first_sentence(text: str, expected: str) -> None:
-    trimmed, original = _trim_card_tail(body(text))
-    assert trimmed["statement"][0]["text"] == expected
-    assert trimmed["statement"][0]["kind"] == "opinion"
-    assert original == len(text)
-
-
-@pytest.mark.parametrize(
-    "text",
-    [
-        "가" * 101,  # 문장 경계 없음
-        "가" * 101 + ". 뒤.",  # 첫 문장이 이미 상한 초과
-        # "3.5" 는 경계가 아니다
-        "커피값 3.5 배를 택시에 태웠고 그 돈이면 지하철 스무 번이다." + "가" * 80,
-        # 상한 안이면 손대지 않는다
-        "편한 건 몸이고 고생은 지갑 몫이다. 이제부턴 알람 열 개 맞추고 뛰어가라.",
-    ],
-)
-def test_trim_card_tail_leaves_other_text_alone(text: str) -> None:
-    trimmed, original = _trim_card_tail(body(text))
-    assert trimmed["statement"][0]["text"] == text
-    assert original is None
-
-
-def test_trim_card_tail_ignores_multiple_statements() -> None:
-    output = {"statement": [{"text": TAIL, "kind": "opinion", "evidence_labels": []}] * 2}
-    trimmed, original = _trim_card_tail(output)
-    assert trimmed == output
-    assert original is None
-
-
-def test_card_body_tail_sentence_is_dropped_without_repair() -> None:
-    """찌르는 문장 + 조언 문장이면 첫 문장만 저장한다. 서기 1회, 재작성 0회."""
-    llm = ScriptedLLM(outputs={"writer": card_output(**body(TAIL))})
+def test_card_body_tail_is_rewritten_with_the_full_previous_text() -> None:
+    llm = ScriptedLLM(sequences={"writer": [card_output(**body(TAIL)), card_output(offset=1)]})
     result = run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
-    assert result.roles() == Counter({"sentencing": 1, "writer": 1, "evaluator": 1})
-    assert result.state["repair_count"] == 0
-    req = result.finalize()
-    assert req.draft.texts[0].statement[0].text == "편한 건 몸이고 고생은 지갑 몫이다."
-    assert req.draft.texts[0].source == "AI"
+    assert result.roles() == Counter({"sentencing": 1, "writer": 2, "evaluator": 1})
+    assert result.state["repair_count"] == 1
+    assert user_payload(result.calls_of("writer")[1])["avoid"]["previous_text"] == TAIL
+    assert (
+        result.finalize().draft.texts[0].statement[0].text == card_output()["statement"][0]["text"]
+    )
     assert_finalize_hash_is_last_evaluated(result)
 
 
@@ -1473,7 +1433,10 @@ def test_minimal_dossier_has_no_grounded_history_or_rule() -> None:
 
 def test_fixture_dossier_grounds_rule_but_not_history() -> None:
     """dossier-taxi 는 RULE_HIT 는 있지만 SPEND·VERDICT 기록이 없다."""
-    assert ungrounded_angles(make_dossier()) == {AttackAngle.REPETITION}
+    assert ungrounded_angles(make_dossier()) == {
+        AttackAngle.REPETITION,
+        AttackAngle.FUTURE_PROPHECY,
+    }
 
 
 @pytest.mark.parametrize(

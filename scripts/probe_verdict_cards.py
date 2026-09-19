@@ -132,6 +132,54 @@ EXAMPLE_CASES: tuple[ExampleCase, ...] = (
         sentence=None,
         sentencing_reason=None,
     ),
+    ExampleCase(
+        key="taxi-after-last-transit",
+        item="택시",
+        reason="야근이 끝났을 때 버스와 지하철이 모두 끊겨서 귀가하려고 탔어요",
+        amount_krw=12000,
+        category="교통/택시",
+        post_type="spent",
+        result="guilty",
+        vote_counts={"guilty": 3, "notGuilty": 1},
+        sentence="oneDay",
+        sentencing_reason="평결은 유죄지만 대중교통 종료로 귀가에 필요했던 사정을 인정합니다.",
+    ),
+    ExampleCase(
+        key="charger-replacement",
+        item="노트북 충전기",
+        reason="기존 충전기가 고장 났고 업무에 필요해요. 수리는 6만 원이라 새것이 더 저렴해요",
+        amount_krw=49000,
+        category="기타",
+        post_type="considering",
+        result="agree",
+        vote_counts={"agree": 3, "disagree": 1},
+        sentence=None,
+        sentencing_reason=None,
+    ),
+    ExampleCase(
+        key="charger-color",
+        item="노트북 충전기",
+        reason="잘 쓰는 충전기가 두 개 있지만 새로 나온 색이 예뻐서 하나 더 사고 싶어요",
+        amount_krw=49000,
+        category="기타",
+        post_type="considering",
+        result="disagree",
+        vote_counts={"agree": 1, "disagree": 3},
+        sentence=None,
+        sentencing_reason=None,
+    ),
+    ExampleCase(
+        key="empty-reason",
+        item="멀티탭",
+        reason="",
+        amount_krw=18000,
+        category="기타",
+        post_type="spent",
+        result="guilty",
+        vote_counts={"guilty": 3, "notGuilty": 1},
+        sentence="probation",
+        sentencing_reason="등록된 지출과 배심원 평결만으로 판단하며 구매 동기는 추측하지 않습니다.",
+    ),
 )
 
 
@@ -212,6 +260,7 @@ def _case_summary(index: int) -> dict[str, Any]:
         "index": index,
         "key": case.key,
         "item": case.item,
+        "reason": case.reason,
         "amount_krw": case.amount_krw,
         "result": case.result,
         "sentence": case.sentence,
@@ -222,7 +271,7 @@ def validate_output(output: dict[str, Any] | None, schema: dict[str, Any]) -> bo
     """전체 메타데이터·서버 지정 enum과 카드의 공백/길이를 함께 검증한다."""
     if output is None or not Draft202012Validator(schema).is_valid(output):
         return False
-    card = {k: v for k, v in output.items() if k not in ("meme_hints", "meme_tag")}
+    card = {k: v for k, v in output.items() if k not in ("case_reading", "meme_hints", "meme_tag")}
     try:
         CardTextDraft.model_validate({**card, "source": "AI"})
         if output["meme_hints"] is not None:
