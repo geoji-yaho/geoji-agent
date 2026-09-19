@@ -41,6 +41,7 @@
 
 | 날짜 | 무엇이 바뀌었나 → 백엔드가 할 일 | 절 | 상태 |
 |---|---|---|---|
+| 9/20 | **데모 AI 배심원 떼거지봇(18).** 방에 '데모용 AI 유저 추가' 를 누르면 고정 AI 사용자가 멤버가 되고 템플릿 글 2개가 올라가며, 이후 그 방의 사람 글마다 워커가 LLM 으로 표·사유를 만들어 봇 명의로 투표한다. 백엔드가 할 일 6개: ① Supabase auth 사용자 1개(닉네임 **떼거지봇**, `profiles` 행은 `monthly_budget` 기본값)를 만들고 id 를 **`GEOJI_AI_JUROR_USER_ID`** 로 서버 환경에 ② `JobKind.JURY_VOTE(60, 2, null)`, `PostCreator.create` 에서 공유 방 중 **봇이 멤버이고 작성자가 봇이 아닌 방마다** `ai.jobs` INSERT(§3 표 새 행, PREPARE 와 같은 트랜잭션) ③ `GET /internal/v1/ai-jobs/{job_id}/snapshot` 이 `JURY_VOTE` 도 받게(PREPARE 와 같은 모양, `jury=null`, `room_snapshots` 공유 방 전부) ④ 새 내부 API `POST /internal/v1/posts/{postId}/jury-votes`(§4.8) → `PostVoteService.cast(postId, 봇, …)` ⑤ 새 공개 API `POST /api/rooms/{roomId}/ai-member`(§9) — 봇 멤버 추가 + 봇 명의 템플릿 글 2개(`SubmissionService.submit`, 시드 러너처럼 `NEEDS_INPUT` 이면 `PROCEED`), 멱등 ⑥ 테스트 DDL 복사본 `001_ai_jobs.sql` 의 `kind` CHECK 에 `'JURY_VOTE'`. **운영 DB 의 CHECK 는 AI 마이그레이션 006 이 바꾼다**(§16.3, AI 가 적용) — ②를 배포하기 전에 006 이 적용돼 있어야 INSERT 가 통과한다. 템플릿 글 내용은 시드 재사용: `spent · 32000 · 교통/택시 · 심야 택시 · "막차가 끊겨서 어쩔 수 없었어요"`, `considering · 189000 · 쇼핑/패션 · 무선 이어폰 · "기존 이어폰 한쪽이 안 들려요"`. 프론트 버튼은 18 §2 | §3·§4.1·§4.8·§9·§16.3 | 미전달 |
 | 9/19 | **운영 판결이 전부 기본 문구로 가는 원인은 백엔드 finalize 409 `EVIDENCE_INVALIDATED` 다(운영 로그 12:18·12:29 UTC, `ai-20260919-2` 배포 뒤. 서기·검수는 `spicy=AI`·`hell=AI` 통과).** 코드 대조: `CaseSnapshotAssembler.build` 가 판결이 걸린 job(SENTENCE·TEXT_RETRY)에는 `findSnapshotRooms(post, verdict.roomId)` 로 **그 방 하나만** 넣어 `privacy_versions` 의 `room:` 키도 하나뿐인데, `FinalizeService` 3단계 `privacyVersionsCurrent` 는 `findRoomIds(postId)` = **공유된 방 전부**의 키가 요청에 있어야 통과시킨다(`given.keySet().containsAll(requiredKeys)`). 게시물이 방 2개 이상에 올라가면 첫 finalize 부터 항상 409 → `generation_failed` → TEMPLATE. 같은 이유로 PREPARE 스냅샷(방 전부)과 SENTENCE 스냅샷(방 하나)의 `privacy_versions` 가 달라 AI 가 준비된 조서를 못 쓰고 즉석(INLINE) 조서로 20~27초를 쓴다. **수정은 server PR #39 로 `main` 머지(`524f543`, 9/19):** `CaseSnapshotAssembler` 의 `privacy_versions` scope 키만 `findSharedRooms(post)` 전부로. `room_snapshots`·`audience.room_ids` 는 그대로 판결 방 하나라 방마다 다른 판결이 나오는 설계는 유지. 테스트 CaseSnapshotAssemblerTest 22·FinalizeServiceTest 37·AiJobControllerTest 28 통과. **백엔드가 할 일: 서버를 `524f543` 이후로 재배포.** AI 이미지는 그대로(`ai-20260919-2`). 배포 뒤 확인: 방 2개 이상 지출의 판결 카드 머리글 "AI 판사 선고", 워커 로그 `sentence_summary` 의 `source` 가 `PREP\|…` 로 시작 | §4.1·§5 | 미전달 |
 | 9/19 | **새 AI 이미지 `geoji-ai:ai-20260919-2`(agent `c0456d5`, linux/amd64) 배포. `ai-20260919-1` 을 대체한다(1 을 아직 안 올렸으면 2 만).** 1 대비: 카드 본문 상한 30→100자·서기 v5.8(PR #51·#53·#55, 백엔드 변경 없음, 프론트 렌더만 확인), 심문관이 전부 폴백으로 빠지던 버그(PR #50), 드립 후보를 카드 길이로(PR #52·#54), 검수관이 "통장 장례식"·"카드 부검" 을 자해 표현으로 반려하던 충돌 해소(PR #52, 정책 문자열 `guardrail-v2` 유지). 전달은 `docker save` 압축 파일(sha256 `e03c3364…`, 173 MB) 또는 백엔드가 agent `main` 을 직접 빌드. 절차는 아래 1 행과 같고 태그만 `-2`, 확인값은 `prompt_bundle_version=bundle-afa59044c8df` | §16.3·§16.1 | 미전달 |
 | 9/19 | **카드 본문 상한 30→100자(세 강도 공통, 제목 20자 유지) → 백엔드 코드 변경 없음, AI 이미지만 다시 받아 배포.** 파서는 본문을 1~300 으로 받으므로(server `65bffc2` 대조) 그대로 통과한다. 아래 `ai-20260919-1` 은 이 변경 전 빌드라 **다시 빌드한 태그로 대체**한다. 새 이미지의 `prompt_bundle_version` 은 ~~`bundle-5349a5f3a47c`~~ → 드립 v2·검수관 개정(PR #52·#54)까지 넣어 빌드한 실제 값은 `bundle-afa59044c8df`(맨 위 행). 카드 화면은 본문이 두세 줄이 될 수 있으니 프론트 렌더만 확인 | §5·§16.3 | 미전달 |
@@ -154,6 +155,7 @@ Frontend ──▶ Main Backend ── 내부 HTTP ──▶ AI API (FastAPI)  :
 | 판결 최초 저장(finalize 또는 watchdog) | `RETAIN` / `sentence.finalized` | `retain:verdict:{verdict_id}:{version}` | 10 | 5 | null | `{event:"sentence.finalized", verdict_id, comment_id:null, version}` — `version` = `verdict_version` (9/14 코드 대조) | `verdict_id` / `version` |
 | 템플릿 저장·재시도 필요 | `TEXT_RETRY` / `verdict.text_retry` | `text-retry:{verdict_id}:{verdict_version}:{round}` | 50 | 1 | **INSERT 시각 + 60s** (9/16, `TEXT_RETRY_TIMEOUT_SECONDS` 60 과 같게. 백엔드 `JobKind.TEXT_RETRY` 는 아직 20 → §0.1) | `{verdict_id, verdict_version, round, intensities?}` — `intensities` 는 선택 (9/14 코드 대조) | `verdict_id` / `verdict_version` |
 | 승인된 댓글(안전 검토 통과) | `RETAIN` / `comment.approved` | `retain:comment:{comment_id}:{version}` | 10 | 5 | null | `{event:"comment.approved", verdict_id:null, comment_id, version}` (9/14 코드 대조) | `comment_id` / `version` |
+| **(9/20, 18)** 게시물 저장 — 공유 방 중 **떼거지봇(`GEOJI_AI_JUROR_USER_ID`)이 멤버이고 작성자가 봇이 아닌 방마다 1개**, PREPARE 와 같은 트랜잭션 | `JURY_VOTE` / `jury.vote_requested` | `jury-vote:{post_id}:{room_id}:{voter_id}` | 60 | 2 | null | `{post_id, post_version, room_id, voter_id}` — `voter_id` 는 봇 id | `post_id` / `post_version` |
 
 - (원문) RETAIN payload `{event:"sentence.finalized", verdict_id, verdict_version}` · `{event:"comment.approved", comment_id, comment_version}`, dedupe `retain:verdict:{verdict_id}:{verdict_version}` · `retain:comment:{comment_id}:{comment_version}`, TEXT_RETRY payload `{verdict_id, verdict_version, round, intensities[]}`
 - **payload 는 kind 별 모양 그대로, 알 수 없는 필드는 워커가 거부한다**(9/14 코드 대조, AI 저장소 `src/geoji_ai/contracts/jobs.py`). RETAIN 은 `event`·`verdict_id`·`comment_id`·`version` **네 키가 모두 있어야 하고** 쓰지 않는 id 는 `null`. TEXT_RETRY `intensities` 는 빠지면 `target_intensities` 전체를 다시 쓰고, 빈 배열은 거부, `target_intensities` 밖 강도가 있으면 워커가 모델 호출 없이 `generation-failed(SCHEMA_INVALID)`. 일부 강도만 TEMPLATE 이면 그 강도만 넣어 달라(§5 10단계 `(제안)`, §14)
@@ -182,6 +184,7 @@ ON CONFLICT (dedupe_key) DO NOTHING;   -- 같은 업무 트랜잭션 안. commit
 | `POST /internal/v1/verdicts/{id}/begin-generation` | 백엔드 | §4.3 |
 | `POST /internal/v1/verdicts/{id}/finalize` | 백엔드 | §5 |
 | `POST /internal/v1/verdicts/{id}/generation-failed` | 백엔드 | §4.6 |
+| `POST /internal/v1/posts/{post_id}/jury-votes` **(9/20, 18)** | 백엔드 | §4.8 |
 
 intake 동작 (9/14 코드 대조, 07 §3.1·§3.2·§3.4):
 
@@ -206,6 +209,7 @@ intake 동작 (9/14 코드 대조, 07 §3.1·§3.2·§3.4):
   - 확장 필드가 **없으면 워커는 행 0 으로 complete — 기억이 쌓이지 않는다.** 댓글 기억은 댓글 방이 `room_snapshots` 에 있어야 저장된다
   - `comment.content` 가 1000자를 넘으면 스냅샷 전체가 거부된다
   - 삭제된 원본이면 **404** — 워커는 skip(complete). 409 등 다른 거부는 skip 이 아니라 오류로 재시도한다
+- **(9/20, 18) `JURY_VOTE` job 도 같은 응답이다.** PREPARE 와 같은 모양 — `jury=null`, `room_snapshots`·`audience.room_ids`·`privacy_versions` 는 공유 방 전부. 워커가 `payload.room_id` 로 방을 고른다. 그 방이 `room_snapshots` 에 없으면(공유 철회) 워커는 모델을 부르지 않고 complete
 
 ### 4.2 resolve-evidence
 - 요청 `{candidates[{source_type, source_id, source_version, score}], include: ["rules","aggregates","recent_verdicts","style_comments"]}` (후보 ≤ 20)
@@ -253,6 +257,16 @@ intake 동작 (9/14 코드 대조, 07 §3.1·§3.2·§3.4):
 - 워커는 백엔드 4xx 본문의 `code` 를 읽고, 없으면 `HTTP_<status>` 로 본다. 파서는 옛 모양 호환으로 `error_code`·`detail.code` 도 여전히 읽지만 계약 모양은 `{"code"}` 하나다. AI 저장소 가짜 백엔드도 `{"code"}` 를 쓴다. 이 문서에 이름이 없던 코드 — 401 `UNAUTHORIZED` · 404 `NOT_FOUND` · 422 `INVALID_REQUEST`(begin·failed·resolve 본문 검증) — 는 가짜 백엔드가 정한 것이라 확정 회신 대기(§14)
 - AI API 가 내는 거부(9/14 코드 대조): 401 `UNAUTHORIZED`(`WWW-Authenticate: Bearer` 헤더 유지), intake 422 `ITEM_LENGTH`·`REASON_LENGTH`·`AMOUNT`, 본문 스키마 위반 422 `INVALID_REQUEST`(검증 오류 원문·입력값 없음), trace 404 `TRACE_NOT_FOUND`, trace 인데 `DATABASE_URL` 없음 503 `DB_UNAVAILABLE`. `/health/ready` 503 은 거부가 아니라 상태 보고라 본문이 다르다(§16.2). 없는 경로 404 는 FastAPI 기본 `{"detail": "Not Found"}`
 - (원문, 9/14 폐기) AI API 가 내는 거부는 FastAPI 모양 `{"detail": {"code": "…"}}` 이다
+
+### 4.8 jury-votes — 떼거지봇 표 (9/20, 18 §3.6)
+
+워커가 `JURY_VOTE` job 하나당 한 번 부른다. 백엔드는 이 요청으로 **`PostVoteService.cast(postId, voter_id, PostVoteRequest(verdict, reason, room_id))`** 를 실행한다 — 사람 표와 같은 검증·정족수·평결 확정·D-24 게이트를 탄다.
+
+- 요청 `POST /internal/v1/posts/{post_id}/jury-votes` 본문 `{job_id, generation_id, room_id, voter_id, verdict, reason, source: "AI"|"TEMPLATE"}`. 헤더는 §4.7 5종. `reason` 은 1~60자(워커가 보장, DB CHECK 는 500)
+- 검증 순서: job 존재 ∧ `RUNNING` ∧ `X-Generation-Id`(=본문 `generation_id`) 일치 ∧ lease 유효(§4.1 과 같음) → 아니면 409 `STALE_GENERATION` / `voter_id` 가 `GEOJI_AI_JUROR_USER_ID` 와 다르면 403 `NOT_AI_JUROR`(워커가 남의 표를 넣지 못하게) / 글 없음·삭제 404 `NOT_FOUND` / 마감·평결 확정·공유 철회·봇이 그 방 멤버 아님 409 `VOTING_CLOSED` / 이미 투표 409 `ALREADY_VOTED` / `verdict` 유형 불일치·`reason` 빈 값·500자 초과 422 `INVALID_REQUEST`
+- 응답 **201** `{"vote_id": "<uuid>"}`. 같은 job 의 재전송(응답 유실)은 `ALREADY_VOTED` 409 로 받고 워커는 이를 성공으로 본다 — 별도 commit record 는 없다
+- 워커 처리: 201·`VOTING_CLOSED`·`ALREADY_VOTED`·`STALE_GENERATION` → complete, 404 → cancel, `NOT_AI_JUROR` → fail(재시도 없음), 401 → `BACKEND_AUTH`. read timeout 2초, 4xx 재전송 없음
+- `source` 는 로그·집계용이다. `votes` 에 저장 컬럼이 없으면 버려도 된다. 표는 `source` 와 무관하게 들어간다(사용자 결정 7 — 모델이 죽어도 표는 들어간다)
 
 ## 5. finalize (proposal2 §10)
 
@@ -375,6 +389,7 @@ WHERE status = 'RUNNING' AND lease_until < now();
 | `POST /api/post-submissions/{id}/complete` | `{action: REVISE|PROCEED, 최종 값, revision}`. `REVISE` 는 `/internal/v1/intake(mode=FINAL_CHECK)` 1회. **`BLOCKED` 를 `PROCEED` 로 우회 불가(409).** 중복 완료는 기존 post 반환 | 409 만료·버전 충돌·차단 |
 | `GET /api/posts/{id}/verdict?room_id=` | `verdict-view-v1`: `schemaVersion, postId, juryStatus|null, sentenceStatus, textStatus, textVersion, view|null, pollAfterMs`. 방 강도 행, 없으면 `applied_intensity`. 투표 중 juryStatus/view null. view의 sentence/sentenceLabel/sentencingReason/meme도 null 허용 | 404 없음/권한 없음/삭제 |
 | `GET /api/posts/{id}/share-card` | `{postId,postType,juryStatus,intensity,headline,statement,sentence,sentenceLabel,meme}`. 공개 허용 문구·이미지 metadata만. **Evidence 원문·개인 이력 반환 금지.** sentence/sentenceLabel/meme null 허용 | 404 없음/권한 없음/삭제/미확정 |
+| **(9/20, 18)** `POST /api/rooms/{roomId}/ai-member` | 요청자(JWT)가 그 방 멤버여야 한다. 본문 없음. ① `room_members(roomId, 봇)` 없으면 추가 ② 봇 명의 템플릿 글 2개(§0.1 9/20 행의 spent·considering, `roomIds=[roomId]`)가 그 방에 없으면 `SubmissionService.submit` → `NEEDS_INPUT` 이면 `PROCEED`(시드 러너와 같음). 봇 글은 사람 글과 같은 PREPARE 를 탄다. 응답 `201 {userId, nickname: "떼거지봇", postIds: [2개]}`, 이미 있으면 `200` 같은 모양(멱등). 봇 글에는 봇 표 job 을 만들지 않는다(작성자 제외) | 404 `{"message"}` 멤버 아님·방 없음, 503 `{"code":"AI_JUROR_NOT_CONFIGURED"}` 봇 id 미설정, 401 |
 
 9/16 정정: 공개 DTO는 camelCase, 내부 API는 snake_case다. `verdict-view-v1`을 실제 백엔드 DTO와 맞춰 재생성했다. 이전 snake_case 정본 소비자에게는 호환되지 않는 정정이지만 실제 응답의 `schemaVersion=1`을 유지한다. 생성기·Pydantic·공개 fixture·프론트 타입을 함께 갱신한다.
 
@@ -427,6 +442,8 @@ WHERE status = 'RUNNING' AND lease_until < now();
 
 | ID | 항목 | 기한 |
 |---|---|---|
+| 떼거지봇 계정 (18) | Supabase auth 사용자 **떼거지봇** 의 id(`GEOJI_AI_JUROR_USER_ID`). AI 쪽 코드에는 id 가 필요 없고(payload `voter_id` 를 그대로 돌려보낸다) 운영 확인 때만 쓴다. 계정을 누가 만들지(백엔드 관리자 콘솔) 확정 | 9/20 |
+| §4.8 `source` (18) | `votes` 에 `source`(AI/TEMPLATE) 를 저장할지. 저장하면 프론트가 "AI 표" 라벨을 붙일 수 있다. 안 저장해도 동작에는 영향 없음 | 9/20 |
 | 투표 사유 `(제안)` | §4.1 `jury` 에 `votes[{verdict, reason}]` 를 실을 수 있는가(`votes.reason` 은 이미 저장, 17 §표). 실리면 AI 는 서기 입력에 넣고(사유 속 지시는 데이터로만) 검수관 근거 대조에 더한다. 안 실리면 첫 지출 판결은 이번 지출 정보(F0)와 표 수만으로 쓴다 | 마감 전 확정 못 하면 제출 후 |
 | 배포 키 전달 `(제안)` | PR #41에서 `.env` 없는 환경변수 주입을 지원할지, 배포 시 비밀값 파일을 생성할지 합의. API/worker별 DB role, 실행 이미지 태그·CPU 아키텍처, 내부 접속 주소 확정. A3 URL 수정은 §16.6 | 운영 연동 전 |
 | 관리자 b-meme 등록 `(제안)` | §16.5의 파일 업로드·검수·활성화를 백엔드에서 소유하고 LLM 키/AI readiness와 독립시킬 것. 참고 패치의 운영 DDL/스토리지 적용은 담당자 검토 필요 | 담당자와 조율 |
@@ -538,6 +555,7 @@ Spring/Elastic Beanstalk에 등록한 값은 별도 EC2의 AI 컨테이너로 �
 
 - 시간 예산 키 `INTAKE_TIMEOUT_SECONDS`(기본 4)·`SENTENCING_NODE_TIMEOUT_SECONDS`(12)·`WRITER_NODE_TIMEOUT_SECONDS`(10)·`EVALUATOR_NODE_TIMEOUT_SECONDS`(30)·`TEXT_RETRY_TIMEOUT_SECONDS`(60)는 소수를 받는다(9/14). **운영에서는 적지 않는다** — 9/16 기본값을 실측으로 올렸으니 `.env` 에 옛 값(3·6·4·20)이 남아 있으면 지운다. 기본값보다 낮추면 검수관이 TIMEOUT 나 매 판결이 템플릿이 된다
 - 서기·드립 모델(`MODEL_WRITER`)에 추론 모델(`grok-4.6`·`4.5`·`4.3`)을 넣으면 환경과 무관하게 기동 실패
+- **(9/20, 18)** 워커 슬롯 기본값에 `"JURY": 1` 이 늘었다(`WORKER_SLOTS` 기본 `{"SENTENCE":2,"PREPARE":1,"BACKGROUND":1,"JURY":1}`). **`.env` 에 `WORKER_SLOTS` 를 직접 적어 두었다면 `JURY` 를 더해야** 떼거지봇이 투표한다. 안 적었으면 할 일 없음. `JUROR_TIMEOUT_SECONDS`(10)·`JUROR_MAX_OUTPUT_TOKENS`(120)는 기본값으로 둔다
 
 ### 16.2 AI API 엔드포인트
 
@@ -555,7 +573,7 @@ Spring/Elastic Beanstalk에 등록한 값은 별도 EC2의 AI 컨테이너로 �
 
 | 파일·명령 | 어디에 | 왜 |
 |---|---|---|
-| `database/migrations/001_ai_jobs.sql`·`002_preparation_evidence.sql`·`003_memory_call_ledger.sql` | 적용만(복사 불필요) | `DATABASE_URL=<Session Pooler URL> uv run geoji-ai migrate` 로 AI 파트가 적용한다. 번호 순·`ai.schema_migrations` 기록·재적용 no-op·advisory lock 으로 동시 실행 안전. **001~003 만** 적용하고 004 는 백엔드 소유(§2). **파일에 `CREATE ROLE` 이 없다** — `ai_worker`·`ai_api`·`backend` role 을 먼저 만들어야 `GRANT` 가 통과한다. 권한 표는 §1 |
+| `database/migrations/001_ai_jobs.sql`·`002_preparation_evidence.sql`·`003_memory_call_ledger.sql`·**`006_jury_vote_kind.sql`(9/20)** | 적용만(복사 불필요) | `DATABASE_URL=<Session Pooler URL> uv run geoji-ai migrate` 로 AI 파트가 적용한다. 번호 순·`ai.schema_migrations` 기록·재적용 no-op·advisory lock 으로 동시 실행 안전. **001~003·006** 을 적용하고 004 는 백엔드 소유(§2, 러너가 번호 4 를 건너뛴다), 005 는 P1. **(9/20)** 006 은 `ai.jobs.kind` CHECK 에 `'JURY_VOTE'` 를 더한다 — 백엔드가 `JURY_VOTE` 를 INSERT 하기 **전에** AI 가 운영 DB 에 적용한다. 백엔드 테스트 DDL 복사본은 백엔드가 직접 고친다(§0.1 9/20 ⑥). **파일에 `CREATE ROLE` 이 없다** — `ai_worker`·`ai_api`·`backend` role 을 먼저 만들어야 `GRANT` 가 통과한다. 권한 표는 §1 |
 | `database/sql/invalidate_scope.sql` | 백엔드 무효화 스케줄러 | 삭제·공유 철회 뒤 파생 데이터 무효화(§8, 04 §3.5). 한 트랜잭션, 바인드 `:t`·`:id`·`:scope_key`. 9/16 POST의 `payload.post_id` 삭제 조건이 추가됐으므로 구형 복사본도 함께 갱신 |
 | `src/geoji_ai/adapters/postgres_jobs.py` 의 `REAPER_SQL` | 백엔드 스케줄러, 5초 주기 | lease 만료 회수(§7 원문). 운영에서 워커 `--reaper` 는 끈다 |
 | `contracts/fixtures/templates-v1.json` | 백엔드 저장소, 버전 고정 | watchdog·generation-failed 폴백 문구(§10). 토큰 `{n}`·`{m}`·`{sentence_label}` |
