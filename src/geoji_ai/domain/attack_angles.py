@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from enum import StrEnum
 from zlib import crc32
@@ -13,6 +14,9 @@ from zlib import crc32
 __all__ = [
     "ANGLE_GUIDES",
     "ANGLE_ORDER",
+    "HISTORY_ANGLES",
+    "NEEDS_EVIDENCE",
+    "RULE_ANGLES",
     "AngleGuide",
     "AttackAngle",
     "pick",
@@ -89,11 +93,24 @@ ANGLE_GUIDES: dict[AttackAngle, AngleGuide] = {
 }
 
 
-def pick(post_id: str, offset: int = 0) -> AttackAngle:
+#: 조서에 근거가 있어야 성립하는 각도(9/18). 반복은 과거 지출·판결 기록이나 반복 집계,
+#: 규칙 의인화는 방 규칙이 조서에 있어야 한다. 없는데 시키면 서기가 지어내고("42번째 키보드",
+#: "규칙이 절교 선언") 검수관이 `UNGROUNDED_CLAIM` 으로 반려한다. 첫 지출일수록 그렇다.
+HISTORY_ANGLES: frozenset[AttackAngle] = frozenset({AttackAngle.REPETITION})
+RULE_ANGLES: frozenset[AttackAngle] = frozenset({AttackAngle.RULE_PERSONIFICATION})
+NEEDS_EVIDENCE: frozenset[AttackAngle] = HISTORY_ANGLES | RULE_ANGLES
+
+
+def pick(post_id: str, offset: int = 0, *, skip: Collection[AttackAngle] = ()) -> AttackAngle:
     """같은 `post_id` 는 같은 각도, `offset` 을 올리면 다음 각도(6종 순환).
 
     01 §3.5 원문은 `crc32(post_id) % 6 + offset` 이지만 `offset ≥ 1` 에서 범위를
     넘는다(D-2). §4.2 가 요구하는 6종 순환이 되도록 바깥에서 한 번 더 `% 6` 한다.
+
+    `skip`(9/18) 은 조서에 근거가 없어 쓸 수 없는 각도다. 해시로 정한 자리부터 순서대로
+    돌되 그 각도는 건너뛴다. 같은 `post_id`·같은 조서면 같은 결과다. 전부 건너뛰면 무시한다.
     """
     index = crc32(post_id.encode("utf-8")) % len(ANGLE_ORDER)
-    return ANGLE_ORDER[(index + offset) % len(ANGLE_ORDER)]
+    rotated = [ANGLE_ORDER[(index + i) % len(ANGLE_ORDER)] for i in range(len(ANGLE_ORDER))]
+    candidates = [angle for angle in rotated if angle not in skip] or rotated
+    return candidates[offset % len(candidates)]

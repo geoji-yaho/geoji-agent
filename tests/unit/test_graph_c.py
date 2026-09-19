@@ -26,11 +26,16 @@ from geoji_ai.contracts.jobs import Job
 from geoji_ai.contracts.sentencing import SentencingDecision
 from geoji_ai.contracts.writer import BanterStrategy
 from geoji_ai.core.config import Settings
-from geoji_ai.domain.attack_angles import pick
+from geoji_ai.domain.attack_angles import NEEDS_EVIDENCE, AttackAngle, pick
 from geoji_ai.domain.draft_hash import draft_hash
 from geoji_ai.domain.intensity import Intensity
 from geoji_ai.domain.visibility import Scope
-from geoji_ai.graphs.sentencing import _trim_card_tail, build_sentence_graph
+from geoji_ai.graphs.sentencing import (
+    _trim_card_tail,
+    build_sentence_graph,
+    minimal_dossier,
+    ungrounded_angles,
+)
 from geoji_ai.graphs.states import Candidate
 from geoji_ai.ports.backend import BeginGenerationResult, FinalizeResult
 from geoji_ai.ports.llm import LLMError
@@ -1433,3 +1438,63 @@ def test_card_previous_text_is_not_logged(caplog: pytest.LogCaptureFixture) -> N
     with caplog.at_level(logging.DEBUG):
         run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
     assert long_text not in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# 9/18 공격 각도는 조서 근거를 본다 — 이력·규칙이 없으면 반복·규칙 의인화를 건너뛴다
+# ---------------------------------------------------------------------------
+
+
+def aggregate_dossier(repeat_text: str) -> Dossier:
+    base = make_dossier()
+    fact = EvidenceFact(
+        label="F1",
+        epistemic_type="DB_RECORD",
+        fact_type="AGGREGATE",
+        text=repeat_text,
+        scope=base.facts[0].scope,
+        aggregation=None,
+        occurred_at=None,
+        sources=(),
+    )
+    return replace(base, facts=(base.facts[0], fact), label_map={"F0": "SPEND", "F1": "AGGREGATE"})
+
+
+def test_minimal_dossier_has_no_grounded_history_or_rule() -> None:
+    assert ungrounded_angles(minimal_dossier(make_snapshot())) == NEEDS_EVIDENCE
+    assert ungrounded_angles(None) == NEEDS_EVIDENCE
+
+
+def test_fixture_dossier_grounds_rule_but_not_history() -> None:
+    """dossier-taxi 는 RULE_HIT 는 있지만 SPEND·VERDICT 기록이 없다."""
+    assert ungrounded_angles(make_dossier()) == {AttackAngle.REPETITION}
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("최근 30일 같은 카테고리 확정 소비 3건.", {AttackAngle.RULE_PERSONIFICATION}),
+        ("최근 30일 같은 카테고리 확정 소비 0건.", NEEDS_EVIDENCE),
+    ],
+)
+def test_repeat_aggregate_grounds_repetition_only_when_positive(
+    text: str, expected: set[AttackAngle]
+) -> None:
+    assert ungrounded_angles(aggregate_dossier(text)) == frozenset(expected)
+
+
+def test_first_spend_skips_repetition_angle_in_writer_request() -> None:
+    """post-graph-c 는 해시가 반복(1) 인데 첫 지출(최소 조서)이라 변명 해부(2) 로 민다."""
+    # 강도는 hell 하나: fake spicy fixture 는 F1 을 인용해 최소 조서에서 규칙 ⑤ 재작성이 붙는다.
+    snapshot = make_snapshot(target_intensities=["hell"]).model_copy(
+        update={"post_id": "post-graph-c"}
+    )
+    result = run(
+        preparation=FakePreparation(None),
+        snapshot=snapshot,
+        backend_kwargs={"remaining_s": 8.4},
+    )
+    assert result.state["dossier_source"] == "MINIMAL"
+    angles = {writer_angle(c) for c in result.calls_of("writer")}
+    assert angles == {AttackAngle.EXCUSE_DISSECTION.value}
+    assert len(result.backend.finalized) == 1
