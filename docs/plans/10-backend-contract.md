@@ -41,6 +41,7 @@
 
 | 날짜 | 무엇이 바뀌었나 → 백엔드가 할 일 | 절 | 상태 |
 |---|---|---|---|
+| 9/19 | **새 AI 이미지 `geoji-ai:ai-20260919-1`(agent `f8eb99d`, linux/amd64) 배포.** 9/17 카드 규격 뒤 서기·재작성 `SCHEMA_INVALID` 해결(서기 v5.7·첫 문장 구제·압축 재작성, PR #48), 첫 지출에서 없는 이력 지어내던 각도 차단(PR #49), recall 상한 0.5→3초(PR #47), 9/16 노드 상한 12·10·30초. 전달은 `docker save` 압축 파일(sha256 `5a443ccf…`) 또는 백엔드가 agent `main` 을 직접 빌드. EC2 에서 `docker load` → `.env` 의 `GEOJI_AI_IMAGE=geoji-ai:ai-20260919-1` → `docker compose -f docker-compose.prod.yml up -d` → `sentence_summary` 로그에 `prompt_bundle_version=bundle-a6ababef067d` 확인. 백엔드 카드 규격 패치(server #32)는 이미 main 이라 순서 제약 없음. 롤백은 직전 태그 | §16.3·§16.1 | 미전달 |
 | 9/18 | **배심원 투표 사유를 스냅샷에 실어 달라(제안, §14):** `jury.votes[{verdict, reason}]`(사유는 `votes.reason` 1~500자, 투표자 식별자는 빼고). 지금 AI 는 `vote_counts`·`guilty_ratio` 만 받아 배심원이 **왜** 유죄를 줬는지 모른 채 판결문을 쓴다. 첫 지출(이력 없음)에서는 사유가 유일한 사람 근거다. 백엔드가 필드를 확정하면 AI 쪽 스키마·서기 입력·검수 대조를 맞춘다. 그 전까지는 AI 변경 없음 | §4.1·§14 | 미전달 |
 | 9/17 | **카드 문구 단축 배포 전 필수:** finalize 본문 최소 개수 2→1, 공유 템플릿 갱신. AI는 새 생성에 제목 ≤20자·본문 1항목 ≤30자를 적용한다. server `c970ab4`에서도 최소 2항목을 재현하고 `codex/card-text-contract`에서 수정·전체 빌드 검증했다. 해당 브랜치의 main 반영·배포 후 AI 이미지 배포 | §5·§10·§16.3 | 미전달 |
 | 9/16 | **`FinalizeRequestParser.GUARDRAIL_VERSIONS` 에 `guardrail-v3` 을 더해 달라**(현재 `Set.of("guardrail-v1", "guardrail-v2")`). 지옥맛 비속어 제한을 없앤 새 검수 정책을 v3 으로 올리려 했는데 finalize 가 422 `INVALID_DRAFT` 를 내서 판결이 통째로 막혔다(15 §6 7회차). **지금은 AI 쪽이 v2 를 제자리에서 개정해 쓰므로 백엔드 작업 없이도 돈다.** 이 줄은 나중에 정책 버전을 올릴 수 있게 하는 선반영 요청이다. 허용 목록만 늘리면 되고 기본값·저장 컬럼은 그대로 | §5·§15.3 D-07 | 미전달 |
@@ -558,7 +559,7 @@ Spring/Elastic Beanstalk에 등록한 값은 별도 EC2의 AI 컨테이너로 �
 | `scripts/seed_agent_db.py` | 실행만(AI 저장소) | 데모 시드(드립 예시·데모 C 메모리). 멱등. `uv run scripts/seed_agent_db.py [--banter-csv … --banter-candidates …] [--demo-user U --demo-room R --post-ids P1,P2 [--verdict-ids V1,V2] [--now ISO8601]]`(08 §3.5). `meme_catalog` 은 만들지 않는다 |
 | `scripts/seed_memory_demo_c.py` | 실행만(AI 저장소) | 데모 C 메모리만 따로. 백엔드 시드가 만든 스타벅스 post 2개·verdict 2개 id 를 받아 `uv run scripts/seed_memory_demo_c.py --user U --room R --post-ids P1,P2 [--verdict-ids V1,V2] [--now ISO8601]`. 멱등. `--now` 는 백엔드 시드 기준 시각과 맞춘다(04 §3.6, §12) |
 | `docs/runbook.md` | 참조 | 헬스·알림·비용 경고·롤백·동결·토큰 회전 절차(08 §3.6). 리허설 체크리스트 포함 |
-| `ai-api`·`ai-worker` 이미지 · compose 조각 | EC2 | §15.2 배포. (9/16 코드 대조) `Dockerfile`·`docker-compose.prod.yml`은 열린 [PR #41](https://github.com/geoji-yaho/geoji-agent/pull/41)에 있으며 `main`에는 아직 없다. 이미지 빌드·배포 태그와 환경변수 전달 방식은 §16.6. (원문, 9/14) 아직 AI 저장소에 없다 |
+| `ai-api`·`ai-worker` 이미지 · compose 조각 | EC2 | §15.2 배포. **(9/19)** `Dockerfile`·`docker-compose.prod.yml` 은 `main` 에 있다(PR #41 머지). 빌드는 `docker build --platform linux/amd64 -t geoji-ai:ai-YYYYMMDD-N .`(runbook §6 태그 규칙), 전달은 `docker save geoji-ai:<태그> \| gzip > geoji-ai-<태그>.tar.gz` 파일(GHCR 은 아직 권한·절차 없음). 배포된 이미지가 어느 코드인지는 `sentence_summary` 로그의 `prompt_bundle_version` 으로 대조한다(9/19 = `bundle-a6ababef067d`). 최신 태그·내용은 §0.1 맨 위 |
 
 ### 16.4 9/16 로컬 구현 대조
 
