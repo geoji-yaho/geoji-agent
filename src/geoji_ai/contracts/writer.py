@@ -18,7 +18,7 @@ STATEMENT_TOTAL_MAX = 300
 
 # 새 생성은 카드 분량으로 제한한다. 저장된 과거 판결문에는 위의 읽기 계약을 유지한다.
 CARD_HEADLINE_MAX = 20
-CARD_STATEMENT_MAX = 30
+CARD_STATEMENT_MAX = 100
 _CARD_LINE_BREAKS = "\r\n\v\f\x1c\x1d\x1e\x85\u2028\u2029"
 _CARD_LINE_PATTERN = (
     r"^[^\r\n\v\f\u001c-\u001e\u0085\u2028\u2029]*\S"

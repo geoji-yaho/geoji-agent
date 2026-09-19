@@ -96,7 +96,7 @@ def test_dismissed_has_no_template() -> None:
     assert "dismissed" not in load_templates()["results"]
 
 
-@pytest.mark.parametrize("statement", [["가" * 31], ["첫 문장", "둘째 문장"], ["앞\n뒤"]])
+@pytest.mark.parametrize("statement", [["가" * 101], ["첫 문장", "둘째 문장"], ["앞\n뒤"]])
 def test_template_outside_card_limits_is_unavailable(statement: list[str]) -> None:
     templates = deepcopy(load_templates())
     templates["results"]["guilty"]["statement"] = statement
