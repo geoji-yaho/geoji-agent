@@ -54,6 +54,7 @@
 | 9/16 | `(제안)` 로컬 b-meme 결과 파일을 관리자 JWT로 업로드·검수·활성화하는 API를 백엔드에 반영. OpenAI/xAI 키와 AI readiness 없이 동작해야 함. 최소 계약·키 없는 재현·수용검사는 §16.5 | §16.5 | 미전달 |
 | 9/16 | AI API와 worker에 키를 프로세스 환경변수로 주입. Python 설정은 `.env` 없이 동작하고 환경변수가 우선. **배포 PR #41의 Compose는 별도로 `.env`를 요구하므로 §16.6 참조.** 키 교체 때 두 프로세스 재시작 | §16.1 | 미전달 |
 | 9/16 | 로컬 참고 패치 검토 요청: HTTP client 3곳 HTTP/1.1, 최초 non-guilty `sentencing:null`, 공개 camelCase/nullable, 삭제 Q2·Q3, 별도 PNG/이미지 API. 백엔드 커밋·푸시 없음 | §5·§8·§9·§16.4 | 미전달 |
+| 9/14 | D-28 짤 점수 선택 미정 값 3개 확정 + AI 저장소 참조 구현 → finalize 10 단계에서 전략은 `default_intensity` 판결문 값, 동점은 crc32 오름차순, 키워드는 NFC·앞뒤 공백 제거 뒤 일치. 같은 입력이면 AI 저장소 `src/geoji_ai/domain/meme_selection.py` 와 같은 `meme_image_id` | §11·§15.6 | 미전달 |
 | 9/14 | D-26 무효화 트랜잭션에서 진행 중 job 끄기를 가짜 백엔드로 재현함 → 게시물 삭제·공유 철회 트랜잭션에서 epoch +1 먼저, 같은 트랜잭션에서 그 post 의 `QUEUED`·`RUNNING` PREPARE·SENTENCE·TEXT_RETRY 를 `CANCELLED`(`owner_id`·`generation_id`·`lease_until` NULL). **TEXT_RETRY payload 에는 `post_id` 가 없어 `verdict_id` → post 로 찾아야 한다.** 워커는 다음 heartbeat(기본 5초) 안에 멈추고 그 사이 나간 모델 호출 1건은 원장 `UNKNOWN` | §8 | 미전달 |
 | 9/14 | D-24 SENTENCE 게이트를 가짜 백엔드로 재현함 → 평결 확정 때 같은 post(`payload->>'post_id'`) PREPARE 가 `QUEUED`·`RUNNING` 이면 보류, PREPARE 종료(`SUCCEEDED`·`FAILED`·`CANCELLED`) 또는 `confirmed_at + 30s` 에 INSERT, job·verdict `deadline_at` = INSERT 시각(DB `now()`) + 10s. 보류 중엔 마감이 없어 watchdog 대상 아님 | §3·§6 | 미전달 |
 | 9/14 | AI API 거부 본문 `{"code"}` 로 변경(옛 `{"detail": {"code"}}`), 스키마 위반은 422 `INVALID_REQUEST` → intake·trace 호출부가 `code` 를 최상위에서 읽는다 | §4·§4.7·§15.5 | 미전달 |
@@ -391,6 +392,7 @@ WHERE status = 'RUNNING' AND lease_until < now();
 
 `meme_images` 중 `tag == draft.meme_tag ∧ is_active` → `+3` `banter_strategy ∈ strategies` · `+2` `meme_hints.emotion ∈ emotions` · `+1` `|keywords ∩ meme_hints.keywords|` · `−5` 같은 사용자 최근 노출 5장 → `crc32(post_id + image_id)` tie-break → `meme_image_id` 고정(새로고침 불변). 후보 0 → 결과별 기본 이미지. 감정 어휘 6종: `DISAPPROVAL` `ABSURD_SERIOUSNESS` `SMUG` `PITY` `CELEBRATION` `RESIGNATION`. 문구 합성은 클라이언트 캔버스, 이미지는 CORS 허용 CDN.
 - (9/14 코드 대조) 6종은 이제 계약 enum 이다(§5). 이 밖의 값은 finalize 요청에 오지 않는다. `meme_images.emotions` 도 이 6종으로 채운다
+- (9/14 D-28, §15.6) 원문에 없던 값 3개: `+3` 의 `banter_strategy` 는 **`default_intensity` 판결문** 값(그 강도 판결문이 없으면 `+3` 없음) · 동점은 `crc32(post_id + image_id)` **오름차순**(충돌 시 `image_id` 문자열 순) · 키워드는 **NFC 정규화·앞뒤 공백 제거 뒤 정확 일치**. `+1` 은 교집합 원소마다, `meme_hints` 가 null 이면 `+2`·`+1` 없음, 최근 노출은 최근 순 앞 5장. 참조 구현은 AI 저장소 `src/geoji_ai/domain/meme_selection.py`(`select_meme`), 기대값은 `tests/unit/test_meme_selection.py` — finalize 10 단계는 같은 입력에 같은 `meme_image_id` 를 내야 한다
 
 ## 12. 시드 (9/17, proposal2 §18 데모 시드 생성기)
 
@@ -503,6 +505,14 @@ WHERE status = 'RUNNING' AND lease_until < now();
 | **D-26** | **게시물 삭제·공유 철회·탈퇴 시 진행 중 작업을 끈다.** 결과를 버리는 것(epoch 검사)에 더해, 모델 비용이 더 나가지 않게 한다 | §8 무효화 트랜잭션에서 영향 job `CANCELLED`(`(제안)`, §14) | 모델 호출 직전 epoch 확인 → 달라졌으면 호출 0·`EVIDENCE_INVALIDATED`. heartbeat 취소 경로 통합 테스트 |
 | **D-27** | **입력이 바뀌면 바뀐 부분만 다시 만든다.** 준비 자료 유효 판정을 한 덩어리 `input_hash` 대신 부분 키로: 조서 = 게시물 필드·심문 결과·방 규칙 버전(epoch 은 키에 넣지 않고 dossier `privacy_versions` == 스냅샷 비교로 따로 본다), 드립 후보 = 조서 + 그 강도(강도별). 방 강도만 바뀌면 드립만, 규칙 버전이 바뀌면 조서부터. **epoch 가 바뀐 것(삭제·철회)은 부분 재사용하지 않는다.** 모델 호출 단위 캐시(`node_results`)는 그대로. 조서 키에 메모리 recall 결과·`audience_version` 은 넣지 않는다 — recall 은 시간에 따라 바뀌어 넣으면 재사용이 거의 안 되고, 대가로 새 과거 기록이 생겨도 게시물·심문 결과·규칙 버전이 같으면 이전 조서를 쓴다(9/14 코드 대조) | 없음(방 강도·규칙 변경 때 PREPARE 재INSERT 는 기존 규약) | 05 §3.2 `input_hash`·§3.3 `load_valid_prep` 을 부분 키로. DDL 은 기존 컬럼(`dossiers.snapshot_hash`·`trial_prep.banter_json`)으로 먼저, 부족하면 결정 요청 |
 | **9/14 거부 본문** | AI API 거부 응답 본문을 백엔드와 같은 `{"code"}` 로 통일. 스키마 위반은 422 `INVALID_REQUEST` | 없음(이미 `{"code"}`) | AI API 예외 핸들러 |
+
+### 15.6 9/14 결정 기록 — 짤 점수 선택의 미정 값
+
+> 9/14 사용자 결정. 배경: §11 점수식은 있으나 구현하면 값이 갈리는 곳 3개가 비어 있었고, 백엔드(`geoji-server`)에 선택 코드가 아직 없어 AI 저장소에 참조 구현을 먼저 두었다. 선택 실행 주체는 그대로 백엔드 finalize(00 §8.2).
+
+| ID | 결정 | 백엔드가 할 일 | AI 파트가 할 일 |
+|---|---|---|---|
+| **D-28** | **짤 점수 선택 미정 값 3개.** ① `+3` 전략 일치는 `default_intensity` 판결문의 `banter_strategy`(`meme_hints` 와 같은 서기 호출, 05 §3) ② 동점은 `crc32(post_id + image_id)` 오름차순 ③ 키워드는 NFC 정규화·앞뒤 공백 제거 뒤 정확 일치. **실행 주체는 백엔드 그대로**, AI 저장소는 참조 구현만 둔다 | finalize 10 단계를 §11 과 참조 구현에 맞춘다. 같은 사용자 최근 노출을 최근 순으로 앞 5장 | `domain/meme_selection.py`·단위·흐름 테스트(9/14 완료). 13 평가 기준선으로 재사용 |
 
 ## 16. 배포 · 연동 (9/14, 옛 백엔드 전달 파일 §1~§3 흡수)
 

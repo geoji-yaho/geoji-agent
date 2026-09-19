@@ -92,7 +92,7 @@
 
 ### 3.4 짤 (proposal2 §17, 10 §11)
 - 서기 `meme_hints.emotion` 어휘 enum(01 스키마, **9/8 확정**): `DISAPPROVAL`(한심) `ABSURD_SERIOUSNESS`(진지한 헛소리) `SMUG`(득의양양) `PITY`(측은) `CELEBRATION`(축하) `RESIGNATION`(체념). 태그 대응 — 유죄 무거움 DISAPPROVAL/ABSURD_SERIOUSNESS, 유죄 가벼움 PITY/SMUG, 무죄·동의 CELEBRATION, 기각 RESIGNATION. `keywords` ≤ 5
-- 점수 규칙(백엔드 finalize): 태그 필터 → `+3` 전략 일치 · `+2` 감정 일치 · `+1` 키워드 교집합 · `−5` 같은 사용자 최근 노출 5장 → `crc32(post_id+image_id)` tie-break → `meme_image_id` 고정. 후보 0 → 결과별 기본 이미지
+- 점수 규칙(백엔드 finalize): 태그 필터 → `+3` 전략 일치 · `+2` 감정 일치 · `+1` 키워드 교집합 · `−5` 같은 사용자 최근 노출 5장 → `crc32(post_id+image_id)` tie-break → `meme_image_id` 고정. 후보 0 → 결과별 기본 이미지. 미정 값 3개(전략 강도·동점 방향·키워드 정규화)는 9/14 D-28(10 §15.6)
 - 우리 몫: 서기 출력의 `meme_tag` 교정(⑤ 4), 힌트 어휘 준수율(골든셋 자동 검사에 추가)
 
 ### 3.5 데모 시드 · 리허설 (proposal2 부록 B)
@@ -163,6 +163,6 @@ uv run geoji-ai ledger-sweep --older-than 24h
 **OP-01** — [ ] kill@9s / [ ] 늦은 성공 409 / [ ] retry 중 삭제 / [ ] commit 후 단절 / [ ] 벤더 2종·예산
 **OP-02** — [ ] REGENERATE 규칙 5 / [ ] sweep CLI / [ ] 테스트
 **OP-03** — [ ] 로그 필드 / [ ] 지표 9 / [ ] snapshot·trace / [ ] 알림 4종 훅 / [ ] ID 라벨 검사
-**OP-04** — [ ] enum·스키마 / [ ] 골든셋 검사 / [ ] 10 §11 전달
+**OP-04** — [ ] enum·스키마 / [ ] 골든셋 검사 / [ ] 10 §11 전달 / ~~점수 규칙 참조 구현~~(9/14 완료 — `domain/meme_selection.py`·단위·흐름 테스트, D-28)
 **OP-05** — [ ] 시드 / [ ] 백엔드 시드 확인 / [ ] 7행 × 3회 기록
 **OP-06** — [ ] runbook / [ ] 헬스·알림 / [ ] 동결 태그
