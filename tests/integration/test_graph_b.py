@@ -175,7 +175,7 @@ class BanterFailLLM:
 
 
 class HangingMemory:
-    """recall 이 끝나지 않는 기억 포트. 0.5초 `wait_for` 가 끊어야 한다."""
+    """recall 이 끝나지 않는 기억 포트. `RECALL_TIMEOUT_S` 의 `wait_for` 가 끊어야 한다."""
 
     def __init__(self) -> None:
         self.never = asyncio.Event()
