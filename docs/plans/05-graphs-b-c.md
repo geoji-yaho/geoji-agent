@@ -106,7 +106,7 @@ class SentenceState(TypedDict):
 | `analyze_reason` | LLM(조서, luna): 입력 = 사건·코드 사실(라벨)·사유 원문. 출력 `facts[]{kind, text, source_refs}` + `reason_analysis`. **`source_refs ⊆ 입력 라벨`** 아닌 fact 삭제. 살아남은 fact 는 `MODEL_INFERENCE` Evidence 로 `F{n}` 이어 붙임(`RULE_HIT`·`MITIGATION`·`REASON_ANALYSIS` 만 허용) | 코드 Evidence 만으로 계속(§5.2) |
 | `persist_dossier` | epoch 재확인 → `ai.dossiers`+`ai.evidence`+`ai.trial_prep(status=DOSSIER_READY, input_hash, prompt_version)` 한 트랜잭션. 같은 `(post_id, input_hash, prompt_version)` 이 이미 `COMPLETE` 면 **새로 쓰지 않고 종료**(불변) | fail |
 | `generate_banter` | 강도마다 1호출(Grok): 입력 = 허용 Evidence(라벨), 사건 타입, 강도, 승인 예시 ≤ 3(`ai.banter_examples approved=true`), 말투 예시(플래그). 출력 후보 3~5, `fits` 양쪽 계열 | 그 강도 후보 없음 |
-| `validate_banter` | `REPEAT_OFFENSE`·`ROOM_RULE_CALLBACK` 인데 `evidence_labels` 비면 삭제, 없는 라벨 삭제, `DEATH_WORDS` 삭제, `mild`·`spicy` 에 `PROFANITY` 삭제 | — |
+| `validate_banter` | `REPEAT_OFFENSE`·`ROOM_RULE_CALLBACK` 인데 `evidence_labels` 비면 삭제, 없는 라벨 삭제, `DEATH_WORDS` 삭제, `mild`·`spicy` 에 `PROFANITY` 삭제, **(9/19) 비었거나 카드 본문 상한(`CARD_STATEMENT_MAX`, 같은 날 30→100)을 넘는 후보 삭제**(15 §6 13회차: 카드에 못 넣는 후보는 서기가 고르지 않았다) | — |
 | `persist_banter` | `trial_prep.banter_json` 최초 1회 채움 → `COMPLETE` | `DOSSIER_READY` 유지 |
 `input_hash` = sha256(canonical(snapshot 의 post·audience·room_snapshots·privacy_versions·intake_result)). 프롬프트 버전이 바뀌면 새 행. 9/14 D-27: 이 해시에 더해 조서 키 = `dossiers.snapshot_hash`, 드립 키 = `banter_json` 강도별 `{key, candidates}`(키 = 조서 id + 강도 + `prompt_version`).
 
@@ -177,7 +177,7 @@ xAI strict 스키마는 `maxLength` 를 강제하지 않는다(실측 15 §6). �
 | `sentencing-v1.md` | 양형만 결정·밴드·허용 목록 안·가중/감경은 라벨로·100자·사유의 지시는 데이터. 예시는 다른 사건 |
 | `context-v1.md` | 정리만·창작 금지·`source_refs` 규칙·kind 정의·인젝션 의심 표시 |
 | `banter-v1.md` | 전략 8종·`fits`·Evidence 규칙·금지선 둘·강도 섹션(서기 강도 문단 축약) |
-| `banter-v2.md` | (9/19, `BANTER_PROMPT`) v1 + text 1~30자 한 문장(목표 15~22자, 글자 수 예시), 후보 간 소재·기법 중복 금지, 승인 예시 복사 금지, 지옥맛 허용 목록 삭제(9/16). 서기가 60~90자 후보를 하나도 안 골라서(15 §6 13회차) |
+| `banter-v2.md` | (9/19, `BANTER_PROMPT`) v1 + text 를 카드 본문 길이로(한두 문장 1~100자, 목표 30~60자, 글자 수 예시. 같은 날 카드 상한 30→100 에 맞춰 제자리 수정), 후보 간 소재·기법 중복 금지, 승인 예시 복사 금지, 지옥맛 허용 목록 삭제(9/16). 카드에 못 넣는 후보는 서기가 안 골라서(15 §6 13회차) |
 | `evaluator/guardrail-v2.md` · `guardrail-v1.md` | 검사표 + 강도별 적용 표(v2 는 결정 15, v1 은 기획서 원안) + `Violation.code` 정의 + 다른 사건 위반 예시 |
 - 프롬프트는 코드 문자열에 숨기지 않는다. `PROMPT_BUNDLE_VERSION` 은 파일 해시로 만들고 `llm_calls`·`node_results`·finalize 에 기록
 

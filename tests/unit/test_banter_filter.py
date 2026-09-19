@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from geoji_ai.application.build_evidence import build_evidence
-from geoji_ai.contracts.writer import BanterStrategy
+from geoji_ai.contracts.writer import CARD_STATEMENT_MAX, BanterStrategy
 from geoji_ai.domain.intensity import Intensity
 from geoji_ai.domain.visibility import Scope, Visibility
 from geoji_ai.graphs.preparation import filter_banter, merge_inferred_facts
@@ -69,11 +69,10 @@ def test_규칙4_PROFANITY_는_mild_spicy_에서만_삭제():
 
 
 def test_규칙5_카드_본문_상한을_넘거나_빈_후보는_삭제():
-    """9/19: 서기는 30자 카드에 못 쓰는 후보를 고르지 않는다. 넘겨 봐야 비용만 든다."""
-    short = _c(text="가" * 30)
-    kept = filter_banter(
-        [short, _c(text="가" * 31), _c(text="   "), _c(text="")], Intensity.hell, LABELS
-    )
+    """9/19: 서기는 카드 상한(`CARD_STATEMENT_MAX`)을 넘는 후보를 고르지 않는다."""
+    short = _c(text="가" * CARD_STATEMENT_MAX)
+    over = _c(text="가" * (CARD_STATEMENT_MAX + 1))
+    kept = filter_banter([short, over, _c(text="   "), _c(text="")], Intensity.hell, LABELS)
     assert kept == [short]
 
 

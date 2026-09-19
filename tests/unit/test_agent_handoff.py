@@ -276,7 +276,7 @@ def test_banter_output_is_filtered_and_relabeled_before_writer() -> None:
                 "evidence_labels": [],
             },
             {
-                "text": "서른 자를 넘기는 후보는 서기가 카드 본문에 쓸 수 없으니 서버가 버린다.",
+                "text": "카드 상한을 넘는 후보. " * 10,  # CARD_STATEMENT_MAX 초과 → 삭제
                 "strategy": "EXCUSE_STRIPPING",
                 "fits": ["guilty"],
                 "evidence_labels": [],
