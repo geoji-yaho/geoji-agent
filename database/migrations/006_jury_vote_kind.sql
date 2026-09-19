@@ -12,7 +12,9 @@ BEGIN
         FROM pg_constraint
         WHERE conrelid = 'ai.jobs'::regclass
           AND contype = 'c'
-          AND pg_get_constraintdef(oid) LIKE '%kind%IN (%'
+          -- Postgres 는 IN (...) 을 `= ANY (ARRAY[...])` 로 저장한다. 열 이름과 값 하나로 찾는다
+          AND pg_get_constraintdef(oid) LIKE '%kind%'
+          AND pg_get_constraintdef(oid) LIKE '%PREPARE%'
     LOOP
         EXECUTE format('ALTER TABLE ai.jobs DROP CONSTRAINT %I', constraint_name);
     END LOOP;

@@ -156,7 +156,8 @@ async def test_006_을_적용하면_JURY_VOTE_INSERT_가_통과한다(engine: As
         " aggregate_id, aggregate_version, payload, priority, max_attempts, trace_id)"
         " VALUES (gen_random_uuid(), gen_random_uuid(), 'jury.vote_requested', 'JURY_VOTE',"
         " 'jury-vote:p1:r1:bot1', 'p1', 1,"
-        """ '{"post_id":"p1","post_version":1,"room_id":"r1","voter_id":"bot1"}'::jsonb,"""
+        # `:1` 은 text() 가 바인드로 읽는다. 콜론 뒤에 공백을 둔다
+        """ '{"post_id": "p1", "post_version": 1, "room_id": "r1", "voter_id": "bot1"}'::jsonb,"""
         " 60, 2, 't')",
     )
     assert inserted == 1
