@@ -30,7 +30,7 @@ from geoji_ai.domain.attack_angles import pick
 from geoji_ai.domain.draft_hash import draft_hash
 from geoji_ai.domain.intensity import Intensity
 from geoji_ai.domain.visibility import Scope
-from geoji_ai.graphs.sentencing import build_sentence_graph
+from geoji_ai.graphs.sentencing import _trim_card_tail, build_sentence_graph
 from geoji_ai.graphs.states import Candidate
 from geoji_ai.ports.backend import BeginGenerationResult, FinalizeResult
 from geoji_ai.ports.llm import LLMError
@@ -1326,3 +1326,110 @@ def test_card_format_repair_shares_budget_with_evaluator_repair() -> None:
     assert result.state["repair_count"] == 1
     assert result.backend.failed == ["EVAL_FAILED"]
     assert not result.backend.finalized
+
+
+# ---------------------------------------------------------------------------
+# 9/18 카드 본문 길이 — 꼬리 문장 구제 + 재작성에 직전 제목·본문·글자 수 전달
+# 9/17 운영: 서기가 본문 30자를 34~48자로 넘기고, 재작성도 규칙 문장만 받아 같은 길이로 다시 썼다.
+# ---------------------------------------------------------------------------
+
+TAIL = "편한 건 몸이고 고생은 지갑 몫이다. 이제부턴 알람 열 개 맞추고 뛰어가라."
+
+
+def body(text: str) -> dict[str, Any]:
+    return {"statement": [{"text": text, "kind": "opinion", "evidence_labels": []}]}
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (TAIL, "편한 건 몸이고 고생은 지갑 몫이다."),
+        ("잔고가 먼저 퇴근했네! 알람은 왜 안 맞추고 택시는 왜 잘 잡냐.", "잔고가 먼저 퇴근했네!"),
+        ("지갑이 왜 우냐? 늦잠 값이 지하철 여덟 번인데 택시가 웬 말이냐.", "지갑이 왜 우냐?"),
+    ],
+)
+def test_trim_card_tail_keeps_first_sentence(text: str, expected: str) -> None:
+    trimmed, original = _trim_card_tail(body(text))
+    assert trimmed["statement"][0]["text"] == expected
+    assert trimmed["statement"][0]["kind"] == "opinion"
+    assert original == len(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "가" * 31,  # 문장 경계 없음
+        "가" * 31 + ". 뒤.",  # 첫 문장이 이미 상한 초과
+        "커피값 3.5 배를 택시에 태웠고 그 돈이면 지하철 스무 번이다.",  # "3.5" 는 경계가 아니다
+        "편한 건 몸이고 고생은 지갑 몫이다.",  # 상한 안이면 손대지 않는다
+    ],
+)
+def test_trim_card_tail_leaves_other_text_alone(text: str) -> None:
+    trimmed, original = _trim_card_tail(body(text))
+    assert trimmed["statement"][0]["text"] == text
+    assert original is None
+
+
+def test_trim_card_tail_ignores_multiple_statements() -> None:
+    output = {"statement": [{"text": TAIL, "kind": "opinion", "evidence_labels": []}] * 2}
+    trimmed, original = _trim_card_tail(output)
+    assert trimmed == output
+    assert original is None
+
+
+def test_card_body_tail_sentence_is_dropped_without_repair() -> None:
+    """찌르는 문장 + 조언 문장이면 첫 문장만 저장한다. 서기 1회, 재작성 0회."""
+    llm = ScriptedLLM(outputs={"writer": card_output(**body(TAIL))})
+    result = run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
+    assert result.roles() == Counter({"sentencing": 1, "writer": 1, "evaluator": 1})
+    assert result.state["repair_count"] == 0
+    req = result.finalize()
+    assert req.draft.texts[0].statement[0].text == "편한 건 몸이고 고생은 지갑 몫이다."
+    assert req.draft.texts[0].source == "AI"
+    assert_finalize_hash_is_last_evaluated(result)
+
+
+def test_card_body_too_long_repair_receives_previous_text_and_length() -> None:
+    """한 문장인데 31자면 재작성. 서기에게 직전 본문·글자 수·압축 지시가 간다."""
+    long_text = "가" * 31
+    llm = ScriptedLLM(sequences={"writer": [card_output(**body(long_text)), card_output(offset=1)]})
+    result = run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
+    assert result.roles()["writer"] == 2
+    avoid = user_payload(result.calls_of("writer")[1])["avoid"]
+    assert avoid["violations"] == ["SCHEMA_INVALID"]
+    assert avoid["previous_text"] == long_text
+    assert avoid["previous_text_length"] == 31
+    assert avoid["previous_headline"] == "지갑만 조기 퇴근"
+    assert avoid["previous_statement_count"] == 1
+    assert any("31자" in m and "30자" in m for m in avoid["rule_messages"])
+    assert not any("제목이" in m for m in avoid["rule_messages"])
+    assert len(result.backend.finalized) == 1
+
+
+def test_card_headline_too_long_repair_receives_previous_headline() -> None:
+    llm = ScriptedLLM(
+        sequences={"writer": [card_output(headline="가" * 21), card_output(offset=1)]}
+    )
+    result = run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
+    avoid = user_payload(result.calls_of("writer")[1])["avoid"]
+    assert avoid["previous_headline_length"] == 21
+    assert any("제목이 21자" in m for m in avoid["rule_messages"])
+    assert not any("본문이" in m for m in avoid["rule_messages"])
+
+
+def test_card_two_statements_repair_names_the_count() -> None:
+    changes = {"statement": [{"text": "첫 문장", "kind": "opinion", "evidence_labels": []}] * 2}
+    llm = ScriptedLLM(sequences={"writer": [card_output(**changes), card_output(offset=1)]})
+    result = run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
+    avoid = user_payload(result.calls_of("writer")[1])["avoid"]
+    assert avoid["previous_statement_count"] == 2
+    assert any("항목이 2개" in m for m in avoid["rule_messages"])
+
+
+def test_card_previous_text_is_not_logged(caplog: pytest.LogCaptureFixture) -> None:
+    """직전 본문 원문은 재작성 요청에만 가고 로그에는 없다."""
+    long_text = "나" * 31
+    llm = ScriptedLLM(sequences={"writer": [card_output(**body(long_text)), card_output(offset=1)]})
+    with caplog.at_level(logging.DEBUG):
+        run(llm, snapshot=make_snapshot(target_intensities=["spicy"]))
+    assert long_text not in caplog.text

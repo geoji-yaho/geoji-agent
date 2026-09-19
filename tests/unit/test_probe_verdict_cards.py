@@ -28,15 +28,46 @@ async def test_default_dry_run_has_current_requests_without_building_client(monk
     assert result["writer_version"] == WRITER_VERSION
     assert result["provider_calls"] == 0
     assert result["scope"] == "writer_only"
-    for item in result["results"]:
+    assert result["case_mode"] == "rotate"
+    for index, item in enumerate(result["results"]):
         request = item["request"]
+        case = probe.EXAMPLE_CASES[index]
         assert request["messages"][0]["content"] == build_writer_system(item["intensity"])
         user = json.loads(request["messages"][1]["content"])
-        assert user["case"]["amount_krw"] == 12000
+        assert user["case"]["item"] == case.item
+        assert user["case"]["amount_krw"] == case.amount_krw
         assert [fact["id"] for fact in user["dossier"]] == ["F0"]
         assert user["banter_candidates"] == []
-        assert user["jury"]["result"] == "guilty"
+        assert user["jury"]["result"] == case.result
+        assert item["case"]["key"] == case.key
         assert request["schema"]["properties"]["statement"]["maxItems"] == 1
+    # 9/18: 강도마다 다른 사건이라 세 요청의 소재가 겹치지 않는다.
+    assert len({r["case"]["item"] for r in result["results"]}) == 3
+
+
+async def test_single_case_mode_gives_all_intensities_the_same_case():
+    result = await probe.run_probe(config(), case="4")
+    assert result["case_mode"] == "4"
+    assert {r["case"]["key"] for r in result["results"]} == {"interview-perm"}
+    for item in result["results"]:
+        user = json.loads(item["request"]["messages"][1]["content"])
+        assert user["jury"]["result"] == "notGuilty"
+        assert user["sentencing"] is None  # 비유죄는 양형이 없다(운영과 같다)
+
+
+def test_example_cases_are_distinct_and_valid():
+    keys = [case.key for case in probe.EXAMPLE_CASES]
+    items = [case.item for case in probe.EXAMPLE_CASES]
+    assert len(set(keys)) == len(keys) == len(set(items)) >= 6
+    assert {case.result for case in probe.EXAMPLE_CASES} >= {"guilty", "notGuilty", "disagree"}
+    for index, case in enumerate(probe.EXAMPLE_CASES):
+        snapshot, decision = probe.example_case(index)
+        assert snapshot.item == case.item
+        assert (decision is None) == (case.sentence is None)
+        if decision is not None:
+            assert decision.sentence == case.sentence
+    with pytest.raises(ValueError):
+        probe.case_indices("99")
 
 
 async def test_fake_is_explicit_and_preserves_metadata():
@@ -115,6 +146,7 @@ def test_cli_default_and_missing_key_exit_code(tmp_path, monkeypatch, capsys):
     assert json.loads(out.read_text())["mode"] == "dry-run"
     assert "dry-run" in capsys.readouterr().out
     assert probe.main(["--execute"]) == 1
+    assert probe.main(["--case", "99"]) == 1
 
 
 @pytest.mark.parametrize("field", ["headline", "statement", "meme_tag", "meme_hints"])

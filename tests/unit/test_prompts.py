@@ -61,7 +61,7 @@ def test_writer_system_equals_probe_assembly(intensity: str) -> None:
 @pytest.mark.parametrize("intensity", ["mild", "spicy", "hell"])
 def test_current_writer_requests_one_short_card_with_metadata(intensity: str) -> None:
     system = build_writer_system(intensity)
-    assert WRITER_VERSION == "v5.6"
+    assert WRITER_VERSION == "v5.7"
     assert "headline: 1~20자" in system
     assert "statement: 정확히 1항목" in system
     assert "text는 1~30자" in system
@@ -91,6 +91,26 @@ def test_current_writer_examples_fit_card_body(intensity: str) -> None:
     examples = re.findall(r'^- 예시: "([^"]+)"$', section, re.MULTILINE)
     assert examples
     assert all(1 <= len(example) <= 30 for example in examples)
+
+
+@pytest.mark.parametrize("intensity", ["mild", "spicy", "hell"])
+def test_v5_7_length_section_comes_before_intensity(intensity: str) -> None:
+    """9/18: 길이 절이 강도 절보다 앞에 있고 목표 글자 수·한 문장 규칙을 적는다.
+
+    9/17 운영에서 서기가 본문 30자를 34~48자로 넘겼다. xAI strict 스키마는 `maxLength` 를
+    강제하지 않아 길이는 프롬프트로만 통제된다(15 §6).
+    """
+    system = build_writer_system(intensity)
+    assert system.index("## 길이") < system.index("## 강도")
+    assert "목표는 15~22자" in system
+    assert "본문은 문장 **하나**다" in system
+    section = load_prompt(f"writer/{intensity}-{WRITER_VERSION}.md")
+    per_intensity = {
+        "mild": "다정함은 어미",
+        "spicy": "두 문장이라 실패",
+        "hell": "본문은 **한 방**",
+    }
+    assert per_intensity[intensity] in section
 
 
 def test_spicy_system_has_no_hell_section() -> None:
@@ -123,6 +143,10 @@ def test_spicy_system_has_no_hell_section() -> None:
         "writer/mild-v5.6.md",
         "writer/spicy-v5.6.md",
         "writer/hell-v5.6.md",
+        "writer/common-v5.7.md",
+        "writer/mild-v5.7.md",
+        "writer/spicy-v5.7.md",
+        "writer/hell-v5.7.md",
         "sentencing-v1.md",
         "context-v1.md",
         "banter-v1.md",
@@ -202,6 +226,7 @@ WORN_PHRASE_DECLARATIONS = {
     ("writer/common-v5.4.md", "금지어"),
     ("writer/common-v5.5.md", "금지어"),
     ("writer/common-v5.6.md", "금지어"),
+    ("writer/common-v5.7.md", "금지어"),
     ("evaluator/guardrail-v2.md", "| 금지 | 금지 | 금지 |"),
 }
 
