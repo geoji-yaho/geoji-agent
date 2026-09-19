@@ -1,6 +1,6 @@
 # 떼거지 AI 파트 운영 runbook
 
-심사 기간(9/21~10/5) 운영과 9/20 동결 절차. 정본은 `docs/plans/08-failure-recovery-rehearsal.md` §3.6 이다.
+심사 기간(9/21~10/5) 운영과 9/20 동결 절차. 정본은 `docs/plans/archive/08-failure-recovery-rehearsal.md` §3.6 이다.
 **이 문서는 새 값을 정하지 않는다.** 값은 가리키는 곳이 정본이다.
 
 | 무엇 | 정본 |

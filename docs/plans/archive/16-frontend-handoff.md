@@ -3,9 +3,9 @@
 작성일: 2026-09-16. **geoji-web에는 커밋·푸시하지 않았다.**
 아래는 에이전트 저장소에 남기는 담당자 검토용 요청사항이다.
 임시 checkout에서 실제 API/브라우저 검증한 참고 패치는
-[frontend.patch](evidence/20260916/frontend.patch)에 있다.
+[frontend.patch](../evidence/20260916/frontend.patch)에 있다.
 기준 commit은 `f7fd4f443999fff83459b21262222f50564d776d`이며 담당자가 필요한 변경만 반영한다.
-이 문서는 프론트 요청을 다룬다. 백엔드 API 계약은 [10](10-backend-contract.md)이 정본이다.
+이 문서는 프론트 요청을 다룬다. 백엔드 API 계약은 [10](../10-backend-contract.md)이 정본이다.
 
 ## 1. 반영 우선순위
 
@@ -51,7 +51,7 @@
 - 새 패키지·운영 인증 코드 변경은 없다. 초기 제출 초안은 컴포넌트 메모리에만 있으므로
   새로고침 복구, 개인 이미지 목록, 구형 공유 링크 이전은 별도 후속 범위다.
 - 최종 파일 해시·브라우저 다운로드의 검증 한계와 재실행 방법은
-  [15 실행 보고](15-local-e2e-implementation.md) 및 [검증 요약](evidence/20260916/summary.json)에 있다.
+  [15 실행 보고](../15-local-e2e-implementation.md) 및 [검증 요약](../evidence/20260916/summary.json)에 있다.
 
 백엔드 담당자가 API·DDL을 반영한 뒤 같은 시나리오를 다시 검증한다. 에이전트 저장소의
 커밋·푸시가 프론트 또는 백엔드의 반영·배포를 의미하지 않는다.

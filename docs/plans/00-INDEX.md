@@ -1,5 +1,8 @@
 # 📋 떼거지 서비스 에이전트 구현 계획 — 인덱스 및 우선순위 매트릭스
 
+> **9/19 보관.** 작업 1~4·7~9, 짤 11~13, 로컬 E2E 설계 14, 프론트 인수인계 16, 백엔드 보고서 17 은 끝난 문서라 `archive/` 로 옮겼다. 번호 인용(`01 CT-07` 등)은 그대로 쓰고, 파일은 `archive/` 아래에서 찾는다. 살아 있는 문서는 00·05·06·10·15 이고, 9/19 인터뷰(심문관·드립 후보·검수관 제거, 방 요약, 양형 이유 서기) 뒤의 새 계획은 새 번호로 쓴다.
+
+
 ## 1. 개요
 
 - 근거 문서: `docs/proposal/proposal2.md` v2.0(2026-09-07, 통합 확정본 = 확정안 v1.5 + 상세 구조 설계서 v1.1). 보조: `docs/거지방-MVP-기획서.md` v1.1. **둘 다 git 에 없다**(`.gitignore` 가 `docs/plans/` 만 추적) — 그래서 01~10 은 proposal2 없이도 구현할 수 있게 계약·DDL·수치를 옮겨 적었다
@@ -93,20 +96,20 @@
 | 파일 | 제목 | 마감 | 담당 항목 | 먼저 읽어야 하는 사람 |
 |---|---|:--:|---|---|
 | `00-INDEX.md` | 매트릭스 · 문서 맵 · 정합성 | — | (본 문서) | 전원 |
-| [작업 1 — 계약 · fake provider · 골격](01-contracts-fake-provider.md) | Contracts | 9/9 | #2, #3, #17 | AI 파트 · 백엔드(enum·CaseSnapshot 회신) |
-| [작업 2 — `ai.jobs` 큐 · lease · 워커](02-jobs-queue-lease.md) | Queue | 9/9 | #4, #5 | AI 파트 · 백엔드(INSERT 규약·reaper) |
-| [작업 3 — 수직 흐름(우리 몫) · 스텁 · 클라이언트 · luna 실측](03-backend-vertical-flow-template.md) | M2 | 9/10 | #6, #7, #8 | AI 파트 · **백엔드**(10 과 함께) · 프론트(폴링) |
-| [작업 4 — 메모리 · 근거 · 삭제 epoch](04-memory-evidence-deletion.md) | Evidence | 9/12 | #10~#13 | AI 파트 · 백엔드(resolve-evidence·epoch) · 팀(D-04) |
+| [작업 1 — 계약 · fake provider · 골격](archive/01-contracts-fake-provider.md) | Contracts | 9/9 | #2, #3, #17 | AI 파트 · 백엔드(enum·CaseSnapshot 회신) |
+| [작업 2 — `ai.jobs` 큐 · lease · 워커](archive/02-jobs-queue-lease.md) | Queue | 9/9 | #4, #5 | AI 파트 · 백엔드(INSERT 규약·reaper) |
+| [작업 3 — 수직 흐름(우리 몫) · 스텁 · 클라이언트 · luna 실측](archive/03-backend-vertical-flow-template.md) | M2 | 9/10 | #6, #7, #8 | AI 파트 · **백엔드**(10 과 함께) · 프론트(폴링) |
+| [작업 4 — 메모리 · 근거 · 삭제 epoch](archive/04-memory-evidence-deletion.md) | Evidence | 9/12 | #10~#13 | AI 파트 · 백엔드(resolve-evidence·epoch) · 팀(D-04) |
 | [작업 5 — 그래프 B·C](05-graphs-b-c.md) | Graphs | 9/13 | #14~#18 | AI 파트 · 백엔드(finalize 검증·부분 강도) |
 | [작업 6 — 실제 모델 · 예산 · 프롬프트 · 평가](06-real-model-budget-prompts-eval.md) | M3 | 9/15 | #19~#25 | AI 파트 · **팀 전원**(검수 3명·D-07) |
-| [작업 7 — 심문관 · 프론트](07-intake-frontend.md) | Intake | 9/15 | #26 | AI 파트 · **프론트** · 백엔드(submissions) |
-| [작업 8 — 장애 복구 · 관측 · 리허설 · 동결](08-failure-recovery-rehearsal.md) | M4 | 9/18 | #28~#30 | AI 파트 · 백엔드(watchdog·round·시드·짤) · 프론트 |
-| [P1 로드맵](09-p1-roadmap.md) | P1 | 10/6~ | #31 | 아키텍트 · 팀 |
+| [작업 7 — 심문관 · 프론트](archive/07-intake-frontend.md) | Intake | 9/15 | #26 | AI 파트 · **프론트** · 백엔드(submissions) |
+| [작업 8 — 장애 복구 · 관측 · 리허설 · 동결](archive/08-failure-recovery-rehearsal.md) | M4 | 9/18 | #28~#30 | AI 파트 · 백엔드(watchdog·round·시드·짤) · 프론트 |
+| [P1 로드맵](archive/09-p1-roadmap.md) | P1 | 10/6~ | #31 | 아키텍트 · 팀 |
 | [백엔드 계약서](10-backend-contract.md) | Contract | 9/8~9/17 | #1, #9, #27 + 각 절 | **백엔드 담당 필독** |
-| [로컬 전체 흐름 검증](14-local-e2e-validation.md) | 9/15 검증·후속 계획 | — | 실제 연결의 기준선 | AI 파트 |
+| [로컬 전체 흐름 검증](archive/14-local-e2e-validation.md) | 9/15 검증·후속 계획 | — | 실제 연결의 기준선 | AI 파트 |
 | [로컬 구현·재실행](15-local-e2e-implementation.md) | 9/16 검증·증거·참고 패치 | — | 무료 E2E, PNG, 이미지 등록 | AI 파트 |
-| [프론트 반영 요청](16-frontend-handoff.md) | 신규 posts·저장 PNG·관리자 파일 등록 | — | 프론트 인수인계 | 프론트 담당 |
-| [백엔드 전달 보고서 9/15](17-backend-status-report-2026-09-15.md) | 백엔드 → AI: 할 일 10·질문 15·10 과 달라진 점·§0.1 반영 제안 | — | 백엔드가 쓴 보고서. 10 으로 옮기는 것은 사람(A3 는 9/16 정정, 10 §16.6) | 백엔드 담당 |
+| [프론트 반영 요청](archive/16-frontend-handoff.md) | 신규 posts·저장 PNG·관리자 파일 등록 | — | 프론트 인수인계 | 프론트 담당 |
+| [백엔드 전달 보고서 9/15](archive/17-backend-status-report-2026-09-15.md) | 백엔드 → AI: 할 일 10·질문 15·10 과 달라진 점·§0.1 반영 제안 | — | 백엔드가 쓴 보고서. 10 으로 옮기는 것은 사람(A3 는 9/16 정정, 10 §16.6) | 백엔드 담당 |
 
 ---
 

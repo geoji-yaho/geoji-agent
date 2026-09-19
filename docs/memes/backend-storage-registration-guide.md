@@ -18,7 +18,7 @@ AI 워커나 b-meme 스킬이 업무 DB에 직접 쓰거나 S3에 직접 업로�
 - 확인한 백엔드 기준 커밋: `8b660a5655aa16541b7994cc4161a8e08ce5ae96`
 - 확인일: 2026-09-15
 - 관련 설계: `docs/plans/10-backend-contract.md` §2·§11,
-  `docs/plans/11-meme-hybrid-search-design.md` §3·§6·§8·§10
+  `docs/plans/archive/11-meme-hybrid-search-design.md` §3·§6·§8·§10
 
 ## 3. 현재 상태
 

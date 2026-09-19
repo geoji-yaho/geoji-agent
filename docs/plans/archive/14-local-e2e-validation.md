@@ -1,7 +1,7 @@
 # 로컬 판결·짤·카드 전체 흐름 검증
 
 검토일: 2026-09-15. 실제 실행 결과와 다음 구현 계획을 구분한다.
-후속 구현 및 최신 검증 결과는 [15 로컬 구현·재실행](15-local-e2e-implementation.md)을 참조한다.
+후속 구현 및 최신 검증 결과는 [15 로컬 구현·재실행](../15-local-e2e-implementation.md)을 참조한다.
 이번 사용자 요청: 로컬에서 먼저 사용자 입력 → 전원 투표 → AI 판결·검색 힌트 → 기존 짤 선택 →
 판결 저장을 검증한다. 완성 카드 PNG의 서버 저장과 사용자 기기 다운로드를 모두 지원하고,
 이후 사용자·관리자 이미지 등록 및 변환을 구현·검증한다.
@@ -84,8 +84,8 @@ flowchart TD
 
 보존한 실행 증거:
 
-- [로컬 DB 최종 집계 JSON](evidence/20260915/local-stack-summary.json): 조회 시각, 판결·작업·실제 모델 호출 건수.
-- [Java HTTP 비교 재현 파일](evidence/20260915/GeojiHttpProbe.java): 이번 실행에 사용한 원본.
+- [로컬 DB 최종 집계 JSON](../evidence/20260915/local-stack-summary.json): 조회 시각, 판결·작업·실제 모델 호출 건수.
+- [Java HTTP 비교 재현 파일](../evidence/20260915/GeojiHttpProbe.java): 이번 실행에 사용한 원본.
   localhost:18100과 고정된 테스트 토큰 `geoji-local-service`만 사용한다. 실제 자격증명이 아니다.
   5.2의 AI API를 먼저 실행한 뒤 JDK 25로 `java docs/plans/evidence/20260915/GeojiHttpProbe.java`를 실행한다.
   기본 버전/HTTP 1.1 × 고정 길이/스트리밍의 네 가지 상태 코드가 출력된다.

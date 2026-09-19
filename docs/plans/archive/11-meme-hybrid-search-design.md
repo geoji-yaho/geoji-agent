@@ -141,7 +141,7 @@ RRF 점수는 절대 적합도나 확률이 아니다. 후보가 있어도 부�
 
 ## 11. 참고
 
-- [기존 백엔드 계약](10-backend-contract.md) §1·§11
+- [기존 백엔드 계약](../10-backend-contract.md) §1·§11
 - [pgvector 하이브리드 검색](https://github.com/pgvector/pgvector#hybrid-search)
 - [PostgreSQL 전문 검색과 설정](https://www.postgresql.org/docs/current/textsearch-intro.html)
 - [S3 presigned 업로드와 동일 키 덮어쓰기](https://docs.aws.amazon.com/AmazonS3/latest/userguide/PresignedUrlUploadObject.html)

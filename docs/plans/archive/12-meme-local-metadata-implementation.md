@@ -9,7 +9,7 @@
 - `skills/b-meme/scripts/save_metadata.py`: v1 입력·출력 호환, v2 검증·저장, 검색 문서와 해시 생성.
 - `tests/test_b_meme_metadata.py`: v1 회귀 및 v2 정상·경계·실패·재실행 검사.
 - `skills/b-meme/SKILL.md`, `references/classification.md`: 새 작성 형식과 변환 절차.
-- `docs/plans/13-meme-reranking-evaluation.md`: 모델 비교 실험 방법과 채택 기준.
+- `docs/plans/archive/13-meme-reranking-evaluation.md`: 모델 비교 실험 방법과 채택 기준.
 
 백엔드의 asset_id·asset_version·owner_id, 저장 상태와 임베딩 모델·벡터는 발급하거나 추측하지 않는다. 실제 이미지 형식·크기 검증은 등록 단계 책임으로 남기며 이번 로컬 파일 해시는 등록 가능성이나 이미지 유효성 인증을 뜻하지 않는다. 외부 API 호출·라이브러리 추가·DB/public API 변경은 없다.
 

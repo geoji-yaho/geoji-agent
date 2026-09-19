@@ -1,11 +1,11 @@
 # 로컬 판결·PNG·이미지 등록 구현과 검증
 
-확인일: 2026-09-16. [14의 계획과 이전 실행](14-local-e2e-validation.md)을 이어 구현한 결과다.
+확인일: 2026-09-16. [14의 계획과 이전 실행](archive/14-local-e2e-validation.md)을 이어 구현한 결과다.
 실제 Spring·PostgreSQL·Python API/worker·React를 사용했다. 아래 무료 E2E의 모델 응답은
 테스트 전용 fixture이며, 실제 LLM의 품질·지연시간 검증과 구분한다.
 
 **후속 인계:** 프론트·백엔드는 커밋·푸시하지 않고 참고 패치로만 보존한다. 관리자 b-meme
-완성 파일의 키 없는 등록은 [10 §16.5](10-backend-contract.md), 프론트 요청은 [16](16-frontend-handoff.md)에
+완성 파일의 키 없는 등록은 [10 §16.5](10-backend-contract.md), 프론트 요청은 [16](archive/16-frontend-handoff.md)에
 남겼다. 키는 배포 시 프로세스 환경변수로 주입할 수 있으며 현재 유료 실측은 실행하지 않는다.
 
 ## 1. 구현 범위

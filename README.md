@@ -12,7 +12,7 @@
 이 저장소에는 AI 변경과 검증 도구를 반영한다. 프론트·백엔드 변경은 임시 checkout에서
 검증한 참고 패치이며, 해당 저장소에 커밋·푸시하지 않았다.
 [백엔드 요청사항](docs/plans/10-backend-contract.md)과
-[프론트 요청사항](docs/plans/16-frontend-handoff.md)을 각 담당자가 검토해 반영한다.
+[프론트 요청사항](docs/plans/archive/16-frontend-handoff.md)을 각 담당자가 검토해 반영한다.
 
 9/17 후속: 카드 본문 1항목 수용과 짧은 기본 문구는 최신 server `c970ab4`에서
 `codex/card-text-contract` 브랜치로 수정했다. 백엔드 전체 빌드·536개 테스트를 통과했으며,

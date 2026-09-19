@@ -7,7 +7,7 @@
 
 ## Target (대상)
 
-- 문서·카드: {02 CT-01·CT-02. `docs/plans/02-jobs-queue-lease.md` §3.2, §4.2}
+- 문서·카드: {02 CT-01·CT-02. `docs/plans/archive/02-jobs-queue-lease.md` §3.2, §4.2}
 - 브랜치: `{feat-NN-topic}`. orca 가 워크트리 이름으로 만든다. 바꾸지 않는다
 
 ## Change (만들 것)

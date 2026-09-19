@@ -114,4 +114,4 @@ AI 는 **평결을 내리지 않는다.** 평결은 배심원 투표의 결과�
 | 역할별 모델·상한 설정 | `src/geoji_ai/core/config.py` (`MODEL_JUDGMENT` `MODEL_WRITER` `MODEL_EVALUATOR_HELL`, `*_TIMEOUT_SECONDS`) |
 | job 종류 → 처리기 | `src/geoji_ai/workers/dispatch.py` |
 | 검증 규칙(구조·텍스트) · 어휘 목록 · 공격 각도 | `src/geoji_ai/domain/{validation,lexicon,attack_angles}.py` |
-| 계획서(설계 정본) | `docs/plans/05-graphs-b-c.md`(B·C) · `07-intake-frontend.md`(A) · `06-real-model-budget-prompts-eval.md`(프롬프트·정책) |
+| 계획서(설계 정본) | `docs/plans/05-graphs-b-c.md`(B·C) · `archive/07-intake-frontend.md`(A) · `06-real-model-budget-prompts-eval.md`(프롬프트·정책) |
