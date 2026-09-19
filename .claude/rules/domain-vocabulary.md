@@ -20,12 +20,13 @@ paths:
 
 - 강도 `mild|spicy|hell`, 평결 `guilty|notGuilty|agree|disagree|dismissed`, 게시물 `spent|considering`, 형량 `probation|oneDay|life`, 카테고리 11종 고정
 - 정본은 형제 저장소 `geoji-web/src/shared/domain/`(위치는 `CLAUDE.md`의 `GEOJIBANG_ROOT` 규칙). 새 예시를 쓸 때 대문자 `MILD/GUILTY/DAYS_1`을 쓰지 않는다. `scripts/probe_writer_latency.py`의 대문자는 치환 전 잔재다
-- 대문자를 유지하는 것은 식별자뿐이다. 짤 태그 5종(`GUILTY_HEAVY` 등), `MODEL_EVALUATOR_HELL`, `NO_SPEND`, job kind(`SENTENCE`, `PREPARE`, `RETAIN`, `TEXT_RETRY`), 상태값(`PENDING/FINAL`, `TEMPLATE_READY/AI_READY`), 오류 코드(`AI_NOT_READY`, `STALE_GENERATION`, `EVIDENCE_INVALIDATED`), 소스(`AI/TEMPLATE/RULE`), 정책 버전(`guardrail-v2`)
+- 대문자를 유지하는 것은 식별자뿐이다. 짤 태그 5종(`GUILTY_HEAVY` 등), `MODEL_EVALUATOR_HELL`, `NO_SPEND`, job kind(`SENTENCE`, `PREPARE`, `RETAIN`, `TEXT_RETRY`, `JURY_VOTE`), 상태값(`PENDING/FINAL`, `TEMPLATE_READY/AI_READY`), 오류 코드(`AI_NOT_READY`, `STALE_GENERATION`, `EVIDENCE_INVALIDATED`), 소스(`AI/TEMPLATE/RULE`), 정책 버전(`guardrail-v2`)
 
 ## ID 체계
 
 - 결정 `D-NN`, 카드 `CT-NN`(문서별 접두어), 근거 라벨 `F0~F6`
-- 마이그레이션 `001~005`. 001~003 AI, 004 백엔드, 005 P1
+- 마이그레이션 `001~006`. 001~003·006 AI, 004 백엔드, 005 P1. 러너는 번호 4 를 건너뛴다
+- AI 사용자는 떼거지봇 하나. 역할 이름은 배심원(juror), 잡은 `JURY_VOTE`. 백엔드 전달 문서는 19
 - 마일스톤 M2 9/10, M3 9/15, M4 9/18, 9/20 동결
 
 ## 구조와 수치(바꾸면 00 §1 표와 §7 표도 같이)

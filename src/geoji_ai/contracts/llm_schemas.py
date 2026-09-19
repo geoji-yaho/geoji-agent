@@ -13,14 +13,17 @@ from typing import Any
 
 from geoji_ai.contracts.evaluation import EvaluationReport
 from geoji_ai.contracts.intake import IntakeResult
+from geoji_ai.contracts.juror import JurorVote
 from geoji_ai.contracts.sentencing import SentencingDecision
 from geoji_ai.contracts.writer import BanterStrategy, CardTextDraft, WriterDraft
 
 __all__ = [
+    "VERDICTS_BY_POST_TYPE",
     "banter_schema",
     "context_schema",
     "evaluator_schema",
     "intake_schema",
+    "juror_schema",
     "sentencing_schema",
     "with_enums",
     "writer_schema",
@@ -204,6 +207,27 @@ def banter_schema(strategies: Sequence[str] | None = None) -> dict[str, Any]:
     if strategies is not None:
         schema = with_enums(schema, **{"candidates[].strategy": list(strategies)})
     return schema
+
+
+#: 게시물 유형별 투표 가능 평결(18 §3.2, 프론트 `VOTE_VERDICTS` 와 같은 값).
+VERDICTS_BY_POST_TYPE: dict[str, tuple[str, ...]] = {
+    "spent": ("guilty", "notGuilty"),
+    "considering": ("agree", "disagree"),
+}
+
+
+def juror_schema(post_type: str) -> dict[str, Any]:
+    """배심원(떼거지봇). 게시물 유형에 맞는 평결 2개만 enum 으로 남긴다.
+
+    xAI strict 는 enum·`maxLength` 를 강제하지 않는다(06 §3.3 9/18 실측). 실제 검증은
+    `graphs/jury_vote.py` 가 하고, 이 스키마는 모델에게 모양을 알려 주는 역할이다.
+    """
+    try:
+        verdicts = VERDICTS_BY_POST_TYPE[post_type]
+    except KeyError:
+        raise ValueError(f"알 수 없는 게시물 유형: {post_type!r}") from None
+    schema = _derive(JurorVote)
+    return with_enums(schema, verdict=list(verdicts))
 
 
 def sentencing_schema(allowed_sentences: Sequence[str]) -> dict[str, Any]:

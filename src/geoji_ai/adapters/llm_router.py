@@ -34,6 +34,8 @@ ROLE_VENDOR: dict[str, Vendor] = {
     "evaluator": "openai",
     "banter": "xai",
     "writer": "xai",
+    # 18 §3.2 데모 AI 배심원. 서기와 같은 벤더·기본 모델(`MODEL_WRITER`)이다.
+    "juror": "xai",
 }
 
 
