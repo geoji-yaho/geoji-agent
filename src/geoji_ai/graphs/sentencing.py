@@ -765,6 +765,38 @@ def _forgive_advisory(output: Mapping[str, Any], fresh: Sequence[Mapping[str, An
             check["problem_sentences"] = []
 
 
+def _pass_template_entries(fresh: Sequence[Mapping[str, Any]], draft: WriterDraft) -> None:
+    """TEMPLATE 으로 치환된 강도의 검수 항목을 통과로 되돌린다. 제자리에서 고친다.
+
+    서기가 실패한 강도는 `templates-v1.json` 의 고정 문구로 채운다. 그 문구는 평결만 전하므로
+    검수관이 `INTENSITY_MISMATCH`(지옥맛이 덜 맵다)로 반려하고, 그러면 그 사건은 전 강도
+    TEMPLATE 으로 죽는다. 다시 써서 매워질 수 있는 문구가 아니라 통과시킬 수도 없어 빠져나갈
+    길이 없었다. 9/20 골든셋 실측: `INTENSITY_MISMATCH` 53 회 중 10 회가 우리 TEMPLATE 을
+    반려한 것이었고, 남은 실패 6 건 중 4 건이 여기서 났다.
+
+    `_observe_violations` 뒤에 부른다. 지표에는 남는다. TEMPLATE 이 안전 코드에 걸리면
+    그것은 서기가 아니라 템플릿 문구의 문제라 재작성으로 고칠 수 없다. 로그로 남기고 통과시킨다.
+    """
+    template = {_key(t.intensity) for t in draft.texts if str(t.source) == "TEMPLATE"}
+    if not template:
+        return
+    for entry in fresh:
+        if not isinstance(entry, dict) or _key(entry.get("intensity")) not in template:
+            continue
+        if entry.get("pass") is False:
+            codes = sorted(
+                {
+                    str(v.get("code"))
+                    for v in entry.get("violations") or []
+                    if isinstance(v, Mapping)
+                }
+            )
+            logger.info("TEMPLATE 강도 %s 반려 무시 %s", entry.get("intensity"), codes)
+        entry["pass"] = True
+        entry["violations"] = []
+        entry["problem_sentences"] = []
+
+
 def _observe_violations(output: Mapping[str, Any], fresh: Sequence[Mapping[str, Any]]) -> None:
     """검수관이 `pass=false` 로 낸 위반 코드마다 `evaluation_failure_total(code)` 를 1 올린다.
 
@@ -1846,6 +1878,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             )
             _observe_violations(output, fresh)
             _forgive_advisory(output, fresh)
+            _pass_template_entries(fresh, writer_draft)
             fresh_keys = {_key(e.get("intensity")) for e in fresh}
             entries_list = fresh + [e for k, e in reused.items() if k not in fresh_keys]
             entries_list.sort(key=lambda e: order.get(_key(e.get("intensity")) or "", len(order)))

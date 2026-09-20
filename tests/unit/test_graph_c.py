@@ -560,6 +560,37 @@ def test_06_hell_writer_failure_gives_partial_template() -> None:
     assert result.backend.failed == []
 
 
+def test_06b_template_intensity_is_not_graded() -> None:
+    """서기 실패로 TEMPLATE 이 된 강도를 검수관이 반려해도 무시한다(9/20).
+
+    TEMPLATE 은 `templates-v1.json` 의 고정 문구라 다시 써서 매워질 수 없다. 그런데 검수관이
+    "지옥맛이 덜 맵다" 로 반려하면 그 사건이 전 강도 TEMPLATE 으로 죽는다. 빠져나갈 길이 없다.
+    골든셋 실측: `INTENSITY_MISMATCH` 53 회 중 10 회가 우리 TEMPLATE 을 반려한 것이었다.
+    """
+    llm = ScriptedLLM(
+        FakeScenario.INTENSITY_FAIL,
+        sequences={
+            "evaluator": [
+                report(["spicy", "hell"], fail=["hell"], code="INTENSITY_MISMATCH")
+            ]
+        },
+    )
+    result = run(llm)
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [
+        ("spicy", "AI"),
+        ("hell", "TEMPLATE"),
+    ]
+    # 재작성도 재검수도 없다. TEMPLATE 은 고쳐 쓸 수 있는 글이 아니다.
+    assert result.roles()["evaluator"] == 1
+    assert result.state["repair_count"] == 0
+    assert [(t.intensity, t.pass_) for t in req.evaluation.texts] == [
+        ("spicy", True),
+        ("hell", True),
+    ]
+    assert result.backend.failed == []
+
+
 def test_07_missing_intensity_in_report_becomes_template() -> None:
     """⑦ 검수 보고서 강도 누락 → 그 강도 TEMPLATE(바뀐 draft 는 한 번 더 검수)."""
     llm = ScriptedLLM(sequences={"evaluator": [evaluation_without("hell"), None]})
