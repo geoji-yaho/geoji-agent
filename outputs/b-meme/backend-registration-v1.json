@@ -244,6 +244,100 @@
       "suggested_object_key": "memes/seed/park-stop-it/v1/image.png",
       "image_url": null,
       "is_active": false
+    },
+    {
+      "asset_key": "run20260916-mnet-necklace",
+      "asset_path": "outputs/b-meme/run-20260916-new-inputs/002-Mnet-necklace.png",
+      "metadata_path": "outputs/b-meme/run-20260916-new-inputs/002-Mnet-necklace.metadata.json",
+      "asset_sha256": "d70446c7430a284c87059023c315de51d02891268aa426dee0635d155d0b61f0",
+      "byte_size": 1969675,
+      "mime_type": "image/png",
+      "width": 1674,
+      "height": 940,
+      "tag": "APPROVED",
+      "strategies": [],
+      "emotions": [
+        "CELEBRATION"
+      ],
+      "keywords": [
+        "합격",
+        "목걸이",
+        "인정"
+      ],
+      "suggested_object_key": "memes/seed/run20260916-mnet-necklace/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "run20260916-proceed",
+      "asset_path": "outputs/b-meme/run-20260916-new-inputs/012-images-8.png",
+      "metadata_path": "outputs/b-meme/run-20260916-new-inputs/012-images-8.metadata.json",
+      "asset_sha256": "0c46205b3f266353e659b38aab15154ef813c19b634151cf8b8654631ca94c32",
+      "byte_size": 2092315,
+      "mime_type": "image/png",
+      "width": 1275,
+      "height": 1233,
+      "tag": "APPROVED",
+      "strategies": [],
+      "emotions": [
+        "SMUG"
+      ],
+      "keywords": [
+        "진행시켜",
+        "능청",
+        "전화"
+      ],
+      "suggested_object_key": "memes/seed/run20260916-proceed/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "run20260916-understood",
+      "asset_path": "outputs/b-meme/run-20260916-new-inputs/013-images-9.png",
+      "metadata_path": "outputs/b-meme/run-20260916-new-inputs/013-images-9.metadata.json",
+      "asset_sha256": "d54551f0c694bc962184d69e7588f023d9dc355e33fe22b9468bd0e65d83451b",
+      "byte_size": 2094113,
+      "mime_type": "image/png",
+      "width": 1322,
+      "height": 1190,
+      "tag": "NOT_GUILTY",
+      "strategies": [],
+      "emotions": [
+        "ABSURD_SERIOUSNESS"
+      ],
+      "keywords": [
+        "납득",
+        "당황",
+        "담담함"
+      ],
+      "suggested_object_key": "memes/seed/run20260916-understood/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "run20260916-acknowledging-penguin",
+      "asset_path": "outputs/b-meme/run-20260916-new-inputs/014-images-jpeg.png",
+      "metadata_path": "outputs/b-meme/run-20260916-new-inputs/014-images-jpeg.metadata.json",
+      "asset_sha256": "7c733b06711cfc8a209de817474c67073902f9e368a06e63ebb9f16055672656",
+      "byte_size": 1981177,
+      "mime_type": "image/png",
+      "width": 1254,
+      "height": 1254,
+      "tag": "APPROVED",
+      "strategies": [],
+      "emotions": [
+        "CELEBRATION"
+      ],
+      "keywords": [
+        "인정",
+        "펭귄",
+        "수긍",
+        "유쾌",
+        "유머러스"
+      ],
+      "suggested_object_key": "memes/seed/run20260916-acknowledging-penguin/v1/image.png",
+      "image_url": null,
+      "is_active": false
     }
   ]
 }

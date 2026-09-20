@@ -1,0 +1,1597 @@
+{
+  "model_calls": [
+    {
+      "id": "0a48f32c-994c-42bb-81db-2a10b2e7e775",
+      "post_id": "submission:96816e63-b065-443f-99f9-8d7ffe482c24",
+      "job_id": null,
+      "node": "intake",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 532,
+      "prompt_tokens": 1851,
+      "completion_tokens": 135,
+      "reasoning_tokens": 70,
+      "latency_ms": "3738.614000",
+      "validated_output": null
+    },
+    {
+      "id": "df25b148-10aa-414c-b56a-3a081694e619",
+      "post_id": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+      "job_id": "e1e2af97-f904-458b-8426-778f681d9ed4",
+      "node": "context",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 565,
+      "prompt_tokens": 663,
+      "completion_tokens": 361,
+      "reasoning_tokens": 202,
+      "latency_ms": "3592.440000",
+      "validated_output": {
+        "facts": [
+          {
+            "kind": "MITIGATION",
+            "text": "기존 키보드가 고장 나 업무에 필요한 기본형으로 교체하려는 지출로 설명되어 있다.",
+            "source_refs": [
+              "F0"
+            ]
+          },
+          {
+            "kind": "MITIGATION",
+            "text": "이번 달 예산 소진율은 0%로 기재되어 있다.",
+            "source_refs": [
+              "F1"
+            ]
+          },
+          {
+            "kind": "MITIGATION",
+            "text": "최근 30일 동안 같은 카테고리의 확정 소비가 0건으로 기재되어 있다.",
+            "source_refs": [
+              "F2"
+            ]
+          }
+        ],
+        "reason_analysis": {
+          "has_mitigation": true,
+          "mitigation_kind": "업무에 필요한 고장 물품 교체",
+          "injection_suspected": false
+        }
+      }
+    },
+    {
+      "id": "e19f3818-11b9-49df-9e6d-cdc2b05e6526",
+      "post_id": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+      "job_id": "e1e2af97-f904-458b-8426-778f681d9ed4",
+      "node": "banter",
+      "call_index": 0,
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "status": "COMPLETE",
+      "actual_micro_usd": 2714,
+      "prompt_tokens": 1247,
+      "completion_tokens": 543,
+      "reasoning_tokens": 0,
+      "latency_ms": "6330.847000",
+      "validated_output": {
+        "candidates": [
+          {
+            "fits": [
+              "agree",
+              "disagree"
+            ],
+            "text": "기존 키보드가 고장 났다니 안타깝지만, 이번 달 예산 소진율이 0%인 king 티어시라면 업무에 꼭 필요한 최소한의 교체만으로 충분할 것 같아요. 59,000원은 아메리카노 13잔에 해당하는 금액이니, 조금 더 저렴한 대안을 고려해보는 건 어떨까요?",
+            "strategy": "CHEAPER_ALTERNATIVE",
+            "evidence_labels": [
+              "F0",
+              "F1",
+              "F4"
+            ]
+          },
+          {
+            "fits": [
+              "guilty",
+              "notGuilty"
+            ],
+            "text": "최근 30일 동안 같은 카테고리 소비가 전혀 없고 이번 달 예산도 0% 소진 상태라면, 이번 키보드 교체는 충분히 합리적인 선택으로 보입니다. 업무에 직접 필요한 물품이니 허락해도 괜찮을 듯해요.",
+            "strategy": "NECESSITY_APPROVAL",
+            "evidence_labels": [
+              "F1",
+              "F2",
+              "F3",
+              "F4",
+              "F5"
+            ]
+          },
+          {
+            "fits": [
+              "agree"
+            ],
+            "text": "'기존 키보드가 고장 나서'라는 설명이 명확하고, 최근 30일 같은 카테고리 소비가 0건이라면 불필요한 반복 지출은 아닌 것 같아요. 다만 king 티어답게 조금 더 신중하게 최저가 옵션을 찾아보는 습관을 들이면 좋겠습니다.",
+            "strategy": "REPEAT_OFFENSE",
+            "evidence_labels": [
+              "F2",
+              "F3",
+              "F5"
+            ]
+          },
+          {
+            "fits": [
+              "notGuilty",
+              "disagree"
+            ],
+            "text": "이번 달 예산이 아직 0%밖에 안 쓰였고, 업무용 필수품 교체라는 점을 고려하면 이 지출 자체는 크게 문제없어 보이네요. 다만 59,000원이라는 금액이 아메리카노 13잔 분량이라는 사실을 떠올리며 다음부터는 더 경제적인 선택지도 함께 검토해보세요.",
+            "strategy": "EXCUSE_STRIPPING",
+            "evidence_labels": [
+              "F0",
+              "F1",
+              "F4"
+            ]
+          },
+          {
+            "fits": [
+              "guilty"
+            ],
+            "text": "고장 난 키보드를 업무용 기본형으로 교체하려는 계획 자체는 이해가 가지만, king 티어에서 59,000원을 한 번에 쓰는 대신 비슷한 성능의 더 저렴한 제품을 찾아보는 건 어떨까요?",
+            "strategy": "CHEAPER_ALTERNATIVE",
+            "evidence_labels": [
+              "F0",
+              "F1",
+              "F3"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "41216a4e-34cd-4b55-988c-36a7e8fdc743",
+      "post_id": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+      "job_id": "373e0c49-84df-47ca-941a-a7a521288973",
+      "node": "writer",
+      "call_index": 0,
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "status": "COMPLETE",
+      "actual_micro_usd": 4284,
+      "prompt_tokens": 3257,
+      "completion_tokens": 139,
+      "reasoning_tokens": 0,
+      "latency_ms": "2164.599000",
+      "validated_output": null
+    },
+    {
+      "id": "1eb3fb9a-8ca7-4f14-be24-4f456dfcbe9b",
+      "post_id": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+      "job_id": "373e0c49-84df-47ca-941a-a7a521288973",
+      "node": "writer",
+      "call_index": 3,
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "status": "COMPLETE",
+      "actual_micro_usd": 3867,
+      "prompt_tokens": 3429,
+      "completion_tokens": 128,
+      "reasoning_tokens": 0,
+      "latency_ms": "2688.369000",
+      "validated_output": {
+        "headline": "연말 잔고 0원 예언",
+        "meme_tag": "APPROVED",
+        "intensity": "mild",
+        "statement": [
+          {
+            "kind": "opinion",
+            "text": "이 속도면 연말엔 키보드값만 남아요.",
+            "evidence_labels": [
+              "F0"
+            ]
+          }
+        ],
+        "meme_hints": {
+          "emotion": "RESIGNATION",
+          "keywords": [
+            "예산",
+            "예언",
+            "연말"
+          ]
+        },
+        "attack_angle": "FUTURE_PROPHECY",
+        "banter_strategy": "CHEAPER_ALTERNATIVE",
+        "selected_candidate_id": "1fe436f3-4c5d-4e37-9584-02de6e6fcb48"
+      }
+    },
+    {
+      "id": "b5223d17-3679-4c5a-a4cb-8a7c07249d26",
+      "post_id": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+      "job_id": "373e0c49-84df-47ca-941a-a7a521288973",
+      "node": "evaluator",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 924,
+      "prompt_tokens": 2203,
+      "completion_tokens": 403,
+      "reasoning_tokens": 340,
+      "latency_ms": "4022.057000",
+      "validated_output": {
+        "texts": [
+          {
+            "pass": true,
+            "intensity": "mild",
+            "violations": [],
+            "problem_sentences": []
+          }
+        ],
+        "sentence_check": {
+          "pass": true,
+          "violations": []
+        },
+        "sentencing_reason_check": {
+          "pass": true,
+          "violations": []
+        }
+      }
+    },
+    {
+      "id": "18d7ff2b-993f-4549-b6c1-04c2cfe1fe3b",
+      "post_id": "submission:f4920efc-f72e-446f-9b9f-52f4c6dda93f",
+      "job_id": null,
+      "node": "intake",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 439,
+      "prompt_tokens": 1854,
+      "completion_tokens": 57,
+      "reasoning_tokens": 0,
+      "latency_ms": "1121.838000",
+      "validated_output": null
+    },
+    {
+      "id": "1712e8f2-657a-4a29-9619-4021b7d4a7f2",
+      "post_id": "93547ad5-3a9a-4d1a-98b6-83e03eaaf8d3",
+      "job_id": "8f119885-f7ac-4ac7-bf57-8cd4c418b4dd",
+      "node": "context",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 614,
+      "prompt_tokens": 671,
+      "completion_tokens": 400,
+      "reasoning_tokens": 191,
+      "latency_ms": "3321.627000",
+      "validated_output": {
+        "facts": [
+          {
+            "kind": "RULE_HIT",
+            "text": "운동화를 이미 네 켤레 보유하고 있으나 한정판이라는 이유로 품절 전에 구매하려는 사유가 제시되었다.",
+            "source_refs": [
+              "F0"
+            ]
+          },
+          {
+            "kind": "MITIGATION",
+            "text": "이번 달 예산 소진율은 0%이고, 최근 30일 동안 같은 카테고리의 확정 소비는 0건이다.",
+            "source_refs": [
+              "F1",
+              "F2"
+            ]
+          },
+          {
+            "kind": "REASON_ANALYSIS",
+            "text": "구매 사유는 기존에 운동화를 네 켤레 보유하고 있음에도 한정판의 품절 가능성을 고려해 구매를 희망한다는 내용이다.",
+            "source_refs": [
+              "F0"
+            ]
+          }
+        ],
+        "reason_analysis": {
+          "has_mitigation": true,
+          "mitigation_kind": "이번 달 예산 소진 없음 및 최근 동일 카테고리 확정 소비 없음",
+          "injection_suspected": false
+        }
+      }
+    },
+    {
+      "id": "646383d8-e048-435d-afd5-384547625c20",
+      "post_id": "93547ad5-3a9a-4d1a-98b6-83e03eaaf8d3",
+      "job_id": "8f119885-f7ac-4ac7-bf57-8cd4c418b4dd",
+      "node": "banter",
+      "call_index": 0,
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "status": "COMPLETE",
+      "actual_micro_usd": 2785,
+      "prompt_tokens": 1240,
+      "completion_tokens": 548,
+      "reasoning_tokens": 0,
+      "latency_ms": "7706.167000",
+      "validated_output": {
+        "candidates": [
+          {
+            "fits": [
+              "guilty",
+              "disagree"
+            ],
+            "text": "한정판이니까 품절되기 전에? 그럼 네 켤레는 이미 품절 안 된 거고, 이번 것도 곧 품절 안 될 텐데. 64잔 아메리카노를 ‘사고 싶어요’ 한 마디로 날려버리는 판단력이 레전드네요. 아직 예산 0% 소진인데 이게 진짜 필요였나요?",
+            "strategy": "EXCUSE_STRIPPING",
+            "evidence_labels": [
+              "F0",
+              "F3"
+            ]
+          },
+          {
+            "fits": [
+              "guilty",
+              "disagree"
+            ],
+            "text": "운동화 네 켤레 있는데 한정판이라는 말 한 번에 289000원? 최근 30일 동안 같은 카테고리 0건, 이번 달 예산도 0% 썼는데 이게 ‘필요’라고 우길 수 있나요. 그냥 ‘사고 싶다’를 ‘한정판’으로 포장한 거 실화냐.",
+            "strategy": "PREMISE_REJECTION",
+            "evidence_labels": [
+              "F0",
+              "F2",
+              "F3",
+              "F4"
+            ]
+          },
+          {
+            "fits": [
+              "notGuilty",
+              "agree"
+            ],
+            "text": "티어 king에 예산 0% 소진, 최근 30일 패션 소비 0건. 이 상황에서 64회분 아메리카노를 한 번에 쓰는 게 ‘무지출 0일’을 지키는 방법인가요? 솔직히 이건 필요가 아니라 그냥 충동 아닌가요.",
+            "strategy": "NECESSITY_APPROVAL",
+            "evidence_labels": [
+              "F1",
+              "F2",
+              "F4"
+            ]
+          },
+          {
+            "fits": [
+              "guilty",
+              "disagree"
+            ],
+            "text": "이미 네 켤레 있는데 ‘품절되기 전에’라는 말로 289000원을 정당화하는 건, 사실상 ‘사고 싶다’를 변명으로 바꾼 거예요. 0% 예산에 0건 소비 기록이 있는데 이게 정말 합리적인 선택이었나요?",
+            "strategy": "EXCUSE_STRIPPING",
+            "evidence_labels": [
+              "F0",
+              "F3",
+              "F4"
+            ]
+          },
+          {
+            "fits": [
+              "guilty",
+              "disagree"
+            ],
+            "text": "한정판 때문에 64잔어치 돈을 쓰는 선택을 king 티어, 예산 0%, 최근 소비 0건인 사람이 했다는 게 웃기면서도 어이없네요. 이게 진짜 ‘사고 싶어서’가 아니라 ‘필요해서’였다고 믿으시나요?",
+            "strategy": "PREMISE_REJECTION",
+            "evidence_labels": [
+              "F0",
+              "F1",
+              "F2",
+              "F3"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "abdc1088-f5da-4898-9c4f-640c3596caa7",
+      "post_id": "93547ad5-3a9a-4d1a-98b6-83e03eaaf8d3",
+      "job_id": "d9804a76-c253-426f-8ae7-402b8df2c9fe",
+      "node": "writer",
+      "call_index": 0,
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "status": "COMPLETE",
+      "actual_micro_usd": 4664,
+      "prompt_tokens": 3641,
+      "completion_tokens": 99,
+      "reasoning_tokens": 0,
+      "latency_ms": "1981.700000",
+      "validated_output": {
+        "headline": "64잔 대신 운동화",
+        "meme_tag": "REJECTED",
+        "intensity": "spicy",
+        "statement": [
+          {
+            "kind": "opinion",
+            "text": "64잔 아메리카노가 한 켤레로 바뀌네.",
+            "evidence_labels": [
+              "F0"
+            ]
+          }
+        ],
+        "meme_hints": {
+          "emotion": "SMUG",
+          "keywords": [
+            "한정판",
+            "64잔",
+            "운동화"
+          ]
+        },
+        "attack_angle": "CONVERSION",
+        "banter_strategy": "PREMISE_REJECTION",
+        "selected_candidate_id": null
+      }
+    },
+    {
+      "id": "1620f2e2-35ca-4b5a-84bf-02b8021f8b2d",
+      "post_id": "93547ad5-3a9a-4d1a-98b6-83e03eaaf8d3",
+      "job_id": "d9804a76-c253-426f-8ae7-402b8df2c9fe",
+      "node": "evaluator",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 994,
+      "prompt_tokens": 2172,
+      "completion_tokens": 467,
+      "reasoning_tokens": 298,
+      "latency_ms": "4655.008000",
+      "validated_output": null
+    },
+    {
+      "id": "afc98882-953f-40f1-83a8-059c9c8fd9d2",
+      "post_id": "submission:ea026e78-e7bb-450a-a8ff-debf85665d98",
+      "job_id": null,
+      "node": "intake",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 438,
+      "prompt_tokens": 1850,
+      "completion_tokens": 57,
+      "reasoning_tokens": 0,
+      "latency_ms": "852.704000",
+      "validated_output": null
+    },
+    {
+      "id": "8e894456-0b14-4dcf-818f-1108d1e47193",
+      "post_id": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+      "job_id": "c9cb8e50-f9d9-490e-9a84-568d96b7e487",
+      "node": "context",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 969,
+      "prompt_tokens": 742,
+      "completion_tokens": 684,
+      "reasoning_tokens": 346,
+      "latency_ms": "4823.680000",
+      "validated_output": {
+        "facts": [
+          {
+            "kind": "REASON_ANALYSIS",
+            "text": "이번 지출은 교통/택시 항목의 12,000원 소비이며, 지하철 기본요금 1,400원 기준 약 8회분으로 제시되어 있다.",
+            "source_refs": [
+              "F0"
+            ]
+          },
+          {
+            "kind": "REASON_ANALYSIS",
+            "text": "사유에는 알람을 끄고 다시 잠든 뒤 지각할 것 같아 택시를 이용했다는 내용이 있다.",
+            "source_refs": [
+              "F0"
+            ]
+          },
+          {
+            "kind": "REASON_ANALYSIS",
+            "text": "이번 달 예산 소진율은 2%이고, 티어는 king이며, 무지출 일수는 0일이다.",
+            "source_refs": [
+              "F1"
+            ]
+          },
+          {
+            "kind": "REASON_ANALYSIS",
+            "text": "최근 30일 동안 같은 카테고리의 확정 소비는 0건이다.",
+            "source_refs": [
+              "F2"
+            ]
+          },
+          {
+            "kind": "REASON_ANALYSIS",
+            "text": "지난 판결의 결과는 agree였고 유죄 비율은 0%로 제시되어 있다.",
+            "source_refs": [
+              "F3"
+            ]
+          },
+          {
+            "kind": "REASON_ANALYSIS",
+            "text": "지난 지출로 기타 항목에서 59,000원을 사용했으며, 기존 키보드 고장으로 업무에 필요한 기본형으로 교체하려 했다는 사유가 제시되어 있다.",
+            "source_refs": [
+              "F4"
+            ]
+          }
+        ],
+        "reason_analysis": {
+          "has_mitigation": true,
+          "mitigation_kind": "지각 우려로 인한 택시 이용 사유",
+          "injection_suspected": false
+        }
+      }
+    },
+    {
+      "id": "e193c700-7706-4ccf-bddc-051385a48363",
+      "post_id": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+      "job_id": "c9cb8e50-f9d9-490e-9a84-568d96b7e487",
+      "node": "banter",
+      "call_index": 0,
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "status": "COMPLETE",
+      "actual_micro_usd": 2308,
+      "prompt_tokens": 1228,
+      "completion_tokens": 363,
+      "reasoning_tokens": 0,
+      "latency_ms": "4357.538000",
+      "validated_output": {
+        "candidates": [
+          {
+            "fits": [
+              "guilty"
+            ],
+            "text": "지하철 1,400원이 8회분이나 되는데, 알람을 조금만 더 일찍 맞춰보는 건 어떨까요? 택시비 12,000원은 아까운 선택이었던 것 같습니다.",
+            "strategy": "CHEAPER_ALTERNATIVE",
+            "evidence_labels": [
+              "F0"
+            ]
+          },
+          {
+            "fits": [
+              "agree",
+              "disagree"
+            ],
+            "text": "이번 달 무지출 기록이 아직 없고 예산도 2%밖에 안 썼는데, 택시 대신 지하철로 충분히 대체할 수 있지 않을까요?",
+            "strategy": "FREE_ALTERNATIVE",
+            "evidence_labels": [
+              "F1",
+              "F0"
+            ]
+          },
+          {
+            "fits": [
+              "guilty"
+            ],
+            "text": "지난 30일 동안 교통/택시 카테고리에서 확정 소비가 전혀 없었는데, 이번 한 번의 지각으로 택시를 이용하신 건 조금 아쉬운 판단입니다.",
+            "strategy": "PREMISE_REJECTION",
+            "evidence_labels": [
+              "F2",
+              "F0"
+            ]
+          },
+          {
+            "fits": [
+              "notGuilty",
+              "agree"
+            ],
+            "text": "지난 판결에서도 agree로 마무리되었고 유죄 비율이 0%였는데, 이번에도 비슷한 상황에서 택시를 선택하신 이유를 다시 한 번 생각해보시는 건 어떨까요?",
+            "strategy": "ROOM_RULE_CALLBACK",
+            "evidence_labels": [
+              "F3"
+            ]
+          },
+          {
+            "fits": [
+              "guilty",
+              "disagree"
+            ],
+            "text": "기존 키보드를 교체하실 때처럼 업무에 꼭 필요한 상황이 아니었다면, 이번 택시 지출은 조금 더 신중하게 결정할 수 있지 않았을까요?",
+            "strategy": "EXCUSE_STRIPPING",
+            "evidence_labels": [
+              "F4",
+              "F0"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "17d30cbf-120d-4ba5-9747-9556fd74a64e",
+      "post_id": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+      "job_id": "db381e87-635f-4ee2-aac2-ea3138be77e9",
+      "node": "sentencing",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 461,
+      "prompt_tokens": 837,
+      "completion_tokens": 245,
+      "reasoning_tokens": 116,
+      "latency_ms": "2168.405000",
+      "validated_output": {
+        "sentence": "oneDay",
+        "mitigating": [
+          "최근 30일 같은 카테고리 소비 0건",
+          "이번 달 예산 소진율 2%"
+        ],
+        "aggravating": [
+          "알람을 끄고 다시 자 택시를 이용함"
+        ],
+        "evidence_labels": [
+          "F0",
+          "F1",
+          "F2"
+        ],
+        "sentencing_reason": "유죄율 100%이고 지각을 피하려 택시를 탔지만, 같은 달 반복이 없고 예산 소진율이 2%라 하루 형으로 정한다."
+      }
+    },
+    {
+      "id": "e9465ca4-7377-4497-8f9b-0ee1450eb4c2",
+      "post_id": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+      "job_id": "db381e87-635f-4ee2-aac2-ea3138be77e9",
+      "node": "writer",
+      "call_index": 0,
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "status": "COMPLETE",
+      "actual_micro_usd": 3823,
+      "prompt_tokens": 3396,
+      "completion_tokens": 127,
+      "reasoning_tokens": 0,
+      "latency_ms": "1895.314000",
+      "validated_output": {
+        "headline": "알람 1초, 택시 8회",
+        "meme_tag": "GUILTY_LIGHT",
+        "intensity": "mild",
+        "statement": [
+          {
+            "kind": "opinion",
+            "text": "지각 한 번에 택시 8회분이네요.",
+            "evidence_labels": [
+              "F0"
+            ]
+          }
+        ],
+        "meme_hints": {
+          "emotion": "PITY",
+          "keywords": [
+            "지각",
+            "택시",
+            "반복",
+            "알람"
+          ]
+        },
+        "attack_angle": "REPETITION",
+        "banter_strategy": "CHEAPER_ALTERNATIVE",
+        "selected_candidate_id": "ef13a6cb-c495-478d-9f41-bffd8cf43fcc"
+      }
+    },
+    {
+      "id": "d2933b2d-befd-48cc-bb30-484a52c4bcf3",
+      "post_id": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+      "job_id": "db381e87-635f-4ee2-aac2-ea3138be77e9",
+      "node": "evaluator",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 1025,
+      "prompt_tokens": 2353,
+      "completion_tokens": 462,
+      "reasoning_tokens": 399,
+      "latency_ms": "4058.633000",
+      "validated_output": {
+        "texts": [
+          {
+            "pass": true,
+            "intensity": "mild",
+            "violations": [],
+            "problem_sentences": []
+          }
+        ],
+        "sentence_check": {
+          "pass": true,
+          "violations": []
+        },
+        "sentencing_reason_check": {
+          "pass": true,
+          "violations": []
+        }
+      }
+    },
+    {
+      "id": "ec48bb19-1217-4d67-9839-8cfdc374d2a4",
+      "post_id": "submission:659b7543-3885-41db-915c-36922340f322",
+      "job_id": null,
+      "node": "intake",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 438,
+      "prompt_tokens": 1852,
+      "completion_tokens": 57,
+      "reasoning_tokens": 0,
+      "latency_ms": "1390.624000",
+      "validated_output": null
+    },
+    {
+      "id": "8e94303e-2f83-4d37-8326-b2af4dfc6622",
+      "post_id": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+      "job_id": "0e0ef665-7252-4bcf-b11b-1458080a3305",
+      "node": "context",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 981,
+      "prompt_tokens": 749,
+      "completion_tokens": 693,
+      "reasoning_tokens": 512,
+      "latency_ms": "5377.994000",
+      "validated_output": {
+        "facts": [
+          {
+            "kind": "RULE_HIT",
+            "text": "냉장고에 먹을 게 있었지만 치킨과 사이드를 배달한 지출이다.",
+            "source_refs": [
+              "F0"
+            ]
+          },
+          {
+            "kind": "MITIGATION",
+            "text": "비 오는 날이라는 상황을 배달 사유로 제시했다.",
+            "source_refs": [
+              "F0"
+            ]
+          },
+          {
+            "kind": "MITIGATION",
+            "text": "최근 30일 동안 같은 카테고리의 확정 소비가 0건이다.",
+            "source_refs": [
+              "F2"
+            ]
+          },
+          {
+            "kind": "MITIGATION",
+            "text": "이번 달 예산 소진율은 9%이다.",
+            "source_refs": [
+              "F1"
+            ]
+          }
+        ],
+        "reason_analysis": {
+          "has_mitigation": true,
+          "mitigation_kind": "상황적 사유 및 최근 동일 카테고리 소비 없음",
+          "injection_suspected": false
+        }
+      }
+    },
+    {
+      "id": "d5d60239-ab12-42e9-973c-f498e8b5a20d",
+      "post_id": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+      "job_id": "0e0ef665-7252-4bcf-b11b-1458080a3305",
+      "node": "banter",
+      "call_index": 0,
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "status": "COMPLETE",
+      "actual_micro_usd": 2771,
+      "prompt_tokens": 1351,
+      "completion_tokens": 487,
+      "reasoning_tokens": 0,
+      "latency_ms": "6680.784000",
+      "validated_output": {
+        "candidates": [
+          {
+            "fits": [
+              "guilty",
+              "disagree"
+            ],
+            "text": "비 오는 날이라 치킨 31,000원이 필수였다고? 그럼 아메리카노 6잔 값이 매일 비 오는 날마다 날아가도 괜찮다는 거네. 숫자가 이렇게 말하고 있는데 또 '상황' 탓 하실 건가요?",
+            "strategy": "EXCUSE_STRIPPING",
+            "evidence_labels": [
+              "F0",
+              "F5",
+              "F6"
+            ]
+          },
+          {
+            "fits": [
+              "guilty"
+            ],
+            "text": "냉장고에 먹을 게 있었는데도 배달? 최근 30일 같은 카테고리 0건인데 이번 달 9%나 썼으면 이건 그냥 '배달 중독' 레벨 아닌가. king 티어답게 또 지르고 싶으신 거지?",
+            "strategy": "REPEAT_OFFENSE",
+            "evidence_labels": [
+              "F1",
+              "F2",
+              "F5",
+              "F7",
+              "F8"
+            ]
+          },
+          {
+            "fits": [
+              "notGuilty",
+              "agree"
+            ],
+            "text": "비 오는 날 치킨 배달이 그렇게 급했다면, 집에 있던 재료로 간단히 만들어 먹는 DIY 버전은 왜 안 떠올랐을까. 31,000원 대신 3,000원으로도 충분했을 텐데.",
+            "strategy": "DIY_REPLACEMENT",
+            "evidence_labels": [
+              "F0",
+              "F5",
+              "F6"
+            ]
+          },
+          {
+            "fits": [
+              "guilty",
+              "disagree"
+            ],
+            "text": "지난번엔 한정판 운동화 289,000원 지르고 disagree 받았는데, 이번엔 냉장고 음식 있는데도 배달? 패턴이 너무 똑같아서 '습관성 지름'이라고밖에 안 보이네. 또 100% 유죄 먹을 준비 되셨나.",
+            "strategy": "REPEAT_OFFENSE",
+            "evidence_labels": [
+              "F3",
+              "F4",
+              "F5"
+            ]
+          },
+          {
+            "fits": [
+              "guilty",
+              "disagree"
+            ],
+            "text": "이번 달 예산 9%밖에 안 썼고 king 티어인데, '비 오는 날' 핑계로 6잔 분량 치킨 시킨 걸 합리화하려는 건 좀 웃기지 않나. 진짜 필요였다면 왜 사유가 상황 핑계뿐일까.",
+            "strategy": "PREMISE_REJECTION",
+            "evidence_labels": [
+              "F0",
+              "F1",
+              "F6",
+              "F8"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "edd387e0-236f-4f7c-acae-e46682c6b1e4",
+      "post_id": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+      "job_id": "944c5f86-8018-45d2-80f6-9aeebd758967",
+      "node": "sentencing",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 738,
+      "prompt_tokens": 962,
+      "completion_tokens": 455,
+      "reasoning_tokens": 324,
+      "latency_ms": "3999.469000",
+      "validated_output": {
+        "sentence": "oneDay",
+        "mitigating": [
+          "비 오는 날의 상황",
+          "같은 카테고리 확정 소비 0건",
+          "예산 소진율 9%"
+        ],
+        "aggravating": [
+          "냉장고에 먹을 것이 있었음"
+        ],
+        "evidence_labels": [
+          "F0",
+          "F1",
+          "F2",
+          "F5",
+          "F6"
+        ],
+        "sentencing_reason": "유죄율 100%이고 냉장고에 먹을 것이 있었지만, 예산 소진율 9%와 같은 지출 전력이 없어 하루 형으로 정한다."
+      }
+    },
+    {
+      "id": "dd370cf9-bded-407f-98ab-e009ad59c2d2",
+      "post_id": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+      "job_id": "944c5f86-8018-45d2-80f6-9aeebd758967",
+      "node": "writer",
+      "call_index": 0,
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "status": "COMPLETE",
+      "actual_micro_usd": 5023,
+      "prompt_tokens": 3890,
+      "completion_tokens": 118,
+      "reasoning_tokens": 0,
+      "latency_ms": "2026.346000",
+      "validated_output": null
+    },
+    {
+      "id": "63684eed-e7a9-4f7c-9281-a82293a29e83",
+      "post_id": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+      "job_id": "944c5f86-8018-45d2-80f6-9aeebd758967",
+      "node": "writer",
+      "call_index": 3,
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "status": "COMPLETE",
+      "actual_micro_usd": 5118,
+      "prompt_tokens": 4000,
+      "completion_tokens": 128,
+      "reasoning_tokens": 0,
+      "latency_ms": "2360.014000",
+      "validated_output": {
+        "headline": "집밥 대신 6잔 아메리카노",
+        "meme_tag": "GUILTY_HEAVY",
+        "intensity": "spicy",
+        "statement": [
+          {
+            "kind": "opinion",
+            "text": "비 오면 라면 끓여 먹어라.",
+            "evidence_labels": []
+          }
+        ],
+        "meme_hints": {
+          "emotion": "DISAPPROVAL",
+          "keywords": [
+            "환산",
+            "핑계",
+            "배달"
+          ]
+        },
+        "attack_angle": "CONVERSION",
+        "banter_strategy": "EXCUSE_STRIPPING",
+        "selected_candidate_id": "a16c4d8b-aeb7-40db-b605-02d3333c8f49"
+      }
+    },
+    {
+      "id": "4dce7aa3-e36a-4ef9-8bc4-f78232da24e2",
+      "post_id": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+      "job_id": "944c5f86-8018-45d2-80f6-9aeebd758967",
+      "node": "evaluator",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 870,
+      "prompt_tokens": 2448,
+      "completion_tokens": 317,
+      "reasoning_tokens": 254,
+      "latency_ms": "2710.196000",
+      "validated_output": {
+        "texts": [
+          {
+            "pass": true,
+            "intensity": "spicy",
+            "violations": [],
+            "problem_sentences": []
+          }
+        ],
+        "sentence_check": {
+          "pass": true,
+          "violations": []
+        },
+        "sentencing_reason_check": {
+          "pass": true,
+          "violations": []
+        }
+      }
+    },
+    {
+      "id": "3566ddba-b6ac-4c08-91f8-67af99cf9db6",
+      "post_id": "submission:236a86a6-8cd4-47fc-990c-e2ca2253e47b",
+      "job_id": null,
+      "node": "intake",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 475,
+      "prompt_tokens": 1856,
+      "completion_tokens": 87,
+      "reasoning_tokens": 22,
+      "latency_ms": "1707.561000",
+      "validated_output": null
+    },
+    {
+      "id": "0c7445a3-78c9-46ee-ab72-056b8859c5e5",
+      "post_id": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+      "job_id": "ab8a5ccd-d869-4716-90dd-469d0dd82979",
+      "node": "context",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 640,
+      "prompt_tokens": 676,
+      "completion_tokens": 421,
+      "reasoning_tokens": 204,
+      "latency_ms": "3324.936000",
+      "validated_output": {
+        "facts": [
+          {
+            "kind": "RULE_HIT",
+            "text": "사유에 게임 스킨 묶음을 충동 결제했다고 기재되어 있다.",
+            "source_refs": [
+              "F0"
+            ]
+          },
+          {
+            "kind": "MITIGATION",
+            "text": "이번 달 예산 소진율은 28%로 기재되어 있다.",
+            "source_refs": [
+              "F1"
+            ]
+          },
+          {
+            "kind": "MITIGATION",
+            "text": "최근 30일 동안 같은 카테고리의 확정 소비는 0건으로 기재되어 있다.",
+            "source_refs": [
+              "F2"
+            ]
+          },
+          {
+            "kind": "REASON_ANALYSIS",
+            "text": "실력은 변하지 않았지만 한정 스킨을 착용하면 이길 수 있을 것 같다는 기대가 결제 이유로 제시되어 있으며, 본인이 이를 충동 결제로 표현했다.",
+            "source_refs": [
+              "F0"
+            ]
+          }
+        ],
+        "reason_analysis": {
+          "has_mitigation": true,
+          "mitigation_kind": "예산 소진율 및 최근 동일 카테고리 소비 이력",
+          "injection_suspected": false
+        }
+      }
+    },
+    {
+      "id": "8016953e-d4cc-4975-944e-9e0139673ae6",
+      "post_id": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+      "job_id": "ab8a5ccd-d869-4716-90dd-469d0dd82979",
+      "node": "banter",
+      "call_index": 0,
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "status": "COMPLETE",
+      "actual_micro_usd": 2359,
+      "prompt_tokens": 1251,
+      "completion_tokens": 372,
+      "reasoning_tokens": 0,
+      "latency_ms": "4739.667000",
+      "validated_output": {
+        "candidates": [
+          {
+            "fits": [
+              "guilty"
+            ],
+            "text": "야 실화냐? 실력은 그대로인데 스킨만 끼면 이긴다고? 그럼 너 지금까지 22번 아메리카노 대신 지갑에 총알 박은 거잖아. 정신 나갔냐 새끼야.",
+            "strategy": "PREMISE_REJECTION",
+            "evidence_labels": [
+              "F0",
+              "F3"
+            ]
+          },
+          {
+            "fits": [
+              "guilty"
+            ],
+            "text": "이번 달 28%밖에 안 썼는데 무지출 0일에 flower 티어? 개같은 선택으로 예산 다 날려버릴 기세네. 충동이 아니라 그냥 바보 인증이야.",
+            "strategy": "EXCUSE_STRIPPING",
+            "evidence_labels": [
+              "F1",
+              "F4"
+            ]
+          },
+          {
+            "fits": [
+              "disagree"
+            ],
+            "text": "최근 30일 같은 카테고리 확정 소비 0건인데 한 번에 99,000원? 레전드네. 이게 네 취미/여가의 실체구나. 지갑이랑 친구하자.",
+            "strategy": "REPEAT_OFFENSE",
+            "evidence_labels": [
+              "F2",
+              "F5"
+            ]
+          },
+          {
+            "fits": [
+              "notGuilty"
+            ],
+            "text": "실력 그대로인데 스킨 사면 이긴다는 헛소리 믿고 9만 9천 원 처바른 거, 그냥 무료 스킨으로 연습이나 더 해. 그게 진짜 승률 올리는 길이야.",
+            "strategy": "DIY_REPLACEMENT",
+            "evidence_labels": [
+              "F0",
+              "F3"
+            ]
+          },
+          {
+            "fits": [
+              "agree"
+            ],
+            "text": "한정 스킨 사면 이길 것 같다는 미친 논리, 완전 개소리잖아. 돈 아까우면 그냥 게임 접거나 무료로 이기는 법부터 배워.",
+            "strategy": "FREE_ALTERNATIVE",
+            "evidence_labels": [
+              "F0"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "bb6279f3-8c9d-4efa-9f09-838e94a70d87",
+      "post_id": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+      "job_id": "adb14074-e2c0-4861-ba63-336739839586",
+      "node": "sentencing",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 415,
+      "prompt_tokens": 867,
+      "completion_tokens": 202,
+      "reasoning_tokens": 95,
+      "latency_ms": "2091.379000",
+      "validated_output": {
+        "sentence": "oneDay",
+        "mitigating": [
+          "예산 소진율 28%",
+          "최근 30일 같은 카테고리 소비 없음"
+        ],
+        "aggravating": [
+          "충동 결제"
+        ],
+        "evidence_labels": [
+          "F1",
+          "F2",
+          "F3"
+        ],
+        "sentencing_reason": "유죄율 100%이고 충동 결제였지만 예산 소진율이 28%이며 같은 소비 반복은 없어 하루형으로 정한다."
+      }
+    },
+    {
+      "id": "d44243f9-6f85-4b4d-95df-5a56f6379c63",
+      "post_id": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+      "job_id": "adb14074-e2c0-4861-ba63-336739839586",
+      "node": "writer",
+      "call_index": 0,
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "status": "COMPLETE",
+      "actual_micro_usd": 4824,
+      "prompt_tokens": 3699,
+      "completion_tokens": 134,
+      "reasoning_tokens": 0,
+      "latency_ms": "2417.223000",
+      "validated_output": {
+        "headline": "99k로 22잔",
+        "meme_tag": "GUILTY_HEAVY",
+        "intensity": "hell",
+        "statement": [
+          {
+            "kind": "opinion",
+            "text": "실력은 그대로고 잔고만 22잔어치 증발했네.",
+            "evidence_labels": [
+              "F0"
+            ]
+          }
+        ],
+        "meme_hints": {
+          "emotion": "DISAPPROVAL",
+          "keywords": [
+            "충동",
+            "스킨",
+            "아메리카노",
+            "증발"
+          ]
+        },
+        "attack_angle": "CONVERSION",
+        "banter_strategy": "PREMISE_REJECTION",
+        "selected_candidate_id": "39747ba0-a52d-4862-8b73-697e550be4c6"
+      }
+    },
+    {
+      "id": "f244dbf1-c6ab-40c9-9394-7e014da30f89",
+      "post_id": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+      "job_id": "adb14074-e2c0-4861-ba63-336739839586",
+      "node": "evaluator",
+      "call_index": 0,
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "status": "COMPLETE",
+      "actual_micro_usd": 741,
+      "prompt_tokens": 2349,
+      "completion_tokens": 226,
+      "reasoning_tokens": 164,
+      "latency_ms": "1960.235000",
+      "validated_output": {
+        "texts": [
+          {
+            "pass": true,
+            "intensity": "hell",
+            "violations": [],
+            "problem_sentences": []
+          }
+        ],
+        "sentence_check": {
+          "pass": true,
+          "violations": []
+        },
+        "sentencing_reason_check": {
+          "pass": true,
+          "violations": []
+        }
+      }
+    }
+  ],
+  "share_evidence": [
+    {
+      "post_id": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+      "intensity": "hell",
+      "field_path": "statement[0]",
+      "scope": "{\"room_ids\": [\"433881c0-d1bb-45c3-9f6b-22d1adf60357\"], \"visibility\": \"ROOMS\"}",
+      "label": "F0",
+      "text": "이번 지출: 게임 스킨 묶음 99,000원, 카테고리 취미/여가, 사유 '실력은 그대로인데 한정 스킨을 끼면 이길 것 같아서 충동 결제했어요.'. 아메리카노 4,500원 기준 약 22회분."
+    },
+    {
+      "post_id": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+      "intensity": "mild",
+      "field_path": "statement[0]",
+      "scope": "{\"room_ids\": [\"56478217-7492-4d18-b342-0f3a1a238929\"], \"visibility\": \"ROOMS\"}",
+      "label": "F0",
+      "text": "이번 지출: 업무용 키보드 59,000원, 카테고리 기타, 사유 '기존 키보드가 고장 나서 업무에 필요한 기본형으로 교체하려고 합니다.'. 아메리카노 4,500원 기준 약 13회분."
+    },
+    {
+      "post_id": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+      "intensity": "mild",
+      "field_path": "statement[0]",
+      "scope": "{\"room_ids\": [\"56478217-7492-4d18-b342-0f3a1a238929\"], \"visibility\": \"ROOMS\"}",
+      "label": "F0",
+      "text": "이번 지출: 택시 12,000원, 카테고리 교통/택시, 사유 '알람을 끄고 다시 자서 지각할 것 같아 택시를 탔어요.'. 지하철 기본요금 1,400원 기준 약 8회분."
+    }
+  ],
+  "jobs": [
+    {
+      "kind": "SENTENCE",
+      "status": "SUCCEEDED",
+      "last_error_code": null,
+      "count": 5
+    },
+    {
+      "kind": "RETAIN",
+      "status": "SUCCEEDED",
+      "last_error_code": null,
+      "count": 5
+    },
+    {
+      "kind": "PREPARE",
+      "status": "SUCCEEDED",
+      "last_error_code": null,
+      "count": 5
+    }
+  ],
+  "events": [
+    {
+      "timestamp": "2026-09-19T11:19:29.680720Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "validate_request",
+      "ok": true,
+      "latency_ms": 0
+    },
+    {
+      "timestamp": "2026-09-19T11:19:33.473934Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "call_intake",
+      "ok": true,
+      "latency_ms": 3792
+    },
+    {
+      "timestamp": "2026-09-19T11:19:33.474351Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "validate_intake_output",
+      "ok": false,
+      "latency_ms": 0
+    },
+    {
+      "timestamp": "2026-09-19T11:19:33.474397Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "fallback_result",
+      "ok": false,
+      "fallback_reason": "INVALID_OUTPUT",
+      "latency_ms": 3793
+    },
+    {
+      "timestamp": "2026-09-19T11:19:53.689289Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "validate_request",
+      "ok": true,
+      "latency_ms": 0
+    },
+    {
+      "timestamp": "2026-09-19T11:19:54.841236Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "call_intake",
+      "ok": true,
+      "latency_ms": 1151
+    },
+    {
+      "timestamp": "2026-09-19T11:19:54.841578Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "validate_intake_output",
+      "ok": false,
+      "latency_ms": 0
+    },
+    {
+      "timestamp": "2026-09-19T11:19:54.841632Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "fallback_result",
+      "ok": false,
+      "fallback_reason": "INVALID_OUTPUT",
+      "latency_ms": 1152
+    },
+    {
+      "timestamp": "2026-09-19T11:20:13.707794Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "validate_request",
+      "ok": true,
+      "latency_ms": 0
+    },
+    {
+      "timestamp": "2026-09-19T11:20:14.580864Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "call_intake",
+      "ok": true,
+      "latency_ms": 872
+    },
+    {
+      "timestamp": "2026-09-19T11:20:14.581041Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "validate_intake_output",
+      "ok": false,
+      "latency_ms": 0
+    },
+    {
+      "timestamp": "2026-09-19T11:20:14.581078Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "fallback_result",
+      "ok": false,
+      "fallback_reason": "INVALID_OUTPUT",
+      "latency_ms": 873
+    },
+    {
+      "timestamp": "2026-09-19T11:20:33.589554Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "validate_request",
+      "ok": true,
+      "latency_ms": 0
+    },
+    {
+      "timestamp": "2026-09-19T11:20:34.999569Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "call_intake",
+      "ok": true,
+      "latency_ms": 1409
+    },
+    {
+      "timestamp": "2026-09-19T11:20:34.999753Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "validate_intake_output",
+      "ok": false,
+      "latency_ms": 0
+    },
+    {
+      "timestamp": "2026-09-19T11:20:34.999800Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "fallback_result",
+      "ok": false,
+      "fallback_reason": "INVALID_OUTPUT",
+      "latency_ms": 1410
+    },
+    {
+      "timestamp": "2026-09-19T11:21:00.198665Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "validate_request",
+      "ok": true,
+      "latency_ms": 0
+    },
+    {
+      "timestamp": "2026-09-19T11:21:01.934641Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "call_intake",
+      "ok": true,
+      "latency_ms": 1735
+    },
+    {
+      "timestamp": "2026-09-19T11:21:01.934974Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "validate_intake_output",
+      "ok": false,
+      "latency_ms": 0
+    },
+    {
+      "timestamp": "2026-09-19T11:21:01.935060Z",
+      "event": "intake_initial",
+      "graph_name": "intake",
+      "node": "fallback_result",
+      "ok": false,
+      "fallback_reason": "INVALID_OUTPUT",
+      "latency_ms": 1736
+    },
+    {
+      "timestamp": "2026-09-19T11:19:46.270515Z",
+      "event": "sentence_fallback",
+      "job_id": "373e0c49-84df-47ca-941a-a7a521288973",
+      "graph_name": "sentencing",
+      "node": "writer",
+      "role": "writer",
+      "intensity": "mild",
+      "outcome": "TEMPLATE",
+      "fallback_reason": "SCHEMA_INVALID"
+    },
+    {
+      "timestamp": "2026-09-19T11:19:46.270600Z",
+      "event": "sentence_node",
+      "job_id": "373e0c49-84df-47ca-941a-a7a521288973",
+      "graph_name": "sentencing",
+      "node": "writer",
+      "outcome": null,
+      "ok": true,
+      "fallback_reason": "SCHEMA_INVALID",
+      "latency_ms": 2183
+    },
+    {
+      "timestamp": "2026-09-19T11:19:46.271634Z",
+      "event": "sentence_fallback",
+      "job_id": "373e0c49-84df-47ca-941a-a7a521288973",
+      "graph_name": "sentencing",
+      "node": "join",
+      "role": "writer",
+      "intensity": "mild",
+      "outcome": "writer_repair",
+      "fallback_reason": "SCHEMA_INVALID"
+    },
+    {
+      "timestamp": "2026-09-19T11:19:53.196011Z",
+      "event": "sentence_summary",
+      "job_id": "373e0c49-84df-47ca-941a-a7a521288973",
+      "graph_name": "sentencing",
+      "outcome": "SAVED",
+      "ok": true,
+      "source": "PREP|-|mild=AI",
+      "fallback_reason": "writer:mild:SCHEMA_INVALID",
+      "latency_ms": 9232
+    },
+    {
+      "timestamp": "2026-09-19T11:20:13.387091Z",
+      "event": "sentence_fallback",
+      "job_id": "d9804a76-c253-426f-8ae7-402b8df2c9fe",
+      "graph_name": "sentencing",
+      "node": "evaluator",
+      "role": "evaluator",
+      "intensity": null,
+      "outcome": "generation_failed",
+      "fallback_reason": "EVAL_FAILED:GLOBAL:CHECK_FAILED"
+    },
+    {
+      "timestamp": "2026-09-19T11:20:13.387159Z",
+      "event": "sentence_node",
+      "job_id": "d9804a76-c253-426f-8ae7-402b8df2c9fe",
+      "graph_name": "sentencing",
+      "node": "evaluator",
+      "outcome": null,
+      "ok": false,
+      "fallback_reason": "EVAL_FAILED",
+      "latency_ms": 4671
+    },
+    {
+      "timestamp": "2026-09-19T11:20:13.472826Z",
+      "event": "sentence_node",
+      "job_id": "d9804a76-c253-426f-8ae7-402b8df2c9fe",
+      "graph_name": "sentencing",
+      "node": "generation_failed",
+      "outcome": null,
+      "ok": false,
+      "fallback_reason": "EVAL_FAILED",
+      "latency_ms": 81
+    },
+    {
+      "timestamp": "2026-09-19T11:20:13.473264Z",
+      "event": "sentence_summary",
+      "job_id": "d9804a76-c253-426f-8ae7-402b8df2c9fe",
+      "graph_name": "sentencing",
+      "outcome": "EVAL_FAILED",
+      "ok": false,
+      "source": "PREP|-|spicy=TEMPLATE",
+      "fallback_reason": null,
+      "latency_ms": 6894
+    },
+    {
+      "timestamp": "2026-09-19T11:20:32.627687Z",
+      "event": "sentence_summary",
+      "job_id": "db381e87-635f-4ee2-aac2-ea3138be77e9",
+      "graph_name": "sentencing",
+      "outcome": "SAVED",
+      "ok": true,
+      "source": "PREP|AI|mild=AI",
+      "fallback_reason": null,
+      "latency_ms": 8373
+    },
+    {
+      "timestamp": "2026-09-19T11:20:54.004100Z",
+      "event": "sentence_fallback",
+      "job_id": "944c5f86-8018-45d2-80f6-9aeebd758967",
+      "graph_name": "sentencing",
+      "node": "writer",
+      "role": "writer",
+      "intensity": "spicy",
+      "outcome": "TEMPLATE",
+      "fallback_reason": "SCHEMA_INVALID"
+    },
+    {
+      "timestamp": "2026-09-19T11:20:54.004189Z",
+      "event": "sentence_node",
+      "job_id": "944c5f86-8018-45d2-80f6-9aeebd758967",
+      "graph_name": "sentencing",
+      "node": "writer",
+      "outcome": null,
+      "ok": true,
+      "fallback_reason": "SCHEMA_INVALID",
+      "latency_ms": 2055
+    },
+    {
+      "timestamp": "2026-09-19T11:20:54.005758Z",
+      "event": "sentence_fallback",
+      "job_id": "944c5f86-8018-45d2-80f6-9aeebd758967",
+      "graph_name": "sentencing",
+      "node": "join",
+      "role": "writer",
+      "intensity": "spicy",
+      "outcome": "writer_repair",
+      "fallback_reason": "SCHEMA_INVALID"
+    },
+    {
+      "timestamp": "2026-09-19T11:20:59.225418Z",
+      "event": "sentence_summary",
+      "job_id": "944c5f86-8018-45d2-80f6-9aeebd758967",
+      "graph_name": "sentencing",
+      "outcome": "SAVED",
+      "ok": true,
+      "source": "PREP|AI|spicy=AI",
+      "fallback_reason": "writer:spicy:SCHEMA_INVALID",
+      "latency_ms": 11403
+    },
+    {
+      "timestamp": "2026-09-19T11:21:17.463171Z",
+      "event": "sentence_summary",
+      "job_id": "adb14074-e2c0-4861-ba63-336739839586",
+      "graph_name": "sentencing",
+      "outcome": "SAVED",
+      "ok": true,
+      "source": "PREP|AI|hell=AI",
+      "fallback_reason": null,
+      "latency_ms": 6738
+    }
+  ],
+  "budget": {
+    "max_calls": 60,
+    "cap_usd": 0.75,
+    "reserved_usd": 0.230827,
+    "attempted_calls": 30
+  }
+}
