@@ -3,7 +3,7 @@
     GEOJI_EVAL=1 uv run python -m tests.evaluations.run_regression \
         [--dry-run] [--quick] [--baseline PATH] [--write-baseline PATH] \
         [--policy guardrail-v1|guardrail-v2] [--writer-model M] [--evaluator-hell-model M] \
-        [--temperature T] [--only-hell] [--concurrency 4] [--out PATH]
+        [--temperature T] [--only-hell] [--only-thin-evidence] [--concurrency 4] [--out PATH]
 
 사건마다 고정 dossier·banter·형량(사건 데이터)을 넣고 그래프 C 를 돌린다. 모델은 **서기·검수관만**
 부른다(조서·드립·양형 0).
@@ -14,6 +14,8 @@
 - 백엔드·준비 포트는 이 파일의 메모리 fake 다. 실제 백엔드를 부르지 않는다
 - `--quick`: judge·검수관 생략. 서버 검증 ⑤ 직후 초안을 채점한다
 - `--dry-run`: `FakeLLM`. 키·네트워크·`.env` 를 쓰지 않는다
+- `--only-thin-evidence`: 조서가 `F0` 하나뿐인 빈 방 사건만 돌린다(옵트인). 기본 실행 분모
+  (`cases.jsonl` 30 + `hell_boundary.jsonl` 20 = 50)는 그대로다. `--only-hell` 과 같이 줄 수 없다
 - judge 모델은 `MODEL_JUDGMENT`(새 설정 키 없음)
 
 `GEOJI_EVAL=1` 이 없으면 코드 1 로 끝난다. 리포트가 나오면 판정과 무관하게 0 이다(판정은 리포트에).
@@ -65,6 +67,7 @@ __all__ = [
     "CASES_PATH",
     "HELL_PATH",
     "TAGS",
+    "THIN_PATH",
     "CaseRun",
     "CountingLLM",
     "Evaluation",
@@ -82,9 +85,11 @@ __all__ = [
 GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
 CASES_PATH = GOLDEN_DIR / "cases.jsonl"
 HELL_PATH = GOLDEN_DIR / "hell_boundary.jsonl"
+#: 빈 방 사건(조서가 `F0` 하나). 기본 실행 밖 옵트인 — `--only-thin-evidence` 로만 돈다.
+THIN_PATH = GOLDEN_DIR / "thin_evidence.jsonl"
 FIXTURES_DIR = Path(__file__).resolve().parents[2] / "contracts" / "fixtures"
 
-#: 사건 태그. 06 §3.4 분포 태그 5종 + 지옥맛 경계 태그.
+#: 사건 태그. 06 §3.4 분포 태그 5종 + 지옥맛 경계 태그 + 빈 방 태그.
 TAGS: frozenset[str] = frozenset(
     {
         "repeat",
@@ -96,6 +101,7 @@ TAGS: frozenset[str] = frozenset(
         "identity_bait",
         "death_bait",
         "profanity_bait",
+        "thin_evidence",
     }
 )
 
@@ -782,6 +788,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--evaluator-hell-model", default=None)
     parser.add_argument("--temperature", type=float, default=None)
     parser.add_argument("--only-hell", action="store_true")
+    parser.add_argument(
+        "--only-thin-evidence",
+        action="store_true",
+        help="빈 방 사건(조서 F0 하나)만 돌린다. 기본 실행 50건 분모는 그대로",
+    )
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument("--out", type=Path, default=None)
     return parser
@@ -794,6 +805,13 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.concurrency < 1:
         print("--concurrency 는 1 이상", file=sys.stderr)
+        return 2
+    if args.only_hell and args.only_thin_evidence:
+        print(
+            "--only-hell 과 --only-thin-evidence 는 서로 배타적이다(둘 다 실행 세트를 좁힌다). "
+            "하나만 준다.",
+            file=sys.stderr,
+        )
         return 2
     if args.temperature is not None and not args.dry_run:
         print(
@@ -835,9 +853,12 @@ def main(argv: list[str] | None = None) -> int:
         if settings.MODEL_EVALUATOR_HELL != settings.MODEL_JUDGMENT:
             hell_model = settings.MODEL_EVALUATOR_HELL
 
-    cases = (
-        load_cases(HELL_PATH) if args.only_hell else load_cases(CASES_PATH) + load_cases(HELL_PATH)
-    )
+    if args.only_hell:
+        cases = load_cases(HELL_PATH)
+    elif args.only_thin_evidence:
+        cases = load_cases(THIN_PATH)
+    else:
+        cases = load_cases(CASES_PATH) + load_cases(HELL_PATH)
     bundle_version = prompt_bundle_version()
     started = time.monotonic()
     result = asyncio.run(
@@ -870,6 +891,7 @@ def main(argv: list[str] | None = None) -> int:
         "dry_run": args.dry_run,
         "quick": args.quick,
         "only_hell": args.only_hell,
+        "only_thin_evidence": args.only_thin_evidence,
         "cases": len(cases),
         "writer_model": settings.MODEL_WRITER,
         "judgment_model(judge·검수)": settings.MODEL_JUDGMENT,

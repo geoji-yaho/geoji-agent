@@ -18,7 +18,7 @@ from geoji_ai.adapters.fake_llm import FakeLLM
 from geoji_ai.contracts.case import CaseSnapshot, VerdictResult
 from geoji_ai.core.config import Settings
 from geoji_ai.domain.attack_angles import ANGLE_ORDER
-from geoji_ai.graphs.sentencing import writer_angles
+from geoji_ai.graphs.sentencing import ungrounded_angles, writer_angles
 from tests.evaluations import checks, judge, report
 from tests.evaluations import run_regression as rr
 
@@ -42,6 +42,24 @@ def hell_cases() -> list[rr.GoldenCase]:
     return rr.load_cases(rr.HELL_PATH)
 
 
+@pytest.fixture(scope="module")
+def thin_cases() -> list[rr.GoldenCase]:
+    """빈 방 사건(조서가 `F0` 하나). 기본 실행 밖 옵트인 세트라 따로 로드한다."""
+    return rr.load_cases(rr.THIN_PATH)
+
+
+def thin_intensity(case: rr.GoldenCase) -> str:
+    """빈 방 사건의 방 강도. 9/20 실측으로 정한 것이라 데이터와 함께 고정한다.
+
+    유죄는 `hell` 이다. 빈 방에서 서기가 근거 없이 면박하는 경로를 이 사건이 덮는다.
+    무죄·동의는 `mild` 다. `hell` 로 두면 검수관의 `INTENSITY_MISMATCH`("면박이 없다")와
+    `VERDICT_CONTRADICTION`("무죄를 사치로 비난했다")이 서로 반대로 당겨 통과 영역이 좁고,
+    실모델 5회에서 2회 실패했다(재작성 1회 뒤 전 강도 TEMPLATE → `EVAL_FAILED:ALL_TEMPLATE`).
+    강도-평결 충돌은 이 데이터셋이 보려는 것(근거 두께)이 아니므로 분리한다.
+    """
+    return "hell" if str(case.jury.result) == "guilty" else "mild"
+
+
 def settings(**update: Any) -> Settings:
     return Settings(_env_file=None).model_copy(update=update)
 
@@ -62,6 +80,52 @@ def test_case_counts(cases: list[rr.GoldenCase], hell_cases: list[rr.GoldenCase]
     assert len(set(ids)) == len(ids)
 
 
+def test_thin_cases_do_not_change_default_denominator(
+    cases: list[rr.GoldenCase], hell_cases: list[rr.GoldenCase], thin_cases: list[rr.GoldenCase]
+) -> None:
+    """기본 실행 분모 30 + 20 = 50 은 그대로고, 빈 방 사건 `case_id` 는 그 50 과 겹치지 않는다."""
+    assert len(rr.load_cases(rr.CASES_PATH)) == 30
+    assert len(rr.load_cases(rr.HELL_PATH)) == 20
+    assert len(thin_cases) == 3
+    default_ids = {c.case_id for c in cases + hell_cases}
+    thin_ids = [c.case_id for c in thin_cases]
+    assert len(set(thin_ids)) == len(thin_ids)
+    assert not default_ids & set(thin_ids)
+    assert rr.THIN_PATH not in (rr.CASES_PATH, rr.HELL_PATH)
+
+
+def test_thin_cases_have_only_f0_this_case(thin_cases: list[rr.GoldenCase]) -> None:
+    for case in thin_cases:
+        labels = [f.label for f in case.dossier.facts]
+        assert labels == ["F0"], case.case_id
+        assert case.dossier.facts[0].kind == "THIS_CASE", case.case_id
+        assert set(case.dossier.label_map) == {"F0"}, case.case_id
+
+
+def test_thin_cases_are_tagged_and_cite_only_f0(thin_cases: list[rr.GoldenCase]) -> None:
+    for case in thin_cases:
+        assert "thin_evidence" in rr.TAGS
+        assert "thin_evidence" in case.tags, case.case_id
+        assert set(case.expect.must_cite_any) <= {"F0"}, case.case_id
+        assert case.banter == {}, case.case_id
+        assert [str(i) for i in case.jury.target_intensities] == [thin_intensity(case)], (
+            case.case_id
+        )
+
+
+def test_thin_cases_sentencing_only_for_spent_guilty(thin_cases: list[rr.GoldenCase]) -> None:
+    """21 §3.2 의 "형량 = `spent ∧ guilty`" 무형량 경로를 빈 방에서도 밟는다."""
+    needs = {
+        c.case_id
+        for c in thin_cases
+        if str(c.jury.result) == "guilty" and c.snapshot.post_type == "spent"
+    }
+    assert needs, "유죄·지출 빈 방 사건이 최소 1건 있어야 한다"
+    assert {c.case_id for c in thin_cases} - needs, "무형량 경로 사건이 최소 1건 있어야 한다"
+    for case in thin_cases:
+        assert (case.sentencing is not None) == (case.case_id in needs), case.case_id
+
+
 def test_case_distribution(cases: list[rr.GoldenCase]) -> None:
     categories = Counter(c.snapshot.category for c in cases)
     assert categories == {name: 5 for name in GOLDEN_CATEGORIES}
@@ -80,6 +144,7 @@ def test_case_tags(cases: list[rr.GoldenCase], hell_cases: list[rr.GoldenCase]) 
     identity = [c for c in hell_cases if "identity_bait" in c.tags]
     assert len(identity) == 5
     assert all("hell_boundary" in c.tags for c in hell_cases)
+    assert not [c.case_id for c in cases + hell_cases if "thin_evidence" in c.tags]
 
 
 def test_tag_contents(cases: list[rr.GoldenCase], hell_cases: list[rr.GoldenCase]) -> None:
@@ -454,8 +519,35 @@ def test_golden_history_enables_runtime_history_angles(cases, hell_cases):
         assert [f.text for f in dossier.facts] == [f.text for f in case.dossier.facts]
 
 
-def test_golden_case_preserves_claim_and_inference_types(cases, hell_cases):
-    for case in cases + hell_cases:
+#: 이력·규칙 근거가 없으면 빠지는 각도 3종(`ungrounded_angles`, 05 §3.4).
+THIN_SKIPPED_ANGLES = {"REPETITION", "FUTURE_PROPHECY", "RULE_PERSONIFICATION"}
+#: 빈 방 유죄 사건에 남는 각도 3종(`writer_angles` 순서).
+THIN_GUILTY_ANGLES = {"EXCUSE_DISSECTION", "CONVERSION", "ALTERNATIVE_MOCKERY"}
+
+
+def test_thin_evidence_narrows_writer_angles(thin_cases):
+    """빈 방 사건은 이력·규칙 각도 3종이 빠진다.
+
+    `writer_angles` 는 `agree`·`notGuilty` 를 조서 확인 전에 `EXCUSE_DISSECTION` 하나로
+    끊는다(`graphs/sentencing.py:444`). 그래서 3종이 남는 것은 유죄 경로에서 관찰한다.
+    """
+    seen_guilty = False
+    for case in thin_cases:
+        dossier = rr.to_dossier(case)
+        assert {a.value for a in ungrounded_angles(dossier)} == THIN_SKIPPED_ANGLES, case.case_id
+        allowed = {angle.value for angle in writer_angles(case.full_snapshot, dossier)}
+        if str(case.jury.result) in {"agree", "notGuilty"}:
+            assert allowed == {"EXCUSE_DISSECTION"}, case.case_id
+            continue
+        seen_guilty = True
+        assert allowed == THIN_GUILTY_ANGLES, case.case_id
+        assert not allowed & THIN_SKIPPED_ANGLES, case.case_id
+        assert allowed <= {a.value for a in ANGLE_ORDER}, case.case_id
+    assert seen_guilty, "유죄 빈 방 사건이 없으면 각도 축소를 관찰할 수 없다"
+
+
+def test_golden_case_preserves_claim_and_inference_types(cases, hell_cases, thin_cases):
+    for case in cases + hell_cases + thin_cases:
         dossier = rr.to_dossier(case)
         assert dossier.facts[0].epistemic_type == "USER_CLAIM"
         assert dossier.facts[0].fact_type == "SPEND"
@@ -630,6 +722,37 @@ def test_main_dry_run_quick_writes_report_and_baseline(
     assert "# 골든셋 회귀 리포트" in text and "| cases | 20 |" in text
     data = json.loads(baseline.read_text("utf-8"))
     assert data["axes"] == {} and data["bundle_version"].startswith("bundle-")
+
+
+def test_main_rejects_both_narrowing_flags(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`--only-hell` 과 `--only-thin-evidence` 는 둘 다 실행 세트를 좁혀 배타적이다."""
+    monkeypatch.setenv("GEOJI_EVAL", "1")
+    assert rr.main(["--dry-run", "--quick", "--only-hell", "--only-thin-evidence"]) == 2
+    err = capsys.readouterr().err
+    assert "--only-hell" in err and "--only-thin-evidence" in err
+
+
+def test_main_only_thin_evidence_runs_just_the_thin_set(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, thin_cases: list[rr.GoldenCase]
+) -> None:
+    """옵트인 플래그는 빈 방 세트만 돌린다(기본 50 은 이 실행에 안 들어온다).
+
+    `main` 은 리포트를 만들면 판정과 무관하게 0 이다 — 0 은 PASS 가 아니다.
+    """
+    monkeypatch.setenv("GEOJI_EVAL", "1")
+    out = tmp_path / "report.md"
+    code = rr.main(["--dry-run", "--quick", "--only-thin-evidence", "--out", str(out)])
+    assert code == 0
+    text = out.read_text("utf-8")
+    assert "# 골든셋 회귀 리포트" in text
+    assert f"| cases | {len(thin_cases)} |" in text
+    assert "| only_thin_evidence | True |" in text
+    assert "| only_hell | False |" in text
+    for case in thin_cases:
+        assert f"| {case.case_id} | {thin_intensity(case)} |" in text
+    assert "| g01 |" not in text and "| h01 |" not in text
 
 
 def test_evaluations_modules_are_not_collected() -> None:

@@ -259,10 +259,14 @@ def _example_prompt_text() -> str:
     return "\n".join(p.read_text(encoding="utf-8") for p in files)
 
 
+#: `golden/*.jsonl` 전수. 기본 실행 50(`cases` 30 + `hell_boundary` 20) + 옵트인 `thin_evidence` 3.
+GOLDEN_ITEM_COUNT = 53
+
+
 def test_golden_items_not_in_prompt_examples() -> None:
     """골든 사건 품목 전체를 예시로 복사하지 않는다. 교체·라지 같은 부분 문자열은 제외."""
     items = _golden_items()
-    assert len(items) == 50
+    assert len(items) == GOLDEN_ITEM_COUNT
     prompts = _example_prompt_text()
     hits = [(item, word) for item in items for word in [item] if len(word) >= 2 and word in prompts]
     assert hits == []
