@@ -625,10 +625,21 @@ def _card_avoid(preview: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _avoid(entry: Mapping[str, Any]) -> dict[str, list[str]]:
-    """검수 항목 → 서기에게 줄 "피할 것"."""
-    codes = [str(v.get("code")) for v in entry.get("violations") or [] if isinstance(v, Mapping)]
+    """검수 항목 → 서기에게 줄 "피할 것".
+
+    코드와 문제 문장만 주면 서기는 **왜** 걸렸는지 모른 채 다시 쓴다. 9/20 골든셋에서
+    `UNGROUNDED_CLAIM` 재작성이 같은 자리에서 또 걸렸다. 검수관이 쓴 판정 사유
+    (`violations[].explanation`)를 `reasons` 로 같이 준다.
+    """
+    violations = [v for v in entry.get("violations") or [] if isinstance(v, Mapping)]
+    codes = [str(v.get("code")) for v in violations]
+    reasons = [str(v["explanation"]) for v in violations if v.get("explanation")]
     sentences = [str(s) for s in entry.get("problem_sentences") or []]
-    return {"violations": list(dict.fromkeys(codes)), "problem_sentences": sentences}
+    return {
+        "violations": list(dict.fromkeys(codes)),
+        "reasons": list(dict.fromkeys(reasons)),
+        "problem_sentences": sentences,
+    }
 
 
 def _merge_same_intensity(entries: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:

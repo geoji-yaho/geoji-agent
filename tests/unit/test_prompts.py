@@ -65,7 +65,7 @@ def test_writer_system_equals_probe_assembly(intensity: str) -> None:
 @pytest.mark.parametrize("intensity", ["mild", "spicy", "hell"])
 def test_current_writer_requests_one_short_card_with_metadata(intensity: str) -> None:
     system = build_writer_system(intensity)
-    assert WRITER_VERSION == "v6.2"
+    assert WRITER_VERSION == "v6.4"
     assert "headline: 1~20자" in system
     assert "statement: 정확히 1항목" in system
     assert "text는 1~100자" in system
@@ -279,6 +279,7 @@ WORN_PHRASE_DECLARATIONS = {
     ("writer/common-v5.8.md", "금지어"),
     ("writer/common-v6.0.md", "금지어"),
     ("writer/common-v6.1.md", "금지어"),
+    ("writer/common-v6.4.md", "금지어"),
     ("writer/common-v6.2.md", "금지어"),
     ("evaluator/guardrail-v2.4.md", "| 금지 | 금지 | 금지 |"),
     ("evaluator/guardrail-v2.2.md", "| 금지 | 금지 | 금지 |"),

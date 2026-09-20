@@ -863,7 +863,12 @@ def test_16_evaluator_failure_repairs_failed_intensity_only() -> None:
     assert writer_angle(writers[0]) == "EXCUSE_DISSECTION"
     assert writers[2].schema == writers[1].schema
     avoid = user_payload(writers[2])["avoid"]
-    assert avoid == {"violations": ["PERSONAL_ATTACK"], "problem_sentences": ["문제 문장 마커"]}
+    # reasons 에 검수관 판정 사유가 실린다. 코드·문장만 주면 서기가 왜 걸렸는지 모른다(9/20).
+    assert avoid == {
+        "violations": ["PERSONAL_ATTACK"],
+        "reasons": ["인신공격"],
+        "problem_sentences": ["문제 문장 마커"],
+    }
     assert "avoid" not in user_payload(writers[1])
     evaluators = result.calls_of("evaluator")
     assert [evaluator_intensities(c) for c in evaluators] == [["spicy", "hell"], ["hell"]]

@@ -32,7 +32,7 @@ __all__ = [
 #: 저장소 루트의 `prompts/`(src/geoji_ai/prompts.py 에서 두 단계 위).
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 
-WRITER_VERSION = "v6.2"
+WRITER_VERSION = "v6.4"
 BANTER_PROMPT = "banter-v3.md"
 SENTENCING_PROMPT = "sentencing-v2.md"
 
