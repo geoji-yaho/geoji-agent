@@ -110,7 +110,7 @@ def build_banter_system(intensity: Intensity | str, *, root: Path | None = None)
 
 def build_evaluator_system(policy: str, *, root: Path | None = None) -> str:
     """백엔드 정책 enum 을 유지하며 v2의 프롬프트 리비전을 별도 파일로 보존한다."""
-    path = "evaluator/guardrail-v2.2.md" if policy == "guardrail-v2" else f"evaluator/{policy}.md"
+    path = "evaluator/guardrail-v2.3.md" if policy == "guardrail-v2" else f"evaluator/{policy}.md"
     prompt = load_prompt(path, root=root)
     if policy == "guardrail-v2":
         prompt += "\n## 문체 기준 (예시는 다른 사건이며 그대로 베끼는지 검사하지 않는다)\n"
