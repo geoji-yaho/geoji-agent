@@ -174,6 +174,9 @@ MINIMAL_PACK_LIMIT = 1
 #: `writer_repair` 를 시작할 최소 남은 시간(05 §3.3 "남은 ≥ 5s").
 REPAIR_MIN_REMAINING_S = 5.0
 
+#: 검수 라운드 수. 0 첫 검수 · 1 repair·치환 뒤 재검수 · 2 남은 강도 치환 뒤 마지막 재검수.
+_EVAL_ROUNDS = 3
+
 GUILTY = "guilty"
 SPENT = "spent"
 
@@ -1726,7 +1729,11 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             )
             return {"calls": calls, "draft_sources": all_template, "failure": code, "eval_kept": {}}
 
-        for attempt in range(2):
+        # 라운드 3. 0 에서 걸린 강도를 repair 하거나 TEMPLATE 으로 치환하고, 1 에서 재검수한다.
+        # 1 에서도 걸리면 예전에는 그 자리에서 전 강도 TEMPLATE 이었다. 그러면 통과한 강도까지
+        # 버려진다(9/20 골든셋: 실패 23 건 중 14 건이 세 강도 대상). 2 를 하나 더 두어 아래
+        # 강도별 TEMPLATE 치환이 한 번 더 돌게 한다. 통과한 강도는 AI 로 남는다.
+        for attempt in range(_EVAL_ROUNDS):
             current_hash = draft_hash(writer_draft, decision)
             current = {
                 Intensity(t.intensity).value: t.model_dump(mode="json") for t in writer_draft.texts
@@ -1785,7 +1792,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     "failure": None,
                     "route": _ROUTE_FINALIZE,
                 }
-            if attempt == 1:
+            if attempt == _EVAL_ROUNDS - 1:
                 logger.warning("재검수도 통과하지 못했다: %s", [i.code for i in issues])
                 return failed(why="RECHECK:" + ",".join(sorted({i.code for i in issues})))
             if _regenerate(state):
