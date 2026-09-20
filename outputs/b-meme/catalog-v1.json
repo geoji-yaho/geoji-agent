@@ -100,6 +100,46 @@
       "suggested_object_key": "memes/seed/park-stop-it/v1/image.png",
       "image_url": null,
       "is_active": false
+    },
+    {
+      "asset_key": "run20260916-mnet-necklace",
+      "asset_path": "outputs/b-meme/run-20260916-new-inputs/002-Mnet-necklace.png",
+      "metadata_path": "outputs/b-meme/run-20260916-new-inputs/002-Mnet-necklace.metadata.json",
+      "tag": "APPROVED",
+      "strategies": [],
+      "suggested_object_key": "memes/seed/run20260916-mnet-necklace/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "run20260916-proceed",
+      "asset_path": "outputs/b-meme/run-20260916-new-inputs/012-images-8.png",
+      "metadata_path": "outputs/b-meme/run-20260916-new-inputs/012-images-8.metadata.json",
+      "tag": "APPROVED",
+      "strategies": [],
+      "suggested_object_key": "memes/seed/run20260916-proceed/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "run20260916-understood",
+      "asset_path": "outputs/b-meme/run-20260916-new-inputs/013-images-9.png",
+      "metadata_path": "outputs/b-meme/run-20260916-new-inputs/013-images-9.metadata.json",
+      "tag": "NOT_GUILTY",
+      "strategies": [],
+      "suggested_object_key": "memes/seed/run20260916-understood/v1/image.png",
+      "image_url": null,
+      "is_active": false
+    },
+    {
+      "asset_key": "run20260916-acknowledging-penguin",
+      "asset_path": "outputs/b-meme/run-20260916-new-inputs/014-images-jpeg.png",
+      "metadata_path": "outputs/b-meme/run-20260916-new-inputs/014-images-jpeg.metadata.json",
+      "tag": "APPROVED",
+      "strategies": [],
+      "suggested_object_key": "memes/seed/run20260916-acknowledging-penguin/v1/image.png",
+      "image_url": null,
+      "is_active": false
     }
   ]
 }

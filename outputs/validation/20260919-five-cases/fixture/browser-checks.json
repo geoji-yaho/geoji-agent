@@ -1,0 +1,67 @@
+[
+  {
+    "case": "01-approved",
+    "displayed_meme_url": "http://127.0.0.1:18209/assets/run20260916-acknowledging-penguin",
+    "image_loaded": true,
+    "save_button_generated_png": true,
+    "png_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/fixture/01-approved-card.png",
+    "png_size": [
+      684,
+      684
+    ],
+    "png_sha256": "7faee3202e4bf8a9049c392beb522afdcc0590bd8a8a60e1a28eb14880620c30",
+    "visible_text": "공유 카드\n로컬배심원0\n무일푼\n기타\n동의\n59,000원\n\n지갑이 잠시 쉬어 갈 시간\n\n떼거지\nlocalhost:3800\n\n프로필 이미지는 들어가지 않습니다\n\n이미지 저장\n공유하기"
+  },
+  {
+    "case": "02-rejected",
+    "displayed_meme_url": "http://127.0.0.1:18209/assets/park-stop-it",
+    "image_loaded": true,
+    "save_button_generated_png": true,
+    "png_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/fixture/02-rejected-card.png",
+    "png_size": [
+      684,
+      684
+    ],
+    "png_sha256": "947e1a000523a9b597dda150dff49b0a8eec605742800eeb7fc136e9638d004b",
+    "visible_text": "공유 카드\n로컬배심원0\n무일푼\n쇼핑/패션\n기각\n289,000원\n\n지갑이 잠시 쉬어 갈 시간\n\n떼거지\nlocalhost:3800\n\n프로필 이미지는 들어가지 않습니다\n\n이미지 저장\n공유하기"
+  },
+  {
+    "case": "03-mild",
+    "displayed_meme_url": "http://127.0.0.1:18209/assets/disappointed",
+    "image_loaded": true,
+    "save_button_generated_png": true,
+    "png_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/fixture/03-mild-card.png",
+    "png_size": [
+      684,
+      684
+    ],
+    "png_sha256": "978cfc2a2a0290e14776966d06f57e9bd2fc62e94b75a40a1c17a3bc87b26608",
+    "visible_text": "공유 카드\n로컬배심원0\n무일푼\n교통/택시\n유죄\n12,000원\n\n지갑이 잠시 쉬어 갈 시간\n\n형량\n징역 1일 (내일 하루 무지출)\n\n떼거지\nlocalhost:3800\n\n프로필 이미지는 들어가지 않습니다\n\n이미지 저장\n공유하기"
+  },
+  {
+    "case": "04-spicy",
+    "displayed_meme_url": "http://127.0.0.1:18209/assets/disappointed",
+    "image_loaded": true,
+    "save_button_generated_png": true,
+    "png_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/fixture/04-spicy-card.png",
+    "png_size": [
+      684,
+      684
+    ],
+    "png_sha256": "effa66c332bb7033e7f85dd5f0e36511da3299d8f4fbb1b8c3800970cf293d6f",
+    "visible_text": "공유 카드\n로컬배심원0\n무일푼\n배달\n유죄\n31,000원\n\n지갑이 잠시 쉬어 갈 시간\n\n형량\n징역 1일 (내일 하루 무지출)\n\n떼거지\nlocalhost:3800\n\n프로필 이미지는 들어가지 않습니다\n\n이미지 저장\n공유하기"
+  },
+  {
+    "case": "05-hell",
+    "displayed_meme_url": "http://127.0.0.1:18209/assets/disappointed",
+    "image_loaded": true,
+    "save_button_generated_png": true,
+    "png_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/fixture/05-hell-card.png",
+    "png_size": [
+      684,
+      684
+    ],
+    "png_sha256": "bb385f02cb2d2f9631dec2e8c819e026ba4f817788951cddece487bc62d7e5c4",
+    "visible_text": "공유 카드\n로컬배심원0\n무일푼\n취미/여가\n유죄\n99,000원\n\n지갑이 잠시 쉬어 갈 시간\n\n형량\n징역 1일 (내일 하루 무지출)\n\n떼거지\nlocalhost:3800\n\n프로필 이미지는 들어가지 않습니다\n\n이미지 저장\n공유하기"
+  }
+]

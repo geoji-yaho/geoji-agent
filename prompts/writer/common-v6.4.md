@@ -27,9 +27,10 @@
   근거 없는 단정이다. fact가 말하는 기간과 세는 대상을 그대로 둔다.
 
 ## avoid가 있을 때(재작성)
-- avoid는 직전 초안이 검수에서 걸린 내용이다. violations는 위반 코드, reasons는 검수관이 적은
-  사유, problem_sentences는 걸린 문장이다.
-- reasons를 먼저 읽고 그 지적을 그대로 반영한다. 문장만 바꿔 쓰고 같은 단정을 반복하지 않는다.
+- avoid는 직전 초안이 검수에서 걸린 내용이다. violations는 위반 코드, problem_sentences는 걸린
+  문장, violation_details는 위반마다 code·path·explanation·evidence_labels다.
+- violation_details의 explanation을 먼저 읽고 그 지적을 그대로 반영한다. 문장만 바꿔 쓰고 같은
+  단정을 반복하지 않는다.
 - 걸린 표현을 못 쓰게 됐으면 그 근거를 빼고 다른 근거로 간다. 억지로 살리지 않는다.
 - 더 싼 제품 가격, 포장 가능 여부, 막차, 회사 지원은 주어지지 않으면 모른다.
   '있는 운동화에 색칠해'처럼 명백한 황당한 농담은 가능하나 실제 대안의 가격·가능성을 보장하지 않는다.

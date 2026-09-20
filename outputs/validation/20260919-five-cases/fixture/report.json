@@ -1,0 +1,1593 @@
+{
+  "scope": "실제 Spring + AI 그래프 + 격리 Postgres + 로컬 밈 파일 서버. 운영 S3/로그인 검증 제외.",
+  "paid_model_calls": 0,
+  "checks": [
+    {
+      "name": "test schema exists",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "JWT missing/bad signature/expired/wrong issuer rejected",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash run1-images-1",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash run1-images-2",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash skill-test-images-3",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash skill-test-images-8",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash skill-test-images-9",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash aeng-doratna",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash disappointed",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash empty-wallet",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash gokyungpyo-shock",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash park-stop-it",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash run20260916-mnet-necklace",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash run20260916-proceed",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash run20260916-understood",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash run20260916-acknowledging-penguin",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved intake completed",
+      "passed": true,
+      "detail": "COMPLETED"
+    },
+    {
+      "name": "01-approved pending no verdict",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved text status",
+      "passed": true,
+      "detail": {
+        "schemaVersion": 1,
+        "postId": "35e2b33e-3ea2-4c7d-a8aa-c399f8399698",
+        "juryStatus": "agree",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "mild",
+          "headline": "지갑이 잠시 쉬어 갈 시간",
+          "statement": [
+            "다음 결제 전에는 한 번 더 생각해 봐요."
+          ],
+          "sentence": null,
+          "sentenceLabel": null,
+          "sentencingReason": null,
+          "source": "AI",
+          "meme": {
+            "tag": "APPROVED",
+            "imageId": "d023cb0b-2d44-5728-a6d1-38930a2d1995",
+            "imageUrl": "http://127.0.0.1:18209/assets/run20260916-acknowledging-penguin"
+          }
+        },
+        "pollAfterMs": 0
+      }
+    },
+    {
+      "name": "01-approved vote count",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved saved version/text",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved finalize replay same commit",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved card excludes private fields",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved selector matches DB",
+      "passed": true,
+      "detail": {
+        "expected": "d023cb0b-2d44-5728-a6d1-38930a2d1995",
+        "actual": "d023cb0b-2d44-5728-a6d1-38930a2d1995"
+      }
+    },
+    {
+      "name": "01-approved card/verdict image matches",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved selected ID stable",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved image GET 200",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "02-rejected intake completed",
+      "passed": true,
+      "detail": "COMPLETED"
+    },
+    {
+      "name": "02-rejected pending no verdict",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "02-rejected text status",
+      "passed": true,
+      "detail": {
+        "schemaVersion": 1,
+        "postId": "dcd35b42-636e-4777-a661-48a26912087f",
+        "juryStatus": "disagree",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "spicy",
+          "headline": "지갑이 잠시 쉬어 갈 시간",
+          "statement": [
+            "다음 결제 전에는 한 번 더 생각해 봐요."
+          ],
+          "sentence": null,
+          "sentenceLabel": null,
+          "sentencingReason": null,
+          "source": "AI",
+          "meme": {
+            "tag": "REJECTED",
+            "imageId": "b1f5be02-48b0-50ed-805e-cbbe10557f92",
+            "imageUrl": "http://127.0.0.1:18209/assets/park-stop-it"
+          }
+        },
+        "pollAfterMs": 0
+      }
+    },
+    {
+      "name": "02-rejected vote count",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "02-rejected saved version/text",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "02-rejected finalize replay same commit",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "02-rejected card excludes private fields",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "02-rejected selector matches DB",
+      "passed": true,
+      "detail": {
+        "expected": "b1f5be02-48b0-50ed-805e-cbbe10557f92",
+        "actual": "b1f5be02-48b0-50ed-805e-cbbe10557f92"
+      }
+    },
+    {
+      "name": "02-rejected card/verdict image matches",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "02-rejected selected ID stable",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "02-rejected image GET 200",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild intake completed",
+      "passed": true,
+      "detail": "COMPLETED"
+    },
+    {
+      "name": "03-mild pending no verdict",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild text status",
+      "passed": true,
+      "detail": {
+        "schemaVersion": 1,
+        "postId": "f32026f8-6f15-495d-9d78-1510c0559589",
+        "juryStatus": "guilty",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "mild",
+          "headline": "지갑이 잠시 쉬어 갈 시간",
+          "statement": [
+            "다음 결제 전에는 한 번 더 생각해 봐요."
+          ],
+          "sentence": "oneDay",
+          "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+          "sentencingReason": "배심원의 투표 결과에 따른 판결입니다.",
+          "source": "AI",
+          "meme": {
+            "tag": "GUILTY_LIGHT",
+            "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+            "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+          }
+        },
+        "pollAfterMs": 0
+      }
+    },
+    {
+      "name": "03-mild vote count",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild saved version/text",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild finalize replay same commit",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild card excludes private fields",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild selector matches DB",
+      "passed": true,
+      "detail": {
+        "expected": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+        "actual": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312"
+      }
+    },
+    {
+      "name": "03-mild card/verdict image matches",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild selected ID stable",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild image GET 200",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy intake completed",
+      "passed": true,
+      "detail": "COMPLETED"
+    },
+    {
+      "name": "04-spicy pending no verdict",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy text status",
+      "passed": true,
+      "detail": {
+        "schemaVersion": 1,
+        "postId": "d7055a30-37d2-4001-8fb9-30af06bb5ef1",
+        "juryStatus": "guilty",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "spicy",
+          "headline": "지갑이 잠시 쉬어 갈 시간",
+          "statement": [
+            "다음 결제 전에는 한 번 더 생각해 봐요."
+          ],
+          "sentence": "oneDay",
+          "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+          "sentencingReason": "배심원의 투표 결과에 따른 판결입니다.",
+          "source": "AI",
+          "meme": {
+            "tag": "GUILTY_LIGHT",
+            "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+            "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+          }
+        },
+        "pollAfterMs": 0
+      }
+    },
+    {
+      "name": "04-spicy vote count",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy saved version/text",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy finalize replay same commit",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy card excludes private fields",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy selector matches DB",
+      "passed": true,
+      "detail": {
+        "expected": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+        "actual": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312"
+      }
+    },
+    {
+      "name": "04-spicy card/verdict image matches",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy selected ID stable",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy image GET 200",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell intake completed",
+      "passed": true,
+      "detail": "COMPLETED"
+    },
+    {
+      "name": "05-hell pending no verdict",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell text status",
+      "passed": true,
+      "detail": {
+        "schemaVersion": 1,
+        "postId": "56ec95dc-1a4e-4589-8072-591ea64132de",
+        "juryStatus": "guilty",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "hell",
+          "headline": "지갑이 잠시 쉬어 갈 시간",
+          "statement": [
+            "다음 결제 전에는 한 번 더 생각해 봐요."
+          ],
+          "sentence": "oneDay",
+          "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+          "sentencingReason": "배심원의 투표 결과에 따른 판결입니다.",
+          "source": "AI",
+          "meme": {
+            "tag": "GUILTY_LIGHT",
+            "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+            "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+          }
+        },
+        "pollAfterMs": 0
+      }
+    },
+    {
+      "name": "05-hell vote count",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell saved version/text",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell finalize replay same commit",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell card excludes private fields",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell selector matches DB",
+      "passed": true,
+      "detail": {
+        "expected": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+        "actual": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312"
+      }
+    },
+    {
+      "name": "05-hell card/verdict image matches",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell selected ID stable",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell image GET 200",
+      "passed": true,
+      "detail": null
+    }
+  ],
+  "cases": [
+    {
+      "name": "01-approved",
+      "post_id": "35e2b33e-3ea2-4c7d-a8aa-c399f8399698",
+      "submission_id": "bf5ac3ef-e346-4262-8199-5e2e5f89d538",
+      "verdict": {
+        "schemaVersion": 1,
+        "postId": "35e2b33e-3ea2-4c7d-a8aa-c399f8399698",
+        "juryStatus": "agree",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "mild",
+          "headline": "지갑이 잠시 쉬어 갈 시간",
+          "statement": [
+            "다음 결제 전에는 한 번 더 생각해 봐요."
+          ],
+          "sentence": null,
+          "sentenceLabel": null,
+          "sentencingReason": null,
+          "source": "AI",
+          "meme": {
+            "tag": "APPROVED",
+            "imageId": "d023cb0b-2d44-5728-a6d1-38930a2d1995",
+            "imageUrl": "http://127.0.0.1:18209/assets/run20260916-acknowledging-penguin"
+          }
+        },
+        "pollAfterMs": 0
+      },
+      "share_card": {
+        "postId": "35e2b33e-3ea2-4c7d-a8aa-c399f8399698",
+        "postType": "considering",
+        "juryStatus": "agree",
+        "intensity": "mild",
+        "headline": "지갑이 잠시 쉬어 갈 시간",
+        "statement": [
+          "다음 결제 전에는 한 번 더 생각해 봐요."
+        ],
+        "sentence": null,
+        "sentenceLabel": null,
+        "meme": {
+          "tag": "APPROVED",
+          "imageId": "d023cb0b-2d44-5728-a6d1-38930a2d1995",
+          "imageUrl": "http://127.0.0.1:18209/assets/run20260916-acknowledging-penguin"
+        }
+      },
+      "latency_ms": 1448,
+      "input": {
+        "key": "01-approved",
+        "label": "구매 승인",
+        "intensity": "mild",
+        "vote": "agree",
+        "tag": "APPROVED",
+        "item": "업무용 키보드",
+        "amountKrw": 59000,
+        "category": "기타",
+        "reason": "기존 키보드가 고장 나서 업무에 필요한 기본형으로 교체하려고 합니다."
+      },
+      "room_id": "338ffbca-8134-406e-b4a9-635db9bc1efb",
+      "browser_url": "http://localhost:3800/posts/35e2b33e-3ea2-4c7d-a8aa-c399f8399698/card?room=338ffbca-8134-406e-b4a9-635db9bc1efb",
+      "verdict_detail": {
+        "jury_result": "agree",
+        "sentence": null,
+        "sentence_source": null,
+        "sentencing_reason": null,
+        "reason_source": null,
+        "text_status": "AI_READY",
+        "last_failed_code": null
+      },
+      "finalize_draft": {
+        "schema_version": 1,
+        "texts": [
+          {
+            "intensity": "mild",
+            "headline": "지갑이 잠시 쉬어 갈 시간",
+            "statement": [
+              {
+                "text": "다음 결제 전에는 한 번 더 생각해 봐요.",
+                "kind": "opinion",
+                "evidence_labels": []
+              }
+            ],
+            "banter_strategy": "PREMISE_REJECTION",
+            "selected_candidate_id": null,
+            "attack_angle": "ALTERNATIVE_MOCKERY",
+            "source": "AI"
+          }
+        ],
+        "meme_tag": "APPROVED",
+        "meme_hints": {
+          "emotion": "RESIGNATION",
+          "keywords": [
+            "실망",
+            "체념"
+          ]
+        }
+      },
+      "evaluation": {
+        "schema_version": 1,
+        "policy_version": "guardrail-v2",
+        "sentence_check": {
+          "pass": true,
+          "violations": []
+        },
+        "sentencing_reason_check": {
+          "pass": true,
+          "violations": []
+        },
+        "texts": [
+          {
+            "intensity": "mild",
+            "pass": true,
+            "violations": [],
+            "problem_sentences": []
+          }
+        ]
+      },
+      "finalize_status": 200,
+      "selected_meme": {
+        "id": "d023cb0b-2d44-5728-a6d1-38930a2d1995",
+        "tag": "APPROVED",
+        "strategies": [],
+        "emotions": [
+          "CELEBRATION"
+        ],
+        "keywords": [
+          "인정",
+          "펭귄",
+          "수긍",
+          "유쾌",
+          "유머러스"
+        ],
+        "image_url": "http://127.0.0.1:18209/assets/run20260916-acknowledging-penguin",
+        "is_active": true,
+        "asset_key": null
+      },
+      "image_sha256": "7c733b06711cfc8a209de817474c67073902f9e368a06e63ebb9f16055672656",
+      "image_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/fixture/01-approved-meme.png"
+    },
+    {
+      "name": "02-rejected",
+      "post_id": "dcd35b42-636e-4777-a661-48a26912087f",
+      "submission_id": "f756427d-a178-4f5e-915f-a2196b222bc3",
+      "verdict": {
+        "schemaVersion": 1,
+        "postId": "dcd35b42-636e-4777-a661-48a26912087f",
+        "juryStatus": "disagree",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "spicy",
+          "headline": "지갑이 잠시 쉬어 갈 시간",
+          "statement": [
+            "다음 결제 전에는 한 번 더 생각해 봐요."
+          ],
+          "sentence": null,
+          "sentenceLabel": null,
+          "sentencingReason": null,
+          "source": "AI",
+          "meme": {
+            "tag": "REJECTED",
+            "imageId": "b1f5be02-48b0-50ed-805e-cbbe10557f92",
+            "imageUrl": "http://127.0.0.1:18209/assets/park-stop-it"
+          }
+        },
+        "pollAfterMs": 0
+      },
+      "share_card": {
+        "postId": "dcd35b42-636e-4777-a661-48a26912087f",
+        "postType": "considering",
+        "juryStatus": "disagree",
+        "intensity": "spicy",
+        "headline": "지갑이 잠시 쉬어 갈 시간",
+        "statement": [
+          "다음 결제 전에는 한 번 더 생각해 봐요."
+        ],
+        "sentence": null,
+        "sentenceLabel": null,
+        "meme": {
+          "tag": "REJECTED",
+          "imageId": "b1f5be02-48b0-50ed-805e-cbbe10557f92",
+          "imageUrl": "http://127.0.0.1:18209/assets/park-stop-it"
+        }
+      },
+      "latency_ms": 1279,
+      "input": {
+        "key": "02-rejected",
+        "label": "구매 기각",
+        "intensity": "spicy",
+        "vote": "disagree",
+        "tag": "REJECTED",
+        "item": "한정판 운동화",
+        "amountKrw": 289000,
+        "category": "쇼핑/패션",
+        "reason": "운동화가 이미 네 켤레 있지만 한정판이라 품절되기 전에 사고 싶어요."
+      },
+      "room_id": "ba90bf1c-c44e-49d3-bbb3-a4b21dcfc221",
+      "browser_url": "http://localhost:3800/posts/dcd35b42-636e-4777-a661-48a26912087f/card?room=ba90bf1c-c44e-49d3-bbb3-a4b21dcfc221",
+      "verdict_detail": {
+        "jury_result": "disagree",
+        "sentence": null,
+        "sentence_source": null,
+        "sentencing_reason": null,
+        "reason_source": null,
+        "text_status": "AI_READY",
+        "last_failed_code": null
+      },
+      "finalize_draft": {
+        "schema_version": 1,
+        "texts": [
+          {
+            "intensity": "spicy",
+            "headline": "지갑이 잠시 쉬어 갈 시간",
+            "statement": [
+              {
+                "text": "다음 결제 전에는 한 번 더 생각해 봐요.",
+                "kind": "opinion",
+                "evidence_labels": []
+              }
+            ],
+            "banter_strategy": "PREMISE_REJECTION",
+            "selected_candidate_id": null,
+            "attack_angle": "FUTURE_PROPHECY",
+            "source": "AI"
+          }
+        ],
+        "meme_tag": "REJECTED",
+        "meme_hints": {
+          "emotion": "RESIGNATION",
+          "keywords": [
+            "실망",
+            "체념"
+          ]
+        }
+      },
+      "evaluation": {
+        "schema_version": 1,
+        "policy_version": "guardrail-v2",
+        "sentence_check": {
+          "pass": true,
+          "violations": []
+        },
+        "sentencing_reason_check": {
+          "pass": true,
+          "violations": []
+        },
+        "texts": [
+          {
+            "intensity": "spicy",
+            "pass": true,
+            "violations": [],
+            "problem_sentences": []
+          }
+        ]
+      },
+      "finalize_status": 200,
+      "selected_meme": {
+        "id": "b1f5be02-48b0-50ed-805e-cbbe10557f92",
+        "tag": "REJECTED",
+        "strategies": [],
+        "emotions": [
+          "DISAPPROVAL"
+        ],
+        "keywords": [
+          "지겨움",
+          "짜증",
+          "그만",
+          "경고",
+          "피곤"
+        ],
+        "image_url": "http://127.0.0.1:18209/assets/park-stop-it",
+        "is_active": true,
+        "asset_key": null
+      },
+      "image_sha256": "e0a838c6ee4af5c6864f33e0775fcbf6a79da1f0472af6fe4e09da5df6373875",
+      "image_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/fixture/02-rejected-meme.png"
+    },
+    {
+      "name": "03-mild",
+      "post_id": "f32026f8-6f15-495d-9d78-1510c0559589",
+      "submission_id": "57029c13-1b76-455d-abc3-7e40399cbe15",
+      "verdict": {
+        "schemaVersion": 1,
+        "postId": "f32026f8-6f15-495d-9d78-1510c0559589",
+        "juryStatus": "guilty",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "mild",
+          "headline": "지갑이 잠시 쉬어 갈 시간",
+          "statement": [
+            "다음 결제 전에는 한 번 더 생각해 봐요."
+          ],
+          "sentence": "oneDay",
+          "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+          "sentencingReason": "배심원의 투표 결과에 따른 판결입니다.",
+          "source": "AI",
+          "meme": {
+            "tag": "GUILTY_LIGHT",
+            "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+            "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+          }
+        },
+        "pollAfterMs": 0
+      },
+      "share_card": {
+        "postId": "f32026f8-6f15-495d-9d78-1510c0559589",
+        "postType": "spent",
+        "juryStatus": "guilty",
+        "intensity": "mild",
+        "headline": "지갑이 잠시 쉬어 갈 시간",
+        "statement": [
+          "다음 결제 전에는 한 번 더 생각해 봐요."
+        ],
+        "sentence": "oneDay",
+        "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+        "meme": {
+          "tag": "GUILTY_LIGHT",
+          "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+          "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+        }
+      },
+      "latency_ms": 1301,
+      "input": {
+        "key": "03-mild",
+        "label": "유죄 · 순한맛",
+        "intensity": "mild",
+        "vote": "guilty",
+        "tag": "GUILTY_LIGHT",
+        "item": "택시",
+        "amountKrw": 12000,
+        "category": "교통/택시",
+        "reason": "알람을 끄고 다시 자서 지각할 것 같아 택시를 탔어요."
+      },
+      "room_id": "338ffbca-8134-406e-b4a9-635db9bc1efb",
+      "browser_url": "http://localhost:3800/posts/f32026f8-6f15-495d-9d78-1510c0559589/card?room=338ffbca-8134-406e-b4a9-635db9bc1efb",
+      "verdict_detail": {
+        "jury_result": "guilty",
+        "sentence": "oneDay",
+        "sentence_source": "AI",
+        "sentencing_reason": "배심원의 투표 결과에 따른 판결입니다.",
+        "reason_source": "AI",
+        "text_status": "AI_READY",
+        "last_failed_code": null
+      },
+      "finalize_draft": {
+        "schema_version": 1,
+        "texts": [
+          {
+            "intensity": "mild",
+            "headline": "지갑이 잠시 쉬어 갈 시간",
+            "statement": [
+              {
+                "text": "다음 결제 전에는 한 번 더 생각해 봐요.",
+                "kind": "opinion",
+                "evidence_labels": []
+              }
+            ],
+            "banter_strategy": "PREMISE_REJECTION",
+            "selected_candidate_id": null,
+            "attack_angle": "CONVERSION",
+            "source": "AI"
+          }
+        ],
+        "meme_tag": "GUILTY_LIGHT",
+        "meme_hints": {
+          "emotion": "RESIGNATION",
+          "keywords": [
+            "실망",
+            "체념"
+          ]
+        }
+      },
+      "evaluation": {
+        "schema_version": 1,
+        "policy_version": "guardrail-v2",
+        "sentence_check": {
+          "pass": true,
+          "violations": []
+        },
+        "sentencing_reason_check": {
+          "pass": true,
+          "violations": []
+        },
+        "texts": [
+          {
+            "intensity": "mild",
+            "pass": true,
+            "violations": [],
+            "problem_sentences": []
+          }
+        ]
+      },
+      "finalize_status": 200,
+      "selected_meme": {
+        "id": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+        "tag": "GUILTY_LIGHT",
+        "strategies": [],
+        "emotions": [
+          "RESIGNATION"
+        ],
+        "keywords": [
+          "실망",
+          "체념",
+          "억지웃음",
+          "예상함",
+          "곁눈질"
+        ],
+        "image_url": "http://127.0.0.1:18209/assets/disappointed",
+        "is_active": true,
+        "asset_key": null
+      },
+      "image_sha256": "8d44f526cfc398ca904fbe47f209e5f0f649a4bcdbf4c05e9569d2409bebddba",
+      "image_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/fixture/03-mild-meme.png"
+    },
+    {
+      "name": "04-spicy",
+      "post_id": "d7055a30-37d2-4001-8fb9-30af06bb5ef1",
+      "submission_id": "40a29f67-207a-44a2-b2ce-c7c4ff10f988",
+      "verdict": {
+        "schemaVersion": 1,
+        "postId": "d7055a30-37d2-4001-8fb9-30af06bb5ef1",
+        "juryStatus": "guilty",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "spicy",
+          "headline": "지갑이 잠시 쉬어 갈 시간",
+          "statement": [
+            "다음 결제 전에는 한 번 더 생각해 봐요."
+          ],
+          "sentence": "oneDay",
+          "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+          "sentencingReason": "배심원의 투표 결과에 따른 판결입니다.",
+          "source": "AI",
+          "meme": {
+            "tag": "GUILTY_LIGHT",
+            "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+            "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+          }
+        },
+        "pollAfterMs": 0
+      },
+      "share_card": {
+        "postId": "d7055a30-37d2-4001-8fb9-30af06bb5ef1",
+        "postType": "spent",
+        "juryStatus": "guilty",
+        "intensity": "spicy",
+        "headline": "지갑이 잠시 쉬어 갈 시간",
+        "statement": [
+          "다음 결제 전에는 한 번 더 생각해 봐요."
+        ],
+        "sentence": "oneDay",
+        "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+        "meme": {
+          "tag": "GUILTY_LIGHT",
+          "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+          "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+        }
+      },
+      "latency_ms": 1269,
+      "input": {
+        "key": "04-spicy",
+        "label": "유죄 · 매운맛",
+        "intensity": "spicy",
+        "vote": "guilty",
+        "tag": "GUILTY_LIGHT",
+        "item": "치킨 배달",
+        "amountKrw": 31000,
+        "category": "배달",
+        "reason": "냉장고에 먹을 게 있었지만 비 오는 날이라 치킨과 사이드를 배달시켰어요."
+      },
+      "room_id": "ba90bf1c-c44e-49d3-bbb3-a4b21dcfc221",
+      "browser_url": "http://localhost:3800/posts/d7055a30-37d2-4001-8fb9-30af06bb5ef1/card?room=ba90bf1c-c44e-49d3-bbb3-a4b21dcfc221",
+      "verdict_detail": {
+        "jury_result": "guilty",
+        "sentence": "oneDay",
+        "sentence_source": "AI",
+        "sentencing_reason": "배심원의 투표 결과에 따른 판결입니다.",
+        "reason_source": "AI",
+        "text_status": "AI_READY",
+        "last_failed_code": null
+      },
+      "finalize_draft": {
+        "schema_version": 1,
+        "texts": [
+          {
+            "intensity": "spicy",
+            "headline": "지갑이 잠시 쉬어 갈 시간",
+            "statement": [
+              {
+                "text": "다음 결제 전에는 한 번 더 생각해 봐요.",
+                "kind": "opinion",
+                "evidence_labels": []
+              }
+            ],
+            "banter_strategy": "PREMISE_REJECTION",
+            "selected_candidate_id": null,
+            "attack_angle": "CONVERSION",
+            "source": "AI"
+          }
+        ],
+        "meme_tag": "GUILTY_LIGHT",
+        "meme_hints": {
+          "emotion": "RESIGNATION",
+          "keywords": [
+            "실망",
+            "체념"
+          ]
+        }
+      },
+      "evaluation": {
+        "schema_version": 1,
+        "policy_version": "guardrail-v2",
+        "sentence_check": {
+          "pass": true,
+          "violations": []
+        },
+        "sentencing_reason_check": {
+          "pass": true,
+          "violations": []
+        },
+        "texts": [
+          {
+            "intensity": "spicy",
+            "pass": true,
+            "violations": [],
+            "problem_sentences": []
+          }
+        ]
+      },
+      "finalize_status": 200,
+      "selected_meme": {
+        "id": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+        "tag": "GUILTY_LIGHT",
+        "strategies": [],
+        "emotions": [
+          "RESIGNATION"
+        ],
+        "keywords": [
+          "실망",
+          "체념",
+          "억지웃음",
+          "예상함",
+          "곁눈질"
+        ],
+        "image_url": "http://127.0.0.1:18209/assets/disappointed",
+        "is_active": true,
+        "asset_key": null
+      },
+      "image_sha256": "8d44f526cfc398ca904fbe47f209e5f0f649a4bcdbf4c05e9569d2409bebddba",
+      "image_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/fixture/04-spicy-meme.png"
+    },
+    {
+      "name": "05-hell",
+      "post_id": "56ec95dc-1a4e-4589-8072-591ea64132de",
+      "submission_id": "9f1ccb28-3624-4e28-b105-39faf1f31692",
+      "verdict": {
+        "schemaVersion": 1,
+        "postId": "56ec95dc-1a4e-4589-8072-591ea64132de",
+        "juryStatus": "guilty",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "hell",
+          "headline": "지갑이 잠시 쉬어 갈 시간",
+          "statement": [
+            "다음 결제 전에는 한 번 더 생각해 봐요."
+          ],
+          "sentence": "oneDay",
+          "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+          "sentencingReason": "배심원의 투표 결과에 따른 판결입니다.",
+          "source": "AI",
+          "meme": {
+            "tag": "GUILTY_LIGHT",
+            "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+            "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+          }
+        },
+        "pollAfterMs": 0
+      },
+      "share_card": {
+        "postId": "56ec95dc-1a4e-4589-8072-591ea64132de",
+        "postType": "spent",
+        "juryStatus": "guilty",
+        "intensity": "hell",
+        "headline": "지갑이 잠시 쉬어 갈 시간",
+        "statement": [
+          "다음 결제 전에는 한 번 더 생각해 봐요."
+        ],
+        "sentence": "oneDay",
+        "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+        "meme": {
+          "tag": "GUILTY_LIGHT",
+          "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+          "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+        }
+      },
+      "latency_ms": 1266,
+      "input": {
+        "key": "05-hell",
+        "label": "유죄 · 지옥맛",
+        "intensity": "hell",
+        "vote": "guilty",
+        "tag": "GUILTY_LIGHT",
+        "item": "게임 스킨 묶음",
+        "amountKrw": 99000,
+        "category": "취미/여가",
+        "reason": "실력은 그대로인데 한정 스킨을 끼면 이길 것 같아서 충동 결제했어요."
+      },
+      "room_id": "9ccbbb01-69ac-4274-b65a-11b9839a5131",
+      "browser_url": "http://localhost:3800/posts/56ec95dc-1a4e-4589-8072-591ea64132de/card?room=9ccbbb01-69ac-4274-b65a-11b9839a5131",
+      "verdict_detail": {
+        "jury_result": "guilty",
+        "sentence": "oneDay",
+        "sentence_source": "AI",
+        "sentencing_reason": "배심원의 투표 결과에 따른 판결입니다.",
+        "reason_source": "AI",
+        "text_status": "AI_READY",
+        "last_failed_code": null
+      },
+      "finalize_draft": {
+        "schema_version": 1,
+        "texts": [
+          {
+            "intensity": "hell",
+            "headline": "지갑이 잠시 쉬어 갈 시간",
+            "statement": [
+              {
+                "text": "다음 결제 전에는 한 번 더 생각해 봐요.",
+                "kind": "opinion",
+                "evidence_labels": []
+              }
+            ],
+            "banter_strategy": "PREMISE_REJECTION",
+            "selected_candidate_id": null,
+            "attack_angle": "EXCUSE_DISSECTION",
+            "source": "AI"
+          }
+        ],
+        "meme_tag": "GUILTY_LIGHT",
+        "meme_hints": {
+          "emotion": "RESIGNATION",
+          "keywords": [
+            "실망",
+            "체념"
+          ]
+        }
+      },
+      "evaluation": {
+        "schema_version": 1,
+        "policy_version": "guardrail-v2",
+        "sentence_check": {
+          "pass": true,
+          "violations": []
+        },
+        "sentencing_reason_check": {
+          "pass": true,
+          "violations": []
+        },
+        "texts": [
+          {
+            "intensity": "hell",
+            "pass": true,
+            "violations": [],
+            "problem_sentences": []
+          }
+        ]
+      },
+      "finalize_status": 200,
+      "selected_meme": {
+        "id": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+        "tag": "GUILTY_LIGHT",
+        "strategies": [],
+        "emotions": [
+          "RESIGNATION"
+        ],
+        "keywords": [
+          "실망",
+          "체념",
+          "억지웃음",
+          "예상함",
+          "곁눈질"
+        ],
+        "image_url": "http://127.0.0.1:18209/assets/disappointed",
+        "is_active": true,
+        "asset_key": null
+      },
+      "image_sha256": "8d44f526cfc398ca904fbe47f209e5f0f649a4bcdbf4c05e9569d2409bebddba",
+      "image_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/fixture/05-hell-meme.png"
+    }
+  ],
+  "commits": {
+    "ai": "f8eb99d97ed7f9bf59f013dec57dc634eb7fb2ae",
+    "backend": "fa1825601a6f6ea5140ad6caf37b7a9db7cbba32",
+    "frontend": "64e963764f00a3fe920c0f771ceb3cd1da4d096f"
+  },
+  "working_tree_dirty": {
+    "ai": true,
+    "backend": false,
+    "frontend": true
+  },
+  "schema_files": [
+    "000a_roles.sql",
+    "000b_base_schema_test.sql",
+    "001_ai_jobs.sql",
+    "002_preparation_evidence.sql",
+    "003_memory_call_ledger.sql",
+    "004_verdict_generation.sql",
+    "004b_internal_read.sql",
+    "004b_meme_asset_key.sql",
+    "004b_post_comments.sql",
+    "004b_privacy.sql",
+    "004b_submissions.sql",
+    "004b_verdicts_per_room.sql"
+  ],
+  "backend_jar_sha256": "aa994e25fee9a99e79f479078a8075ac5c689292cc5bdbdf0ae8eb272b413d21",
+  "room_id": "338ffbca-8134-406e-b4a9-635db9bc1efb",
+  "catalog_registration": "independent DB seed + hash checked local asset server",
+  "mode": "fixture-preflight",
+  "test_cases": [
+    {
+      "key": "01-approved",
+      "label": "구매 승인",
+      "intensity": "mild",
+      "vote": "agree",
+      "tag": "APPROVED",
+      "item": "업무용 키보드",
+      "amountKrw": 59000,
+      "category": "기타",
+      "reason": "기존 키보드가 고장 나서 업무에 필요한 기본형으로 교체하려고 합니다."
+    },
+    {
+      "key": "02-rejected",
+      "label": "구매 기각",
+      "intensity": "spicy",
+      "vote": "disagree",
+      "tag": "REJECTED",
+      "item": "한정판 운동화",
+      "amountKrw": 289000,
+      "category": "쇼핑/패션",
+      "reason": "운동화가 이미 네 켤레 있지만 한정판이라 품절되기 전에 사고 싶어요."
+    },
+    {
+      "key": "03-mild",
+      "label": "유죄 · 순한맛",
+      "intensity": "mild",
+      "vote": "guilty",
+      "tag": "GUILTY_LIGHT",
+      "item": "택시",
+      "amountKrw": 12000,
+      "category": "교통/택시",
+      "reason": "알람을 끄고 다시 자서 지각할 것 같아 택시를 탔어요."
+    },
+    {
+      "key": "04-spicy",
+      "label": "유죄 · 매운맛",
+      "intensity": "spicy",
+      "vote": "guilty",
+      "tag": "GUILTY_LIGHT",
+      "item": "치킨 배달",
+      "amountKrw": 31000,
+      "category": "배달",
+      "reason": "냉장고에 먹을 게 있었지만 비 오는 날이라 치킨과 사이드를 배달시켰어요."
+    },
+    {
+      "key": "05-hell",
+      "label": "유죄 · 지옥맛",
+      "intensity": "hell",
+      "vote": "guilty",
+      "tag": "GUILTY_LIGHT",
+      "item": "게임 스킨 묶음",
+      "amountKrw": 99000,
+      "category": "취미/여가",
+      "reason": "실력은 그대로인데 한정 스킨을 끼면 이길 것 같아서 충동 결제했어요."
+    }
+  ],
+  "source_commits": {
+    "server": "fa1825601a6f6ea5140ad6caf37b7a9db7cbba32",
+    "web": "64e963764f00a3fe920c0f771ceb3cd1da4d096f"
+  },
+  "model_calls": [
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "intake",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 862,
+      "completion_tokens": 56,
+      "reasoning_tokens": 0,
+      "latency_ms": "6.778000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "context",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 269,
+      "completion_tokens": 28,
+      "reasoning_tokens": 0,
+      "latency_ms": "6.582000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "banter",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 375,
+      "completion_tokens": 4,
+      "reasoning_tokens": 0,
+      "latency_ms": "3.128000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "writer",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 950,
+      "completion_tokens": 86,
+      "reasoning_tokens": 0,
+      "latency_ms": "8.232000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "evaluator",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 695,
+      "completion_tokens": 51,
+      "reasoning_tokens": 0,
+      "latency_ms": "3.943000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "intake",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 863,
+      "completion_tokens": 56,
+      "reasoning_tokens": 0,
+      "latency_ms": "3.621000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "context",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 271,
+      "completion_tokens": 28,
+      "reasoning_tokens": 0,
+      "latency_ms": "6.003000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "banter",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 377,
+      "completion_tokens": 4,
+      "reasoning_tokens": 0,
+      "latency_ms": "3.125000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "writer",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 999,
+      "completion_tokens": 86,
+      "reasoning_tokens": 0,
+      "latency_ms": "3.353000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "evaluator",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 696,
+      "completion_tokens": 51,
+      "reasoning_tokens": 0,
+      "latency_ms": "3.830000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "intake",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 858,
+      "completion_tokens": 56,
+      "reasoning_tokens": 0,
+      "latency_ms": "7.102000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "context",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 300,
+      "completion_tokens": 28,
+      "reasoning_tokens": 0,
+      "latency_ms": "3.430000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "banter",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 409,
+      "completion_tokens": 4,
+      "reasoning_tokens": 0,
+      "latency_ms": "5.562000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "sentencing",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 364,
+      "completion_tokens": 32,
+      "reasoning_tokens": 0,
+      "latency_ms": "6.482000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "writer",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 1020,
+      "completion_tokens": 85,
+      "reasoning_tokens": 0,
+      "latency_ms": "4.184000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "evaluator",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 777,
+      "completion_tokens": 51,
+      "reasoning_tokens": 0,
+      "latency_ms": "4.666000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "intake",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 860,
+      "completion_tokens": 56,
+      "reasoning_tokens": 0,
+      "latency_ms": "4.870000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "context",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 306,
+      "completion_tokens": 28,
+      "reasoning_tokens": 0,
+      "latency_ms": "4.264000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "banter",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 412,
+      "completion_tokens": 4,
+      "reasoning_tokens": 0,
+      "latency_ms": "3.075000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "sentencing",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 371,
+      "completion_tokens": 32,
+      "reasoning_tokens": 0,
+      "latency_ms": "3.342000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "writer",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 1072,
+      "completion_tokens": 85,
+      "reasoning_tokens": 0,
+      "latency_ms": "3.352000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "evaluator",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 781,
+      "completion_tokens": 51,
+      "reasoning_tokens": 0,
+      "latency_ms": "2.987000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "intake",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 861,
+      "completion_tokens": 56,
+      "reasoning_tokens": 0,
+      "latency_ms": "3.924000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "context",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 270,
+      "completion_tokens": 28,
+      "reasoning_tokens": 0,
+      "latency_ms": "3.750000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "banter",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 376,
+      "completion_tokens": 4,
+      "reasoning_tokens": 0,
+      "latency_ms": "3.959000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "sentencing",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 336,
+      "completion_tokens": 32,
+      "reasoning_tokens": 0,
+      "latency_ms": "5.148000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "writer",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 1144,
+      "completion_tokens": 87,
+      "reasoning_tokens": 0,
+      "latency_ms": "4.073000"
+    },
+    {
+      "vendor": "fake",
+      "model_id": "fake-local-e2e",
+      "node": "evaluator",
+      "status": "COMPLETE",
+      "actual_micro_usd": 0,
+      "prompt_tokens": 755,
+      "completion_tokens": 51,
+      "reasoning_tokens": 0,
+      "latency_ms": "2.966000"
+    }
+  ],
+  "result": "PASS"
+}

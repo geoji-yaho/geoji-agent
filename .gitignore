@@ -1,5 +1,6 @@
 .env
 .venv/
+.ctx-index.json
 __pycache__/
 # scripts/probe_out/
 

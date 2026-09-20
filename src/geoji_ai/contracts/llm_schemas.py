@@ -275,10 +275,14 @@ def writer_schema(
     )
 
 
-def evaluator_schema(intensities: Sequence[str]) -> dict[str, Any]:
-    """검수관. `policy_version` 은 서버가 채운다. 강도 집합을 주입한다."""
+def evaluator_schema(
+    intensities: Sequence[str], *, include_sentencing_checks: bool = True
+) -> dict[str, Any]:
+    """검수관. 정책·적용 제외된 형량 검사 결과는 서버가 채운다."""
     schema = _derive(EvaluationReport)
     _drop(schema, "policy_version")
+    if not include_sentencing_checks:
+        _drop(schema, "sentence_check", "sentencing_reason_check")
     schema = with_enums(schema, **{"texts[].intensity": list(intensities)})
     # strict json_schema 는 minItems·maxItems 를 받지 않는다. 개수는 말로 적는다(9/16 실측:
     # 위반이 여러 개일 때 같은 강도를 여러 항목으로 쪼개 낸 적이 있다).

@@ -225,6 +225,32 @@ async def call(r: Rig, s: CallScope | None = None, *, timeout_s: float = 3.0) ->
     )
 
 
+async def test_optional_cache_scope_keeps_legacy_hash_and_isolates_new_attempt():
+    r = rig()
+    legacy = await call(r)
+    await r.gateway.remember(legacy)
+    expected = request_hash(
+        {
+            "role": "sentencing",
+            "model_id": MODEL,
+            "messages": MESSAGES,
+            "schema": SCHEMA,
+            "max_output_tokens": MAX_OUTPUT,
+        }
+    )
+    assert legacy.request_hash == expected
+    logical_attempt = {"job_id": "job-1", "mode": "INITIAL", "round": 0, "call_index": 0}
+
+    fresh = await call(r, scope(cache_scope=logical_attempt))
+    await r.gateway.remember(fresh)
+    replay = await call(r, scope(cache_scope=logical_attempt, generation_id="gen-takeover"))
+
+    assert fresh.request_hash != legacy.request_hash
+    assert not fresh.reused
+    assert replay.reused
+    assert len(r.inner.calls) == 2
+
+
 # --- ① 성공 ----------------------------------------------------------------------
 
 
