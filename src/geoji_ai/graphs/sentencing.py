@@ -103,10 +103,10 @@ from geoji_ai.contracts.writer import (
 )
 from geoji_ai.domain.attack_angles import (
     ANGLE_GUIDES,
+    ANGLE_ORDER,
     HISTORY_ANGLES,
     RULE_ANGLES,
     AttackAngle,
-    pick,
 )
 from geoji_ai.domain.budget import (
     EVALUATOR,
@@ -135,7 +135,13 @@ from geoji_ai.ports.backend import (
 )
 from geoji_ai.ports.llm import LLMError, LLMPort, LLMResult, LLMRole
 from geoji_ai.ports.preparation import Dossier, EvidenceInvalidated
-from geoji_ai.prompts import build_writer_system, load_prompt, prompt_bundle_version
+from geoji_ai.prompts import (
+    SENTENCING_PROMPT,
+    build_evaluator_system,
+    build_writer_system,
+    load_prompt,
+    prompt_bundle_version,
+)
 from geoji_ai.telemetry.alerts import AlertNotifier, finalize_db_error
 
 __all__ = [
@@ -382,7 +388,7 @@ _REPEAT_COUNT = re.compile(r"같은 카테고리 확정 소비 (\d+)건")
 def ungrounded_angles(dossier: Dossier | None) -> frozenset[AttackAngle]:
     """조서에 근거가 없어 서기에게 시키면 안 되는 각도(9/18).
 
-    반복(`HISTORY_ANGLES`)은 F0 밖의 지출·판결 기록이나 반복 집계 ≥ 1건이 있어야 하고,
+    반복·미래 예언은 F0 밖의 지출·판결 기록이나 반복 집계 ≥ 1건이 있어야 하고,
     규칙 의인화(`RULE_ANGLES`)는 방 규칙 근거가 있어야 한다.
     첫 지출의 최소 조서(F0 만)는 둘 다 없다.
     """
@@ -415,7 +421,30 @@ def _case_view(snapshot: CaseSnapshot) -> dict[str, Any]:
 
 
 def _facts_view(dossier: Dossier | None) -> list[dict[str, str]]:
-    return [] if dossier is None else [{"id": f.label, "text": f.text} for f in dossier.facts]
+    return (
+        []
+        if dossier is None
+        else [
+            {"id": f.label, "text": f.text, "epistemic_type": f.epistemic_type}
+            for f in dossier.facts
+        ]
+    )
+
+
+def writer_angles(snapshot: CaseSnapshot, dossier: Dossier | None) -> list[AttackAngle]:
+    """사유 검토를 우선하되, 근거가 있는 기법 중 모델이 선택한다.
+
+    승인·무죄는 사유의 타당성을 인정하는 방식으로 쓴다. EXCUSE_DISSECTION 은
+    기존 외부 enum 을 유지하되 이 경우 변명 공격이 아닌 사유 검토를 뜻한다.
+    """
+    if snapshot.jury is not None and str(snapshot.jury.result) in {"agree", "notGuilty"}:
+        return [AttackAngle.EXCUSE_DISSECTION]
+    skip = ungrounded_angles(dossier)
+    return [AttackAngle.EXCUSE_DISSECTION] + [
+        angle
+        for angle in ANGLE_ORDER
+        if angle not in skip and angle is not AttackAngle.EXCUSE_DISSECTION
+    ]
 
 
 def _sentencing_view(sentencing: SentencingDecision | None) -> dict[str, Any] | None:
@@ -432,21 +461,27 @@ def build_writer_request(
     banter: Mapping[Intensity, Sequence[Candidate]] | None = None,
     avoid: Mapping[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """운영 그래프와 서기 실측이 공유하는 순수 요청 조립. 외부 호출·저장은 하지 않는다."""
+    """운영 그래프와 서기 실측이 공유하는 요청 조립. 외부 호출·저장은 하지 않는다.
+
+    offset은 기존 호출 인터페이스를 유지한다. 재작성 때도 기법을 순환 강제하지 않고
+    같은 허용 범위와 avoid에 담긴 실제 문제를 제공한다.
+    """
     jury = snapshot.jury
     if jury is None:
         raise ValueError("선고 스냅샷에 jury 가 없다")
-    angle = pick(snapshot.post_id, offset, skip=ungrounded_angles(dossier))
-    guide = ANGLE_GUIDES[angle]
+    angles = writer_angles(snapshot, dossier)
     candidates = [c for c in (banter or {}).get(intensity, []) if str(jury.result) in c.fits]
     candidate_ids = [c.candidate_id for c in candidates]
     user: dict[str, Any] = {
         "intensity": intensity.value,
-        "attack_angle": {
-            "code": angle.value,
-            "label": guide.label_ko,
-            "instruction": guide.instruction,
-        },
+        "attack_angles": [
+            {
+                "code": angle.value,
+                "label": ANGLE_GUIDES[angle].label_ko,
+                "instruction": ANGLE_GUIDES[angle].instruction,
+            }
+            for angle in angles
+        ],
         "case": _case_view(snapshot),
         "jury": {
             "result": str(jury.result),
@@ -472,7 +507,9 @@ def build_writer_request(
         {"role": "system", "content": build_writer_system(intensity)},
         {"role": "user", "content": _dumps(user)},
     ]
-    return messages, writer_schema([intensity.value], [angle.value], candidate_ids or None)
+    return messages, writer_schema(
+        [intensity.value], [angle.value for angle in angles], candidate_ids or None
+    )
 
 
 def _targets(jury: JurySnapshot) -> list[Intensity]:
@@ -530,36 +567,10 @@ def _rule_avoid(codes: Sequence[str], messages: Sequence[str]) -> dict[str, list
     }
 
 
-#: 문장 경계. 종결 부호 뒤 공백. "3.5 배" 처럼 부호 뒤가 공백이 아니면 경계가 아니다.
-_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?…])\s+")
 _CARD_LIMIT_MESSAGE = (
     f"headline 1~{CARD_HEADLINE_MAX}자, statement 정확히 1항목, text 1~{CARD_STATEMENT_MAX}자. "
     "줄바꿈·빈 문구 금지."
 )
-
-
-def _trim_card_tail(output: Mapping[str, Any]) -> tuple[dict[str, Any], int | None]:
-    """본문이 상한을 넘고 문장이 둘 이상이면 첫 문장만 남긴다(9/18).
-
-    실측(15 §6)에서 넘치는 본문은 거의 "찌르는 문장 + 조언 문장" 이었다. 첫 문장만으로
-    1~`CARD_STATEMENT_MAX`자면 뒤 문장을 버린다. 문장 중간은 자르지 않고 제목은 건드리지 않는다.
-    돌려주는 정수는 잘랐을 때의 원래 글자 수, 아니면 None.
-    """
-    statement = output.get("statement")
-    if (
-        not isinstance(statement, list)
-        or len(statement) != 1
-        or not isinstance(statement[0], Mapping)
-    ):
-        return dict(output), None
-    text = statement[0].get("text")
-    if not isinstance(text, str) or len(text) <= CARD_STATEMENT_MAX:
-        return dict(output), None
-    stripped = text.strip()
-    first = _SENTENCE_BOUNDARY.split(stripped, maxsplit=1)[0].strip()
-    if not first or first == stripped or len(first) > CARD_STATEMENT_MAX:
-        return dict(output), None
-    return {**output, "statement": [{**statement[0], "text": first}]}, len(text)
 
 
 def _card_preview(output: Mapping[str, Any]) -> dict[str, Any]:
@@ -1288,7 +1299,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         jury = _jury(state)
         calls = list(state["calls"])
         messages = [
-            {"role": "system", "content": load_prompt("sentencing-v1.md")},
+            {"role": "system", "content": load_prompt(SENTENCING_PROMPT)},
             {
                 "role": "user",
                 "content": _dumps(
@@ -1359,7 +1370,6 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         jury = _jury(state)
         snapshot = state["snapshot"]
         decision: SentencingDecision | None = state.get("sentencing")
-        angle = pick(snapshot.post_id, offset, skip=ungrounded_angles(state["dossier"]))
         messages, schema = build_writer_request(
             snapshot,
             state["dossier"],
@@ -1386,24 +1396,19 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             if result.output is None:
                 raise ValueError(f"서기 출력 없음({result.stop_reason})")
             raw = dict(result.output)
+            # 모델의 사전 요약은 새 사실이 아니다. 원문·조서로 최종 문구를 검수한다.
+            raw.pop("case_reading", None)
             hints_raw = raw.pop("meme_hints", None)
             raw.pop("meme_tag", None)
-            # 9/18: "찌르는 문장 + 조언 문장" 으로 넘친 본문은 첫 문장만 남긴다(호출 없음).
-            output, original_length = _trim_card_tail(raw)
-            text = CardTextDraft.model_validate({**output, "source": "AI"})
-            if text.intensity != intensity or text.attack_angle != angle:
-                raise ValueError("서버 지정 강도·각도와 다르다")
+            # 뒤 문장에 사유·반전이 있을 수 있다. 초과하면 기존 1회 repair로 압축한다.
+            text = CardTextDraft.model_validate({**raw, "source": "AI"})
+            if (
+                text.intensity != intensity
+                or text.attack_angle.value not in schema["properties"]["attack_angle"]["enum"]
+            ):
+                raise ValueError("요청한 강도·근거 있는 각도 범위와 다르다")
             hints = MemeHints.model_validate(hints_raw) if hints_raw is not None else None
             await commit()
-            if original_length is not None:
-                fallback_log(
-                    state,
-                    node=WRITER if offset == 0 else _ROUTE_REPAIR,
-                    role="writer",
-                    intensity=intensity,
-                    outcome="TRIMMED",
-                    reason=f"{SCHEMA_INVALID}:TAIL_DROPPED:{original_length}",
-                )
         except ValidationError:
             # 길이·항목 수·줄바꿈 등 형식 오류는 원문을 기록하거나 캐시하지 않는다.
             # 재작성에 줄 직전 제목·본문·글자 수만 상태로 넘긴다(9/18).
@@ -1596,12 +1601,13 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 update={"texts": [t for t in writer_draft.texts if Intensity(t.intensity) in group]}
             )
             messages = [
-                {"role": "system", "content": load_prompt(f"evaluator/{policy_version}.md")},
+                {"role": "system", "content": build_evaluator_system(policy_version)},
                 {
                     "role": "user",
                     "content": _dumps(
                         {
                             "policy_version": policy_version,
+                            "case": _case_view(state["snapshot"]),
                             "jury": {
                                 "result": str(jury.result),
                                 "vote_counts": jury.vote_counts,
@@ -1863,7 +1869,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         return {**update, "eval_round": rounds[0]}
 
     async def writer_repair(state: SentenceGraphState) -> dict[str, Any]:
-        """실패 강도만 각도 +1·"피할 것" 전달로 다시 쓴다. 양형·조서는 고정. 실패 → TEMPLATE."""
+        """실패 강도에 같은 기법 범위와 피할 문장을 전달한다. 양형·조서는 고정한다."""
         count = state.get("repair_count", 0) + 1
         targets = list(state.get("repair_targets") or [])
         update = await fan_out(state, targets, count, state.get("repair_avoid") or {})

@@ -19,7 +19,11 @@ __all__ = [
     "JUROR_VERSION",
     "PROMPTS_DIR",
     "WRITER_VERSION",
+    "BANTER_PROMPT",
+    "build_banter_system",
+    "build_evaluator_system",
     "build_juror_system",
+    "SENTENCING_PROMPT",
     "build_writer_system",
     "load_prompt",
     "prompt_bundle_version",
@@ -28,7 +32,9 @@ __all__ = [
 #: 저장소 루트의 `prompts/`(src/geoji_ai/prompts.py 에서 두 단계 위).
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 
-WRITER_VERSION = "v5.8"
+WRITER_VERSION = "v6.2"
+BANTER_PROMPT = "banter-v3.md"
+SENTENCING_PROMPT = "sentencing-v2.md"
 
 #: 배심원 프롬프트 버전(18 §3.3).
 JUROR_VERSION = "v1"
@@ -90,3 +96,26 @@ def prompt_bundle_version(root: Path | None = None) -> str:
         digest.update(path.read_bytes())
         digest.update(b"\0")
     return f"bundle-{digest.hexdigest()[:12]}"
+
+
+def build_banter_system(intensity: Intensity | str, *, root: Path | None = None) -> str:
+    """드립 후보도 현재 서기와 같은 강도 정의·예시를 본다."""
+    key = parse_intensity(intensity)
+    return (
+        load_prompt(BANTER_PROMPT, root=root)
+        + "\n"
+        + load_prompt(f"writer/{key.value}-{WRITER_VERSION}.md", root=root)
+    )
+
+
+def build_evaluator_system(policy: str, *, root: Path | None = None) -> str:
+    """백엔드 정책 enum 을 유지하며 v2의 프롬프트 리비전을 별도 파일로 보존한다."""
+    path = "evaluator/guardrail-v2.2.md" if policy == "guardrail-v2" else f"evaluator/{policy}.md"
+    prompt = load_prompt(path, root=root)
+    if policy == "guardrail-v2":
+        prompt += "\n## 문체 기준 (예시는 다른 사건이며 그대로 베끼는지 검사하지 않는다)\n"
+        prompt += "\n".join(
+            load_prompt(f"writer/{key}-{WRITER_VERSION}.md", root=root)
+            for key in ("mild", "spicy", "hell")
+        )
+    return prompt

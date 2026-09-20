@@ -1,8 +1,7 @@
 """판결문 어휘 목록과 강도별 적용 표(01 §3.5).
 
-단어 목록은 01 §3.5 에 적힌 것 **그대로**다. 늘리거나 줄이지 않는다.
-텍스트 규칙(몇 개까지 허용하는지, 어디에 적용하는지)은 작업 5 에서 붙인다.
-여기는 목록과 "어느 강도에 어느 검사가 켜지는가" 표까지다.
+9/20 사용자 문체 기준: 순한맛은 비속어 없음, 매운맛은 가벼운 채팅 비속어 허용,
+지옥맛은 비속어 제한 없음. 안전 어휘 제한은 모든 강도에 유지한다.
 """
 
 from __future__ import annotations
@@ -18,9 +17,12 @@ __all__ = [
     "HELL_ONCE_PER_VERDICT",
     "ID_IN_TEXT",
     "PROFANITY",
+    "SPICY_ALLOWED_PROFANITY",
     "WORN_PHRASES",
     "LexiconRule",
     "applies",
+    "profanity_hits",
+    "death_word_hits",
 ]
 
 #: 자해·죽음 어휘. 모든 강도에서 금지한다.
@@ -37,7 +39,7 @@ DEATH_WORDS: tuple[str, ...] = (
     "극단적 선택",
 )
 
-#: mild·spicy 에서 0개인지 세는 비속어.
+#: 순한맛 금지 목록. 매운맛은 아래 SPICY_ALLOWED_PROFANITY 만 예외다.
 PROFANITY: tuple[str, ...] = (
     "미친",
     "미쳤",
@@ -63,6 +65,15 @@ PROFANITY: tuple[str, ...] = (
     "또라이",
     "등신",
     "멍청",
+    "도랏",
+    "도랐",
+    "ㅇㅈㄹ",
+    "개소리",
+)
+
+#: 사용자가 제시한 가벼운 거친 말투. 사람의 정체성·인격 공격 여부는 검수관이 본다.
+SPICY_ALLOWED_PROFANITY: frozenset[str] = frozenset(
+    {"미친", "미쳤", "돌았", "도랏", "도랐", "지랄", "ㅇㅈㄹ"}
 )
 
 #: (9/16 결정으로 검사에서 뺐다 — 아래 `_RULE_INTENSITIES` 참고) hell 허용 목록.
@@ -133,3 +144,21 @@ def _parse_rule(rule: LexiconRule | str) -> LexiconRule:
 def applies(intensity: Intensity | str, rule: LexiconRule | str) -> bool:
     """이 강도에서 이 검사를 켜는가."""
     return parse_intensity(intensity) in _RULE_INTENSITIES[_parse_rule(rule)]
+
+
+def profanity_hits(text: str, intensity: Intensity | str) -> list[str]:
+    """후보 필터·서기 검증·말투 수집에서 같은 비속어 경계를 사용한다."""
+    key = parse_intensity(intensity)
+    if not applies(key, LexiconRule.PROFANITY):
+        return []
+    return [
+        word
+        for word in PROFANITY
+        if word in text and not (key is Intensity.spicy and word in SPICY_ALLOWED_PROFANITY)
+    ]
+
+
+def death_word_hits(text: str) -> list[str]:
+    """'투자해' 안의 '자해'를 오탐하지 않는다. 독립된 금지 표현은 계속 검사한다."""
+    normalized = text.replace("투자해", "투자")
+    return [word for word in DEATH_WORDS if word in normalized]

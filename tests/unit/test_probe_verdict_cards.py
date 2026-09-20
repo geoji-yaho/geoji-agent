@@ -9,7 +9,7 @@ from scripts import probe_verdict_cards as probe
 from geoji_ai.adapters.fake_llm import FakeLLM, FakeScenario
 from geoji_ai.contracts.writer import BanterStrategy
 from geoji_ai.core.config import Settings
-from geoji_ai.domain.attack_angles import NEEDS_EVIDENCE, pick
+from geoji_ai.domain.attack_angles import NEEDS_EVIDENCE
 from geoji_ai.domain.intensity import Intensity
 from geoji_ai.graphs.sentencing import build_writer_request, minimal_dossier
 from geoji_ai.graphs.states import Candidate
@@ -58,7 +58,8 @@ async def test_single_case_mode_gives_all_intensities_the_same_case():
 def test_example_cases_are_distinct_and_valid():
     keys = [case.key for case in probe.EXAMPLE_CASES]
     items = [case.item for case in probe.EXAMPLE_CASES]
-    assert len(set(keys)) == len(keys) == len(set(items)) >= 6
+    assert len(set(keys)) == len(keys) >= 10
+    assert len(set(items)) < len(items)  # 같은 품목·금액에 다른 사유를 비교한다.
     assert {case.result for case in probe.EXAMPLE_CASES} >= {"guilty", "notGuilty", "disagree"}
     for index, case in enumerate(probe.EXAMPLE_CASES):
         snapshot, decision = probe.example_case(index)
@@ -68,6 +69,27 @@ def test_example_cases_are_distinct_and_valid():
             assert decision.sentence == case.sentence
     with pytest.raises(ValueError):
         probe.case_indices("99")
+
+
+async def test_reason_pair_keeps_price_and_verdict_but_changes_context():
+    late = await probe.run_probe(config(), case="0")
+    last_transit = await probe.run_probe(config(), case="6")
+    for before, after in zip(late["results"], last_transit["results"], strict=True):
+        assert before["case"]["item"] == after["case"]["item"] == "택시"
+        assert before["case"]["amount_krw"] == after["case"]["amount_krw"] == 12000
+        assert before["case"]["result"] == after["case"]["result"] == "guilty"
+        assert before["case"]["reason"] != after["case"]["reason"]
+
+
+async def test_approved_purchase_and_missing_reason_remain_explicit():
+    approved = await probe.run_probe(config(), case="7")
+    empty = await probe.run_probe(config(), case="9")
+    for row in approved["results"]:
+        assert row["case"]["result"] == "agree"
+        assert row["request"]["schema"]["properties"]["attack_angle"]["enum"] == [
+            "EXCUSE_DISSECTION"
+        ]
+    assert all(row["case"]["reason"] == "" for row in empty["results"])
 
 
 async def test_fake_is_explicit_and_preserves_metadata():
@@ -186,7 +208,7 @@ def test_shared_request_filters_candidates_and_keeps_repair_data():
     )
     user = json.loads(messages[1]["content"])
     # 최소 조서(F0 만)라 반복·규칙 의인화 각도는 건너뛴다(9/18).
-    assert user["attack_angle"]["code"] == pick(snapshot.post_id, 1, skip=NEEDS_EVIDENCE).value
+    assert not {a["code"] for a in user["attack_angles"]} & {a.value for a in NEEDS_EVIDENCE}
     assert user["avoid"] == avoid
     assert user["banter_candidates"] == [
         {

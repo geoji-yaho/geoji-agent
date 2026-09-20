@@ -158,15 +158,17 @@ def test_01_F0_은_항상_첫_라벨이고_USER_CLAIM():
     assert public_f0.scope.visibility is Visibility.PUBLIC
 
 
-def test_02_교통택시는_지하철_환산_그_외는_아메리카노():
+def test_02_사유와_무관한_환산을_자동으로_붙이지_않는다():
     taxi = load_snapshot()
     taxi_text = build_evidence(taxi, make_resolved(taxi), pack_limit=12).facts[0].text
-    assert "지하철 기본요금 1,400원 기준 약 8회분" in taxi_text
+    assert "지하철" not in taxi_text
+    assert taxi.reason in taxi_text
     assert "아메리카노" not in taxi_text
 
     food = load_snapshot(category="식비", item="치킨", amount_krw=20000)
     food_text = build_evidence(food, make_resolved(food), pack_limit=12).facts[0].text
-    assert "아메리카노 4,500원 기준 약 4회분" in food_text
+    assert "아메리카노" not in food_text
+    assert food.reason in food_text
     assert "지하철" not in food_text
 
     cheap = load_snapshot(category="식비", item="껌", amount_krw=1000)

@@ -111,7 +111,7 @@ AI 파트가 할 일(참고): 006 을 운영 DB 에 적용(②를 배포하기 *
 - **006(AI 소유, AI 가 적용)**: `ALTER TABLE ai.jobs DROP CONSTRAINT jobs_kind_check; ADD CONSTRAINT jobs_kind_check CHECK (kind IN ('PREPARE','SENTENCE','TEXT_RETRY','RETAIN','JURY_VOTE'));` `DATABASE_URL=<Session Pooler URL> uv run geoji-ai migrate` 1회. 순서: **006 적용 → 새 AI 이미지 배포 → 백엔드 ②~⑤ 배포**
 - 백엔드 저장소의 테스트 DDL 복사본 `src/test/resources/db/001_ai_jobs.sql` 은 백엔드가 직접 고친다(체크리스트 ⑥)
 - AI 이미지: 워커 슬롯 기본값에 `"JURY": 1` 이 늘었다. **`.env` 에 `WORKER_SLOTS` 를 직접 적어 두었다면 `JURY` 를 더해야** 봇이 투표한다. 안 적었으면 할 일 없음. 새 키 `JUROR_TIMEOUT_SECONDS`(10)·`JUROR_MAX_OUTPUT_TOKENS`(120)는 기본값으로 둔다
-- 프롬프트 파일이 늘어 `prompt_bundle_version` 이 바뀐다. 새 태그와 대조값은 이미지 전달 때 이 표에 적는다: 태그 `____`(빌드 뒤), `prompt_bundle_version` `bundle-62acf5f56945`(9/20 `feat/18-demo-ai-juror` 코드 기준. 빌드한 이미지에서 `sentence_summary` 로그로 재확인)
+- 프롬프트 파일이 늘어 `prompt_bundle_version` 이 바뀐다. 새 태그와 대조값은 이미지 전달 때 이 표에 적는다: 태그 `____`(빌드 뒤), `prompt_bundle_version` `bundle-080f2b413fa1`(9/20 `feat/18-demo-ai-juror` + main PR #57 합친 코드 기준. 빌드한 이미지에서 `sentence_summary` 로그로 재확인)
 - 운영 확인: 사람 1 + 봇 방에서 글 등록 → 5~10초 뒤 피드에 떼거지봇 표 → 평결 확정 → 판결문. 워커 로그 `docker logs geoji-ai-worker | grep jury_vote_summary` 의 `outcome` 이 `AI`(모델) 또는 `TEMPLATE`(폴백)
 
 ## 9. 백엔드 수용 검사

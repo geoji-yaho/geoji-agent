@@ -209,7 +209,21 @@ class FakeLLM:
                 if role == "writer" and self._requested_intensity(schema) == self.fail_intensity:
                     raise LLMError("SCHEMA", message=f"fake {self.fail_intensity} failure")
 
-        return self._result(self._output_for(role, schema), "stop", messages)
+        output = self._output_for(role, schema)
+        if role == "writer" and role not in self.outputs and "case_reading" in _properties(schema):
+            # 실제 추론이 아닌 사유 복사. 고정 fixture를 현행 내부 출력 스키마에 맞춘다.
+            user = next((m.get("content", "{}") for m in messages if m.get("role") == "user"), "{}")
+            try:
+                payload = json.loads(user)
+                reason = str((payload.get("case") or {}).get("reason") or "")
+            except (ValueError, AttributeError, TypeError):
+                reason = ""
+            output["case_reading"] = {
+                "reason_quote": reason[:120],
+                "acknowledged_context": "고정 fixture: 의미 판단 안 함",
+                "roast_target": None,
+            }
+        return self._result(output, "stop", messages)
 
     # 출력 -------------------------------------------------------------
 

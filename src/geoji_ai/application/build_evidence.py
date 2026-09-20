@@ -54,11 +54,6 @@ VERDICT = "VERDICT"
 RULE = "RULE"
 AGGREGATE = "AGGREGATE"
 
-# F0 환산 표(사용자 9/14). 교통 카테고리만 지하철, 나머지는 아메리카노.
-TRANSIT_CATEGORY = "교통/택시"
-SUBWAY = ("지하철 기본요금", 1_400)
-AMERICANO = ("아메리카노", 4_500)
-
 # resolve-evidence `sources[].source_type` → fact_type (04 §3.3 source 열)
 _SOURCE_FACT_TYPE = {"POST": SPEND, "VERDICT": VERDICT}
 
@@ -118,10 +113,6 @@ def _this_case(snapshot: CaseSnapshot) -> _Draft:
         f"이번 지출: {snapshot.item} {_won(snapshot.amount_krw)}, "
         f"카테고리 {snapshot.category}, {_quote(snapshot.reason)}."
     )
-    name, unit = SUBWAY if snapshot.category == TRANSIT_CATEGORY else AMERICANO
-    times = snapshot.amount_krw // unit
-    if times >= 1:
-        text += f" {name} {_won(unit)} 기준 약 {times}회분."
     return _Draft(
         epistemic_type=USER_CLAIM,
         fact_type=SPEND,
