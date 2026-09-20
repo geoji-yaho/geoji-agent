@@ -79,6 +79,9 @@ prompts/** 변경 ─▶ tests/evaluations/run_regression.py (골든 50사건 ×
 - 동기 SDK 를 이벤트 루프에서 부르지 않는다. `AsyncSession` 은 task 마다(서기 fan-out 각 task 가 원장에 쓴다)
 
 ### 3.2 예산·원장 (`domain/budget.py`·`adapters/postgres_call_ledger.py`, proposal2 §7.4)
+
+**9/20 반복 반려 수정(21 §3.1):** 서기·검수의 `request_hash`에는 job·mode·TEXT_RETRY round·call_index를 추가한다. 다른 작성 시도는 새 호출, 같은 논리 작업의 재실행은 재사용한다. generation_id는 캐시 범위에 넣지 않는다. 서기 캐시는 구조 검사 통과 중간 결과이며 의미 통과를 뜻하지 않는다. 반려 검수 보고서는 재사용 결과로 저장하지 않는다. 원장/DB/예산 상한은 유지한다. 구현·검증 상태는 21 §5에 기록한다.
+
 | 항목 | 규칙 |
 |---|---|
 | 단위 | micro-USD 정수. KRW 표시는 화면·리포트에서만(1,450원/$) |
@@ -134,6 +137,7 @@ prompts/** 변경 ─▶ tests/evaluations/run_regression.py (골든 50사건 ×
 | 정책 버전 | `--policy guardrail-v1|v2` — fixture 기대값도 버전별(01 부록 A) |
 
 ### 3.5 검수관 재현율 → `MODEL_EVALUATOR_HELL`
+- 9/20 골든셋 보강(21 §3.4): fixture의 구형 근거 kind를 운영 fact_type으로 변환하고 사용자 주장·모델 해석의 epistemic_type을 보존한다. 운영 캐시+그래프 회귀는 `tests/unit/test_graph_c_cache.py`에서 별도로 검증한다. 골든셋 FakeLLM 결과는 의미 품질 지표로 해석하지 않는다.
 - 라벨 40초안(정상 20 + 심은 위반 20; 지옥맛 12 — 정체성 변형 4·죽음 단어 변형 4·목록 밖 욕 2·평결 부정 2). luna·terra 각 3회 → 코드별 recall/precision. **지옥맛 recall < 0.9** 면 terra(+11원/건). `llm_calls.model_id` 가 호출 단위라 강도별 모델 분기가 원장에 남는다(§3 #13)
 
 ### 3.6 드립 예시 60 (`scripts/build_banter_examples.py`, proposal1 §9.3 절차)

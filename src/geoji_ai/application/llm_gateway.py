@@ -130,6 +130,7 @@ class CallScope:
     `remaining_s` 는 남은 시간을 돌려주는 함수(그래프 `Deadline.remaining_s`)다. 백오프
     대기 뒤에 다시 읽어야 해서 값이 아니라 함수로 받는다. None 이면 기한 없음(PREPARE).
     `reserve_s` 는 이 노드 뒤 필수 단계에 남길 시간이다.
+    `cache_scope` 는 새 작성 시도를 구분하는 내부 문맥이다. None 이면 기존 캐시 키를 유지한다.
     """
 
     budget_key: str
@@ -143,6 +144,7 @@ class CallScope:
     model_override: str | None = None
     remaining_s: Callable[[], float] | None = None
     reserve_s: float = 0.0
+    cache_scope: dict[str, Any] | None = None
 
     def remaining(self) -> float:
         return math.inf if self.remaining_s is None else self.remaining_s()
@@ -169,6 +171,7 @@ def case_scope(
     remaining_s: Callable[[], float] | None = None,
     reserve_s: float = 0.0,
     budget_key: str | None = None,
+    cache_scope: dict[str, Any] | None = None,
 ) -> CallScope:
     """사건 스냅샷 기준 `CallScope`. 예산 키 `budget_key_for_post(post_id)`, 빈 id 는 None.
 
@@ -186,6 +189,7 @@ def case_scope(
         model_override=model_override,
         remaining_s=remaining_s,
         reserve_s=reserve_s,
+        cache_scope=cache_scope,
     )
 
 
@@ -289,15 +293,16 @@ class LLMGateway:
             log.warning("llm_vendor_degraded", vendor=vendor, node=scope.node)
             raise LLMError("DEGRADED", message=f"{vendor} degraded")
 
-        rhash = request_hash(
-            {
-                "role": role,
-                "model_id": model_id,
-                "messages": messages,
-                "schema": schema,
-                "max_output_tokens": max_output_tokens,
-            }
-        )
+        request = {
+            "role": role,
+            "model_id": model_id,
+            "messages": messages,
+            "schema": schema,
+            "max_output_tokens": max_output_tokens,
+        }
+        if scope.cache_scope is not None:
+            request["cache_scope"] = scope.cache_scope
+        rhash = request_hash(request)
         versions = NodeResultKey(
             rhash, model_id, scope.prompt_version, scope.policy_version, scope.privacy_versions
         ).versions()

@@ -56,7 +56,8 @@
       "output_path": "002-Mnet-necklace.png",
       "status": "completed",
       "review_notes": [
-        "목걸이·손·의상과 한 컷 구도 유지, 주요 자막 정확. 주변 방송 그래픽은 단순화됨."
+        "목걸이·손·의상과 한 컷 구도 유지, 주요 자막 정확. 주변 방송 그래픽은 단순화됨.",
+        "2026-09-19 사용자 승인: 판결 태그 APPROVED. 로컬 등록 카탈로그에 반영; 운영 S3·DB 등록 여부는 별도 확인 필요."
       ],
       "classification": {
         "emotions": [
@@ -490,7 +491,8 @@
       "output_path": "012-images-8.png",
       "status": "completed",
       "review_notes": [
-        "안경·백발·전화·손짓과 '재밌네. 진행시켜!' 유지."
+        "안경·백발·전화·손짓과 '재밌네. 진행시켜!' 유지.",
+        "2026-09-19 사용자 승인: 판결 태그 APPROVED. 로컬 등록 카탈로그에 반영; 운영 S3·DB 등록 여부는 별도 확인 필요."
       ],
       "classification": {
         "emotions": [
@@ -532,7 +534,8 @@
       "output_path": "013-images-9.png",
       "status": "completed",
       "review_notes": [
-        "두 인물의 놀람/담담함 대비와 각 말풍선 자막 유지."
+        "두 인물의 놀람/담담함 대비와 각 말풍선 자막 유지.",
+        "2026-09-19 사용자 승인: 판결 태그 NOT_GUILTY. 로컬 등록 카탈로그에 반영; 운영 S3·DB 등록 여부는 별도 확인 필요."
       ],
       "classification": {
         "emotions": [
@@ -581,7 +584,9 @@
       "output_path": "014-images-jpeg.png",
       "status": "completed",
       "review_notes": [
-        "노란 헤드폰 펭귄과 '인정' 자막 유지."
+        "노란 헤드폰 펭귄과 '인정' 자막 유지.",
+        "2026-09-19 사용자 승인: 판결 태그 APPROVED. 로컬 등록 카탈로그에 반영; 운영 S3·DB 등록 여부는 별도 확인 필요.",
+        "사용자 분류 확정: 유쾌·유머러스한 인정 반응. CELEBRATION과 키워드로 반영하고 분류 검토 필요를 해제함."
       ],
       "classification": {
         "emotions": [
@@ -590,7 +595,9 @@
         "keywords": [
           "인정",
           "펭귄",
-          "수긍"
+          "수긍",
+          "유쾌",
+          "유머러스"
         ],
         "expense_categories": [],
         "subject": "animal",
@@ -603,13 +610,11 @@
             ]
           }
         ],
-        "evidence": "큰 인정 자막과 열린 부리가 긍정적 수긍을 나타낸다.",
-        "uncertainties": [
-          "축하보다는 단순 수긍에 가까워 CELEBRATION과 완전히 일치하지 않을 수 있음"
-        ]
+        "evidence": "큰 인정 자막과 동그란 눈, 열린 부리가 긍정적 수긍을 나타낸다. 사용자가 유쾌하고 유머러스한 승인 반응으로 확정했으며, 인정에 해당하는 기존 감정 CELEBRATION으로 분류한다.",
+        "uncertainties": []
       },
       "metadata_path": "014-images-jpeg.metadata.json",
-      "classification_needs_review": true
+      "classification_needs_review": false
     },
     {
       "input_path": "/Users/hyun/dev/geoji/inputs/jjalbox_20241231_6773f2c89ff40.jpg",

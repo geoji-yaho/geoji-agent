@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="d1c5e767-7382-4b1b-b144-8d8d99062076" name="Changes" comment="# &lt;[type]&gt;: &lt;subject&gt;&#10;##### Subject 50 characters ################# -&gt;&#10;&#10;&#10;# Body Message&#10;######## Body 72 characters ####################################### -&gt;&#10;&#10;# Issue Tracker Number or URL (optional) -&gt;&#10;&#10;# --- COMMIT END ---&#10;# Type can be&#10;#   feat    : 새로운 기능 추가&#10;#   fix     : 버그/오타(typo)/로직 등 코드를 수정한 경우&#10;#   refactor: 코드 리팩토링&#10;#   style   : 코드 포맷팅, 세미콜론 누락 수정 등 내부 로직 변경이 없이 코드를 수정한 경우&#10;#   docs    : README 문서 수정&#10;#   test    : 테스트 코드, 리팩토링 테스트 코드 추가&#10;#   chore   : 빌드 업무 수정, 패키지 매니저 수정&#10;#   remove  : 코드/파일 삭제&#10;#   dep     : 패키지 설치/삭제 등 의존성 관련 수정&#10;#   etc     : 기타&#10;# ------------------&#10;# Remember me ~&#10;#   Capitalize the subject line&#10;#     제목줄은 대문자로 시작한다.&#10;#   Use the imperative mood in the subject line&#10;#     제목줄은 명령어로 작성한다.&#10;#   Do not end the subject line with a period&#10;#     제목줄은 마침표로 끝내지 않는다.&#10;#   Separate subject from body with a blank line&#10;#     본문과 제목에는 빈줄을 넣어서 구분한다.&#10;#   Use the body to explain what and why vs. how&#10;#     본문에는 &quot;어떻게&quot; 보다는 &quot;왜&quot;와 &quot;무엇을&quot; 설명한다.&#10;#   Can use multiple lines with &quot;-&quot; for bullet points in body&#10;#     본문에 목록을 나타낼때는 &quot;-&quot;로 시작한다.&#10;# ------------------">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/plans/18-natural-verdict-style.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/plans/18-natural-verdict-style.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/outputs/b-meme/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/outputs/b-meme/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/outputs/b-meme/backend-registration-v1.json" beforeDir="false" afterPath="$PROJECT_DIR$/outputs/b-meme/backend-registration-v1.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/outputs/b-meme/catalog-v1.json" beforeDir="false" afterPath="$PROJECT_DIR$/outputs/b-meme/catalog-v1.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/outputs/b-meme/run-20260916-new-inputs/002-Mnet-necklace.metadata.json" beforeDir="false" afterPath="$PROJECT_DIR$/outputs/b-meme/run-20260916-new-inputs/002-Mnet-necklace.metadata.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/outputs/b-meme/run-20260916-new-inputs/012-images-8.metadata.json" beforeDir="false" afterPath="$PROJECT_DIR$/outputs/b-meme/run-20260916-new-inputs/012-images-8.metadata.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/outputs/b-meme/run-20260916-new-inputs/013-images-9.metadata.json" beforeDir="false" afterPath="$PROJECT_DIR$/outputs/b-meme/run-20260916-new-inputs/013-images-9.metadata.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/outputs/b-meme/run-20260916-new-inputs/014-images-jpeg.metadata.json" beforeDir="false" afterPath="$PROJECT_DIR$/outputs/b-meme/run-20260916-new-inputs/014-images-jpeg.metadata.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/outputs/b-meme/run-20260916-new-inputs/annotations.json" beforeDir="false" afterPath="$PROJECT_DIR$/outputs/b-meme/run-20260916-new-inputs/annotations.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/outputs/b-meme/run-20260916-new-inputs/manifest.json" beforeDir="false" afterPath="$PROJECT_DIR$/outputs/b-meme/run-20260916-new-inputs/manifest.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "git-widget-placeholder": "codex/verdict-style-v6-2",
+    "node.js.selected.package.tslint": "(autodetect)"
+  }
+}]]></component>
+  <component name="TaskManager">
+    <servers />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="# &lt;[type]&gt;: &lt;subject&gt;&#10;##### Subject 50 characters ################# -&gt;&#10;&#10;&#10;# Body Message&#10;######## Body 72 characters ####################################### -&gt;&#10;&#10;# Issue Tracker Number or URL (optional) -&gt;&#10;&#10;# --- COMMIT END ---&#10;# Type can be&#10;#   feat    : 새로운 기능 추가&#10;#   fix     : 버그/오타(typo)/로직 등 코드를 수정한 경우&#10;#   refactor: 코드 리팩토링&#10;#   style   : 코드 포맷팅, 세미콜론 누락 수정 등 내부 로직 변경이 없이 코드를 수정한 경우&#10;#   docs    : README 문서 수정&#10;#   test    : 테스트 코드, 리팩토링 테스트 코드 추가&#10;#   chore   : 빌드 업무 수정, 패키지 매니저 수정&#10;#   remove  : 코드/파일 삭제&#10;#   dep     : 패키지 설치/삭제 등 의존성 관련 수정&#10;#   etc     : 기타&#10;# ------------------&#10;# Remember me ~&#10;#   Capitalize the subject line&#10;#     제목줄은 대문자로 시작한다.&#10;#   Use the imperative mood in the subject line&#10;#     제목줄은 명령어로 작성한다.&#10;#   Do not end the subject line with a period&#10;#     제목줄은 마침표로 끝내지 않는다.&#10;#   Separate subject from body with a blank line&#10;#     본문과 제목에는 빈줄을 넣어서 구분한다.&#10;#   Use the body to explain what and why vs. how&#10;#     본문에는 &quot;어떻게&quot; 보다는 &quot;왜&quot;와 &quot;무엇을&quot; 설명한다.&#10;#   Can use multiple lines with &quot;-&quot; for bullet points in body&#10;#     본문에 목록을 나타낼때는 &quot;-&quot;로 시작한다.&#10;# ------------------" />
+    <option name="LAST_COMMIT_MESSAGE" value="# &lt;[type]&gt;: &lt;subject&gt;&#10;##### Subject 50 characters ################# -&gt;&#10;&#10;&#10;# Body Message&#10;######## Body 72 characters ####################################### -&gt;&#10;&#10;# Issue Tracker Number or URL (optional) -&gt;&#10;&#10;# --- COMMIT END ---&#10;# Type can be&#10;#   feat    : 새로운 기능 추가&#10;#   fix     : 버그/오타(typo)/로직 등 코드를 수정한 경우&#10;#   refactor: 코드 리팩토링&#10;#   style   : 코드 포맷팅, 세미콜론 누락 수정 등 내부 로직 변경이 없이 코드를 수정한 경우&#10;#   docs    : README 문서 수정&#10;#   test    : 테스트 코드, 리팩토링 테스트 코드 추가&#10;#   chore   : 빌드 업무 수정, 패키지 매니저 수정&#10;#   remove  : 코드/파일 삭제&#10;#   dep     : 패키지 설치/삭제 등 의존성 관련 수정&#10;#   etc     : 기타&#10;# ------------------&#10;# Remember me ~&#10;#   Capitalize the subject line&#10;#     제목줄은 대문자로 시작한다.&#10;#   Use the imperative mood in the subject line&#10;#     제목줄은 명령어로 작성한다.&#10;#   Do not end the subject line with a period&#10;#     제목줄은 마침표로 끝내지 않는다.&#10;#   Separate subject from body with a blank line&#10;#     본문과 제목에는 빈줄을 넣어서 구분한다.&#10;#   Use the body to explain what and why vs. how&#10;#     본문에는 &quot;어떻게&quot; 보다는 &quot;왜&quot;와 &quot;무엇을&quot; 설명한다.&#10;#   Can use multiple lines with &quot;-&quot; for bullet points in body&#10;#     본문에 목록을 나타낼때는 &quot;-&quot;로 시작한다.&#10;# ------------------" />
+  </component>
+</project>

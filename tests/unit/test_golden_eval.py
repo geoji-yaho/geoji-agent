@@ -18,6 +18,7 @@ from geoji_ai.adapters.fake_llm import FakeLLM
 from geoji_ai.contracts.case import CaseSnapshot, VerdictResult
 from geoji_ai.core.config import Settings
 from geoji_ai.domain.attack_angles import ANGLE_ORDER
+from geoji_ai.graphs.sentencing import writer_angles
 from tests.evaluations import checks, judge, report
 from tests.evaluations import run_regression as rr
 
@@ -440,6 +441,63 @@ def test_dry_run_one_case_calls_writer_and_evaluator_only(cases: list[rr.GoldenC
     assert run.sentencing is not None and run.sentencing["sentence"] == case.sentencing.sentence
     writer_payload = json.loads(llm.calls[0].messages[-1]["content"])
     assert writer_payload["dossier"][0]["text"] == case.dossier.facts[0].text
+
+
+def test_golden_history_enables_runtime_history_angles(cases, hell_cases):
+    for case in cases + hell_cases:
+        if "repeat" not in case.tags:
+            continue
+        dossier = rr.to_dossier(case)
+        allowed = {angle.value for angle in writer_angles(case.full_snapshot, dossier)}
+        assert {"REPETITION", "FUTURE_PROPHECY"} <= allowed, case.case_id
+        assert dossier.label_map == case.dossier.label_map
+        assert [f.text for f in dossier.facts] == [f.text for f in case.dossier.facts]
+
+
+def test_golden_case_preserves_claim_and_inference_types(cases, hell_cases):
+    for case in cases + hell_cases:
+        dossier = rr.to_dossier(case)
+        assert dossier.facts[0].epistemic_type == "USER_CLAIM"
+        assert dossier.facts[0].fact_type == "SPEND"
+        for source, fact in zip(case.dossier.facts, dossier.facts, strict=True):
+            if source.kind in {"REASON_ANALYSIS", "MITIGATION"}:
+                assert fact.epistemic_type == "MODEL_INFERENCE"
+            elif source.kind != "THIS_CASE":
+                assert fact.epistemic_type == "DB_RECORD"
+            if source.kind == "RULE_HIT":
+                assert fact.fact_type == "RULE"
+            if source.kind == "STATUS":
+                assert fact.fact_type == "AGGREGATE"
+
+
+@pytest.mark.parametrize(
+    ("kind", "epistemic_type", "fact_type"),
+    [
+        ("THIS_CASE", "USER_CLAIM", "SPEND"),
+        ("PATTERN", "DB_RECORD", "SPEND"),
+        ("PRIOR_REASON", "DB_RECORD", "SPEND"),
+        ("PRIOR_VERDICT", "DB_RECORD", "VERDICT"),
+        ("RULE_HIT", "DB_RECORD", "RULE"),
+        ("STATUS", "DB_RECORD", "AGGREGATE"),
+        ("REASON_ANALYSIS", "MODEL_INFERENCE", "MITIGATION"),
+        ("MITIGATION", "MODEL_INFERENCE", "MITIGATION"),
+    ],
+)
+def test_golden_fact_kind_mapping_preserves_label_and_text(cases, kind, epistemic_type, fact_type):
+    case = cases[0].model_copy(deep=True)
+    source = case.dossier.facts[1]
+    source.kind = kind
+    fact = rr.to_dossier(case).facts[1]
+    assert (fact.epistemic_type, fact.fact_type) == (epistemic_type, fact_type)
+    assert fact.label == source.label
+    assert fact.text == source.text
+
+
+def test_golden_unknown_fact_kind_is_not_silently_promoted_to_fact(cases):
+    case = cases[0].model_copy(deep=True)
+    case.dossier.facts[1].kind = "UNKNOWN_KIND"
+    with pytest.raises(ValueError, match="UNKNOWN_KIND"):
+        rr.to_dossier(case)
 
 
 def test_dry_run_quick_skips_evaluator(cases: list[rr.GoldenCase]) -> None:

@@ -46,8 +46,9 @@ generation_failed`.
   `검수 라운드×2 + (hell 별도면 1)`, 양형·조서 0. 검수 라운드는 state `eval_round` 로 센다
 - 게이트웨이 경로의 timeout·재시도는 게이트웨이가 시도마다 건다(그래프 `wait_for` 가 재시도를 자르지
   않게). 세마포어는 재시도 대기 동안에도 쥐고 있다
-- `node_results` 는 검증을 통과한 출력만: 양형은 `parse_sentencing` 뒤,
-  서기는 `CardTextDraft`·강도·각도 검사 뒤, 검수는 보고서에 전역 형식 실패가 없을 때(`remember`)
+- `node_results` 는 단계별 검증을 통과한 출력만: 양형은 `parse_sentencing` 뒤,
+  서기는 `CardTextDraft`·강도·각도 검사 뒤(의미 검수 전 중간 결과), 검수는 전체 통과 때.
+  서기·검수 캐시는 job·mode·TEXT_RETRY round·call_index 로 새 작성 시도를 구분한다
 - `db_now` 는 핸들러가 준다(`application.sentence_case`: `job.updated_at` + 경과 monotonic)
 
 `REGENERATE`(TEXT_RETRY, 08 §3.2):
@@ -624,11 +625,19 @@ def _card_avoid(preview: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _avoid(entry: Mapping[str, Any]) -> dict[str, list[str]]:
+def _avoid(entry: Mapping[str, Any]) -> dict[str, Any]:
     """검수 항목 → 서기에게 줄 "피할 것"."""
-    codes = [str(v.get("code")) for v in entry.get("violations") or [] if isinstance(v, Mapping)]
+    violations = [v for v in entry.get("violations") or [] if isinstance(v, Mapping)]
+    codes = [str(v.get("code")) for v in violations]
     sentences = [str(s) for s in entry.get("problem_sentences") or []]
-    return {"violations": list(dict.fromkeys(codes)), "problem_sentences": sentences}
+    return {
+        "violations": list(dict.fromkeys(codes)),
+        "problem_sentences": sentences,
+        "violation_details": [
+            {key: v[key] for key in ("code", "path", "explanation", "evidence_labels") if key in v}
+            for v in violations
+        ],
+    }
 
 
 def _merge_same_intensity(entries: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -845,6 +854,16 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             started = time.monotonic()
             try:
                 if gateway is not None:
+                    cache_scope = None
+                    if role in ("writer", "evaluator"):
+                        payload = _payload(state)
+                        # generation_id 는 lease 재획득마다 바뀐다. 같은 논리 작업은 재사용한다.
+                        cache_scope = {
+                            "job_id": state["job"].id,
+                            "mode": state["mode"],
+                            "round": payload.round if isinstance(payload, TextRetryPayload) else 0,
+                            "call_index": call_index,
+                        }
                     scope = case_scope(
                         state["snapshot"],
                         node=node,
@@ -856,6 +875,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                         model_override=model_override,
                         remaining_s=deadline.remaining_s,
                         reserve_s=reserve_after(node, settings),
+                        cache_scope=cache_scope,
                     )
                     scoped = await gateway.scoped_call(
                         scope,
@@ -1160,6 +1180,19 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 logger.warning("TEXT_RETRY intensities %s 가 target 밖 → SCHEMA_INVALID", outside)
                 update["failure"] = SCHEMA_INVALID
         fixed = begin.fixed_sentencing
+        needs_sentence = str(_jury(state).result) == GUILTY and state["snapshot"].post_type == SPENT
+        if (fixed is not None and not needs_sentence) or (
+            _regenerate(state) and needs_sentence and fixed is None
+        ):
+            # 무형량 사건의 불필요한 형량과 유죄 재생성의 고정 형량 누락을 숨기지 않는다.
+            fallback_log(
+                state,
+                node="begin_generation",
+                role="backend",
+                outcome="generation_failed",
+                reason=f"{SCHEMA_INVALID}:SENTENCING_PRESENCE",
+            )
+            return {**update, "failure": SCHEMA_INVALID}
         if fixed is not None:
             update["sentencing"] = SentencingDecision(
                 schema_version=1,
@@ -1434,6 +1467,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             ):
                 raise ValueError("요청한 강도·근거 있는 각도 범위와 다르다")
             hints = MemeHints.model_validate(hints_raw) if hints_raw is not None else None
+            # 구조 검사 후의 중간 결과 캐시다. 의미 검수 통과를 보증하지 않는다.
             await commit()
         except ValidationError:
             # 길이·항목 수·줄바꿈 등 형식 오류는 원문을 기록하거나 캐시하지 않는다.
@@ -1609,8 +1643,19 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         """scope 강도만 검수한다. (`OK`|`SKIPPED`|`FAILED`, 합친 출력, 호출 기록, 확정 목록)."""
         jury = _jury(state)
         policy_version = settings.GUARDRAIL_POLICY_VERSION
+        needs_sentence = str(jury.result) == GUILTY and state["snapshot"].post_type == SPENT
+        if needs_sentence != (decision is not None):
+            return ("FAILED", None, [], [])
         evidence = (
             {} if state["dossier"] is None else {f.label: f.text for f in state["dossier"].facts}
+        )
+        evidence_metadata = (
+            {}
+            if state["dossier"] is None
+            else {
+                f.label: {"epistemic_type": f.epistemic_type, "fact_type": f.fact_type}
+                for f in state["dossier"].facts
+            }
         )
         hell_apart = (
             Intensity.hell in scope and settings.MODEL_EVALUATOR_HELL != settings.MODEL_JUDGMENT
@@ -1648,6 +1693,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                             "sentencing": _sentencing_view(decision),
                             "draft": subset.model_dump(mode="json", by_alias=True),
                             "evidence": evidence,
+                            "evidence_metadata": evidence_metadata,
                         }
                     ),
                 },
@@ -1660,7 +1706,9 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     EVALUATOR,
                     role="evaluator",
                     messages=messages,
-                    schema=evaluator_schema([i.value for i in group]),
+                    schema=evaluator_schema(
+                        [i.value for i in group], include_sentencing_checks=needs_sentence
+                    ),
                     max_output_tokens=settings.EVALUATOR_MAX_OUTPUT_TOKENS,
                     call_index=evaluator_call_index(eval_round, is_hell),
                     model_override=settings.MODEL_EVALUATOR_HELL if is_hell else None,
@@ -1676,7 +1724,12 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 broken = CallRecord("evaluator", tag, model, _error_name(exc))
                 return ("FAILED", None, broken, None)
             record = CallRecord("evaluator", tag, result.model_id, None)
-            return ("OK", dict(result.output), record, commit)
+            output = dict(result.output)
+            if not needs_sentence:
+                # 형량이 필요 없는 정상 사건에만 적용 제외를 채운다. texts 검사는 그대로다.
+                for name in _EVALUATION_CHECKS:
+                    output[name] = {"pass": True, "violations": []}
+            return ("OK", output, record, commit)
 
         gathered = await asyncio.gather(*(one(group) for group in groups), return_exceptions=True)
         outcomes = [_raise_if_exception(item) for item in gathered]
@@ -1796,8 +1849,6 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 elif not (issue.path.startswith("texts") and issue.code in _PER_TEXT_CODES):
                     logger.warning("검수 전역 실패: %s %s", issue.code, issue.path)
                     return failed(why=f"GLOBAL:{issue.code}")
-            for commit in commits:
-                await commit()
             if reason_failed:
                 substituted = (
                     None

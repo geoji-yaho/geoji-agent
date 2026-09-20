@@ -419,10 +419,23 @@ def test_evaluator_receives_policy_jury_sentencing_draft_and_evidence(trace: Pip
     call = trace.call("evaluator")
     policy = trace.settings.GUARDRAIL_POLICY_VERSION
     assert call.system == build_evaluator_system(policy)
-    assert set(call.user) == {"policy_version", "case", "jury", "sentencing", "draft", "evidence"}
+    assert set(call.user) == {
+        "policy_version",
+        "case",
+        "jury",
+        "sentencing",
+        "draft",
+        "evidence",
+        "evidence_metadata",
+    }
     assert call.user["policy_version"] == policy
     assert set(call.user["jury"]) == {"result", "vote_counts", "guilty_ratio", "policy"}
-    assert call.user["evidence"] == {f.label: f.text for f in trace.dossier.facts}  # type: ignore[union-attr]
+    assert trace.dossier is not None
+    assert call.user["evidence"] == {f.label: f.text for f in trace.dossier.facts}
+    assert call.user["evidence_metadata"] == {
+        f.label: {"epistemic_type": f.epistemic_type, "fact_type": f.fact_type}
+        for f in trace.dossier.facts
+    }
     assert "policy_version" not in call.schema["properties"]  # 서버가 채운다
     assert call.schema["properties"]["texts"]["items"]["properties"]["intensity"]["enum"] == [
         "mild",
