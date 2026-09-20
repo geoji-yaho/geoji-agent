@@ -175,6 +175,9 @@ MINIMAL_PACK_LIMIT = 1
 #: `writer_repair` 를 시작할 최소 남은 시간(05 §3.3 "남은 ≥ 5s").
 REPAIR_MIN_REMAINING_S = 5.0
 
+#: 검수 라운드 수. 0 첫 검수 · 1 repair·치환 뒤 재검수 · 2 남은 강도 치환 뒤 마지막 재검수.
+_EVAL_ROUNDS = 3
+
 GUILTY = "guilty"
 SPENT = "spent"
 
@@ -626,7 +629,12 @@ def _card_avoid(preview: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _avoid(entry: Mapping[str, Any]) -> dict[str, Any]:
-    """검수 항목 → 서기에게 줄 "피할 것"."""
+    """검수 항목 → 서기에게 줄 "피할 것".
+
+    코드와 문제 문장만 주면 서기는 **왜** 걸렸는지 모른 채 다시 쓴다. 9/20 골든셋에서
+    `UNGROUNDED_CLAIM` 재작성이 같은 자리에서 또 걸렸다. 검수관이 쓴 판정 사유
+    (`violations[].explanation`)를 `violation_details` 로 같이 준다(#68 과 같은 진단).
+    """
     violations = [v for v in entry.get("violations") or [] if isinstance(v, Mapping)]
     codes = [str(v.get("code")) for v in violations]
     sentences = [str(s) for s in entry.get("problem_sentences") or []]
@@ -723,6 +731,38 @@ def _merge_reports(outputs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
 #: `evaluation_failure_total(code)` 라벨로 쓸 수 있는 값. 계약 밖 코드는 세지 않는다(라벨 보호).
 _VIOLATION_CODES = frozenset(code.value for code in ViolationCode)
+
+#: 세기는 하되 판결문을 죽이지 않는 코드. `guardrail-v2.6` 은 검수관에게 근거 대조를 시키지 않지만
+#: 모델이 그래도 내는 일이 있어 여기서 막는다. 서기가 근거 없이 지어낸 문장은 결정적 검사가
+#: 따로 잡는다(`domain/validation.py` 의 근거 라벨 대조. 남은 문장이 0 이면 `UNGROUNDED_CLAIM`).
+#: 9/20 실측: 50 건 반려 131 회 중 71 회가 `UNGROUNDED_CLAIM` 이었고 사람이 훑어 보니 대부분
+#: '최근 7일 4회' 를 '이번 주 네 번' 으로 옮긴 정도의 지적이었다. 한 강도만 걸려도 전 강도가
+#: TEMPLATE 이 되므로 이것이 AI 판결문을 가장 많이 죽이는 경로였다.
+_ADVISORY_CODES = frozenset({ViolationCode.UNGROUNDED_CLAIM.value})
+
+
+def _forgive_advisory(output: Mapping[str, Any], fresh: Sequence[Mapping[str, Any]]) -> None:
+    """`_ADVISORY_CODES` 만으로 걸린 검사를 통과로 되돌린다. 제자리에서 고친다.
+
+    `_observe_violations` 뒤에 부른다. 지표와 로그에는 남기고 판정에서만 뺀다.
+    다른 코드가 함께 있으면 `pass` 는 false 그대로이고 자문 코드만 목록에서 빠진다.
+    """
+    checks: list[Any] = [output.get(name) for name in _EVALUATION_CHECKS]
+    checks.extend(fresh)
+    for check in checks:
+        # 검수관 출력은 JSON 이라 dict 다. 아니면 형식 검사(`validate_evaluation`)가 잡는다.
+        if not isinstance(check, dict) or check.get("pass") is not False:
+            continue
+        violations = [v for v in check.get("violations") or [] if isinstance(v, Mapping)]
+        kept = [v for v in violations if v.get("code") not in _ADVISORY_CODES]
+        if len(kept) == len(violations):
+            continue
+        check["violations"] = kept
+        if kept:
+            continue
+        check["pass"] = True
+        if "problem_sentences" in check:
+            check["problem_sentences"] = []
 
 
 def _observe_violations(output: Mapping[str, Any], fresh: Sequence[Mapping[str, Any]]) -> None:
@@ -1768,7 +1808,11 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
             )
             return {"calls": calls, "draft_sources": all_template, "failure": code, "eval_kept": {}}
 
-        for attempt in range(2):
+        # 라운드 3. 0 에서 걸린 강도를 repair 하거나 TEMPLATE 으로 치환하고, 1 에서 재검수한다.
+        # 1 에서도 걸리면 예전에는 그 자리에서 전 강도 TEMPLATE 이었다. 그러면 통과한 강도까지
+        # 버려진다(9/20 골든셋: 실패 23 건 중 14 건이 세 강도 대상). 2 를 하나 더 두어 아래
+        # 강도별 TEMPLATE 치환이 한 번 더 돌게 한다. 통과한 강도는 AI 로 남는다.
+        for attempt in range(_EVAL_ROUNDS):
             current_hash = draft_hash(writer_draft, decision)
             current = {
                 Intensity(t.intensity).value: t.model_dump(mode="json") for t in writer_draft.texts
@@ -1801,6 +1845,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 [e for e in output.get("texts") or [] if isinstance(e, Mapping)]
             )
             _observe_violations(output, fresh)
+            _forgive_advisory(output, fresh)
             fresh_keys = {_key(e.get("intensity")) for e in fresh}
             entries_list = fresh + [e for k, e in reused.items() if k not in fresh_keys]
             entries_list.sort(key=lambda e: order.get(_key(e.get("intensity")) or "", len(order)))
@@ -1827,7 +1872,7 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     "failure": None,
                     "route": _ROUTE_FINALIZE,
                 }
-            if attempt == 1:
+            if attempt == _EVAL_ROUNDS - 1:
                 logger.warning("재검수도 통과하지 못했다: %s", [i.code for i in issues])
                 return failed(why="RECHECK:" + ",".join(sorted({i.code for i in issues})))
             if _regenerate(state):

@@ -753,7 +753,9 @@ def test_backend_unavailable_fails_job() -> None:
 POST_ID = "post-taxi-20260907-0852"
 
 
-def report(intensities: Iterable[str], fail: Iterable[str] = ()) -> dict[str, Any]:
+def report(
+    intensities: Iterable[str], fail: Iterable[str] = (), code: str = "PERSONAL_ATTACK"
+) -> dict[str, Any]:
     """요청 강도만의 검수 출력. `fail` 강도는 `pass=false` + 위반·문제 문장."""
     base = fixture("evaluation-taxi-pass")
     base.pop("schema_version")
@@ -767,7 +769,7 @@ def report(intensities: Iterable[str], fail: Iterable[str] = ()) -> dict[str, An
             entry["pass"] = False
             entry["violations"] = [
                 {
-                    "code": "PERSONAL_ATTACK",
+                    "code": code,
                     "path": f"texts[{index}].statement[0].text",
                     "evidence_labels": [],
                     "explanation": "인신공격",
@@ -852,6 +854,49 @@ def evaluator_intensities(call: FakeCall) -> list[str]:
     return call.schema["properties"]["texts"]["items"]["properties"]["intensity"]["enum"]
 
 
+def test_16b_ungrounded_claim_alone_does_not_reject() -> None:
+    """`UNGROUNDED_CLAIM` 만으로는 초안을 되돌리지 않는다. 재작성 없이 그대로 확정한다(9/20).
+
+    검수관에게 근거 대조를 시키지 않기로 했다(`guardrail-v2.6`). 모델이 그래도 내면
+    `_forgive_advisory` 가 판정에서 뺀다. 서기가 근거 없이 지어낸 문장은 결정적 검사가 잡는다.
+    골든셋 50 건에서 반려 131 회 중 71 회가 이 코드였고, 한 강도만 걸려도 전 강도가 TEMPLATE 이었다.
+    """
+    llm = ScriptedLLM(
+        sequences={
+            "evaluator": [report(["spicy", "hell"], fail=["hell"], code="UNGROUNDED_CLAIM")]
+        }
+    )
+    result = run(llm)
+    assert [writer_intensity(c) for c in result.calls_of("writer")] == ["spicy", "hell"]
+    assert result.state["repair_count"] == 0
+    req = result.finalize()
+    assert [(t.intensity, t.source) for t in req.draft.texts] == [("spicy", "AI"), ("hell", "AI")]
+    assert [(t.intensity, t.pass_) for t in req.evaluation.texts] == [
+        ("spicy", True),
+        ("hell", True),
+    ]
+    assert [t.violations for t in req.evaluation.texts] == [[], []]
+
+
+def test_16c_ungrounded_claim_with_another_code_still_rejects() -> None:
+    """다른 코드가 함께 있으면 그 강도는 그대로 반려된다. 자문 코드만 목록에서 빠진다."""
+    failing = report(["spicy", "hell"], fail=["hell"])
+    hell = next(t for t in failing["texts"] if t["intensity"] == "hell")
+    hell["violations"].append(
+        {
+            "code": "UNGROUNDED_CLAIM",
+            "path": "texts[1].statement[0].text",
+            "evidence_labels": [],
+            "explanation": "근거 없음",
+        }
+    )
+    llm = ScriptedLLM(sequences={"evaluator": [failing, report(["hell"])]})
+    result = run(llm)
+    assert result.state["repair_count"] == 1
+    avoid = user_payload(result.calls_of("writer")[2])["avoid"]
+    assert avoid["violations"] == ["PERSONAL_ATTACK"]
+
+
 def test_16_evaluator_failure_repairs_failed_intensity_only() -> None:
     """검수 실패한 hell만 같은 기법 범위와 피할 문장을 받아 재작성·재검수한다."""
     llm = ScriptedLLM(
@@ -863,6 +908,7 @@ def test_16_evaluator_failure_repairs_failed_intensity_only() -> None:
     assert writer_angle(writers[0]) == "EXCUSE_DISSECTION"
     assert writers[2].schema == writers[1].schema
     avoid = user_payload(writers[2])["avoid"]
+    # 검수관 판정 사유가 실린다. 코드·문장만 주면 서기가 왜 걸렸는지 모른다(9/20).
     assert avoid == {
         "violations": ["PERSONAL_ATTACK"],
         "problem_sentences": ["문제 문장 마커"],
