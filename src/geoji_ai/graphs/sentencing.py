@@ -720,15 +720,31 @@ def _observe_violations(output: Mapping[str, Any], fresh: Sequence[Mapping[str, 
     """검수관이 `pass=false` 로 낸 위반 코드마다 `evaluation_failure_total(code)` 를 1 올린다.
 
     이번 호출의 출력만 센다(repair 뒤 이어 붙인 직전 통과 항목은 빼고).
+
+    코드만으로는 검수관이 과하게 잡는 것인지 서기가 실제로 지어낸 것인지 가릴 수 없어
+    `evaluation_rejected` 로 검수관의 설명도 같이 남긴다(9/20 운영 진단). 남기는 것은 검수관이
+    쓴 판정 사유이고 판결문 본문(`problem_sentences`)은 넣지 않는다.
     """
+    names = _EVALUATION_CHECKS + tuple(_key(e.get("intensity")) or "?" for e in fresh)
     checks = [output.get(name) for name in _EVALUATION_CHECKS] + list(fresh)
-    for check in checks:
+    for name, check in zip(names, checks, strict=True):
         if not isinstance(check, Mapping) or check.get("pass") is not False:
             continue
+        reasons = []
         for violation in check.get("violations") or []:
-            code = violation.get("code") if isinstance(violation, Mapping) else None
+            if not isinstance(violation, Mapping):
+                continue
+            code = violation.get("code")
             if code in _VIOLATION_CODES:
                 instrument.count("evaluation_failure_total", code=code)
+            reasons.append(
+                "{}@{}: {}".format(
+                    code if code in _VIOLATION_CODES else "UNKNOWN",
+                    str(violation.get("path") or "")[:60],
+                    str(violation.get("explanation") or "")[:300],
+                )
+            )
+        logger.info("검수 반려 %s | %s", name, " ; ".join(reasons) or "사유 없음")
 
 
 def _new_call_errors(state: Mapping[str, Any], update: Mapping[str, Any]) -> list[str]:
@@ -1022,7 +1038,12 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                 )
                 return {"failure": EVAL_FAILED}
             if allow_repair and can_repair(state, bad):
-                logger.info("서버 검증 실패 %s → writer_repair", sorted(i.value for i in bad))
+                # 코드만 남기면 길이 위반인지 카드 규격 위반인지 가릴 수 없다(9/20 운영 진단).
+                logger.info(
+                    "서버 검증 실패 %s → writer_repair | %s",
+                    sorted(i.value for i in bad),
+                    "; ".join(f"{i.value}: {' / '.join(messages.get(i, []))}" for i in bad),
+                )
                 for intensity in bad:
                     fallback_log(
                         state,
@@ -1040,7 +1061,12 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
                     "eval_kept": {},
                 }
             for intensity, codes in bad.items():
-                logger.info("강도 %s 서버 검증 실패 %s → TEMPLATE", intensity, codes)
+                logger.info(
+                    "강도 %s 서버 검증 실패 %s → TEMPLATE | %s",
+                    intensity,
+                    codes,
+                    " / ".join(messages.get(intensity, [])) or "사유 없음",
+                )
                 if sources.get(intensity) == "TEMPLATE":
                     fallback_log(
                         state,
