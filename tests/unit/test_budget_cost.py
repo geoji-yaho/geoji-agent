@@ -23,10 +23,10 @@ from geoji_ai.domain.budget import (
 )
 
 
-def test_cap_은_40원_상당_27586_micro_usd():
+def test_cap_은_100원_상당_68966_micro_usd():
     assert KRW_PER_USD == 1450
-    assert CASE_CAP_MICRO_USD == 27_586
-    assert CASE_CAP_MICRO_USD == round(40 / 1450 * 1e6)
+    assert CASE_CAP_MICRO_USD == 68_966
+    assert CASE_CAP_MICRO_USD == round(100 / 1450 * 1e6)
 
 
 def test_est_max_는_올림한다():

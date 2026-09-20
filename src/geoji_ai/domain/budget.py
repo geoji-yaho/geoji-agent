@@ -143,8 +143,12 @@ class Deadline:
 #: 환산 기준(06 §3.2 "1,450원/$"). 표시용이다.
 KRW_PER_USD = 1450
 
-#: 사건당 상한. 40원 상당 = `round(40/1450*1e6)` = 27,586 micro-USD.
-CASE_CAP_MICRO_USD: int = round(40 / KRW_PER_USD * 1_000_000)
+#: 사건당 상한. 100원 상당 = `round(100/1450*1e6)` = 68,966 micro-USD.
+#:
+#: 9/20 실측: 초기 SENTENCE 만으로 약 23,600(34원)을 쓴다. 40원 상한에서는 TEXT_RETRY 가
+#: 빈 예산을 물려받아 3라운드가 전부 서기 값만 태우고 검수관에서 `BUDGET_EXCEEDED` 로 죽었다.
+#: 재시도 1라운드가 서기+검수 약 6,300 이라 3라운드까지 가려면 약 42,600(62원)이 필요하다.
+CASE_CAP_MICRO_USD: int = round(100 / KRW_PER_USD * 1_000_000)
 
 #: xAI `cost_in_usd_ticks` 환산. 1 micro-USD = 10,000 ticks.
 TICKS_PER_MICRO_USD = 10_000

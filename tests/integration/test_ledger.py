@@ -188,6 +188,23 @@ async def test_2c_cap_과_같으면_예약된다(engine: AsyncEngine):
     assert (await _budget(engine))["reserved_micro_usd"] == 100
 
 
+async def test_2d_상한을_올리면_기존_행도_따라_오르고_내려가지는_않는다(engine: AsyncEngine):
+    # 상한을 올린 이미지를 배포해도 먼저 만들어진 사건이 옛 상한을 들고 가면 상수를 고친 의미가
+    # 없다(9/20 40원 → 100원 상향). 내리는 쪽은 진행 중 예약을 깨뜨리므로 막는다.
+    low = PostgresCallLedger(engine, cap_micro_usd=1_000)
+    await low.reserve(POST, _spec(100, call_index=0))
+    assert (await _budget(engine))["cap_micro_usd"] == 1_000
+
+    high = PostgresCallLedger(engine, cap_micro_usd=5_000)
+    await high.reserve(POST, _spec(4_000, call_index=1))  # 옛 상한이면 거부됐을 값
+    assert (await _budget(engine))["cap_micro_usd"] == 5_000
+    assert (await _budget(engine))["reserved_micro_usd"] == 4_100
+
+    back = PostgresCallLedger(engine, cap_micro_usd=1_000)
+    await back.reserve(POST, _spec(1, call_index=2))
+    assert (await _budget(engine))["cap_micro_usd"] == 5_000
+
+
 # ③ 동시 reserve
 async def test_3_동시_reserve_둘이_cap_을_같이_넘지_못한다(engine: AsyncEngine):
     # 빈 DB 에서 동시에 보내면 `INSERT ... ON CONFLICT` 가 같은 키를 기다려 잠금 없이도 차례로

@@ -82,7 +82,7 @@ prompts/** 변경 ─▶ tests/evaluations/run_regression.py (골든 50사건 ×
 | 항목 | 규칙 |
 |---|---|
 | 단위 | micro-USD 정수. KRW 표시는 화면·리포트에서만(1,450원/$) |
-| `cap_micro_usd` | 40원 상당 = **27,586 micro-USD**(`round(40/1450*1e6)`). `ai.case_budgets` 행은 첫 예약 때 생성 |
+| `cap_micro_usd` | **100원 상당 = 68,966 micro-USD**(`round(100/1450*1e6)`, 9/20 상향. 이전 40원). `ai.case_budgets` 행은 첫 예약 때 생성하고, 그 뒤 상한을 올리면 기존 행도 `GREATEST` 로 따라 올린다(내리지는 않는다). 9/20 실측으로 초기 SENTENCE 만 약 23,600(34원)이라 40원에서는 TEXT_RETRY 3라운드가 전부 `BUDGET_EXCEEDED` 로 죽었다 |
 | 예약 | 호출 전 `est_max = 입력 token(사전 계산) × 입력 단가 + max_output_tokens × 출력 단가`. `spent + reserved + est_max > cap` 이면 호출 시작 안 함 → `BUDGET_EXCEEDED`(양형은 RULE, 문구는 TEMPLATE) |
 | 정산 | 응답 usage 로 `actual`(xAI ticks → micro-USD 내림, `cost_ticks` 원값 보관; OpenAI 는 단가표). `spent += actual`, `reserved −= est_max` |
 | UNKNOWN | timeout·transport: `status=UNKNOWN`, **예약액을 바로 환급하지 않는다.** 하루 뒤 배치(작업 8)가 정리 |
