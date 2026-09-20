@@ -108,6 +108,8 @@ prompts/** 변경 ─▶ tests/evaluations/run_regression.py (골든 50사건 ×
 
 **9/16 지옥맛 결정.** 어휘 검사 쪽 근거와 (원문)은 01 §3.5, 실측 경위는 15 §6. 검수관의 `UNGROUNDED_CLAIM` 도 "조서에 없는 과거 사실 단정" 으로 좁혔다. 지옥맛이 기법으로 쓰는 미래 예언·극단 환산은 수사이지 사실 주장이 아니다.
 
+**9/20 발견(미검증).** `guardrail-v2.7` 의 `INTENSITY_MISMATCH` 와 `writer/hell-v6.4.md` 가 hell 의 면박을 무조건으로 요구해, 조서에 근거가 없는 무죄·승인 사건이 `INTENSITY_MISMATCH` ⇄ `VERDICT_CONTRADICTION` 사이에 끼인다. 실측·제안 문구·검증 절차는 21 §7. **이 절의 프롬프트를 바꾸기 전에 21 §7 을 먼저 읽는다.**
+
 | 파일 | 변경 |
 |---|---|
 | `writer/common-v6.md` | v5.3 공통 + **사건 유형 절**(`spent`/`considering`): `agree` 는 `NECESSITY_APPROVAL` 계열 "억지로 비난하지 않되 후회는 본인 몫", `disagree` 는 전제 부정·대안 조롱. 형량·무지출 언급 금지. 예시는 다른 사건(스투시 반팔·키보드) |
