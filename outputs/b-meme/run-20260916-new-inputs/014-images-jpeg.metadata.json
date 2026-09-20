@@ -10,7 +10,9 @@
     "keywords": [
       "인정",
       "펭귄",
-      "수긍"
+      "수긍",
+      "유쾌",
+      "유머러스"
     ],
     "expense_categories": [],
     "subject": "animal",
@@ -23,15 +25,13 @@
         ]
       }
     ],
-    "evidence": "큰 인정 자막과 열린 부리가 긍정적 수긍을 나타낸다.",
-    "uncertainties": [
-      "축하보다는 단순 수긍에 가까워 CELEBRATION과 완전히 일치하지 않을 수 있음"
-    ]
+    "evidence": "큰 인정 자막과 동그란 눈, 열린 부리가 긍정적 수긍을 나타낸다. 사용자가 유쾌하고 유머러스한 승인 반응으로 확정했으며, 인정에 해당하는 기존 감정 CELEBRATION으로 분류한다.",
+    "uncertainties": []
   },
   "generated_by": "b-meme/codex-visual-v1",
-  "generated_at": "2026-09-16T15:06:42+00:00",
-  "needs_review": true,
-  "tag": null,
+  "generated_at": "2026-09-19T07:02:21+00:00",
+  "needs_review": false,
+  "tag": "APPROVED",
   "strategies": [],
   "is_active": false
 }

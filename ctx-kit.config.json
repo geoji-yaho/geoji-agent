@@ -1,0 +1,42 @@
+{
+  "index_file": ".ctx-index.json",
+  "supported_exts": [
+    ".py",
+    ".md",
+    ".json",
+    ".sql",
+    ".toml",
+    ".yaml",
+    ".yml",
+    ".ts",
+    ".js",
+    ".txt"
+  ],
+  "ignore_dirs": [
+    ".git",
+    "__pycache__",
+    "node_modules",
+    ".venv",
+    "venv",
+    "dist",
+    "build",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "coverage",
+    "_workspace",
+    "_workspace_prev",
+    "outputs",
+    "inputs",
+    ".idea"
+  ],
+  "ignore_files": [
+    ".env",
+    ".env.*",
+    ".DS_Store",
+    "uv.lock",
+    ".ctx-index.json"
+  ],
+  "top_k": 5,
+  "max_chars_per_file": 3000
+}

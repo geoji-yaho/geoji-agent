@@ -1,0 +1,72 @@
+[
+  {
+    "case": "01-approved",
+    "displayed_meme_url": "http://127.0.0.1:18209/assets/run20260916-proceed",
+    "image_loaded": true,
+    "no_meme_expected": false,
+    "save_button_generated_png": true,
+    "png_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/live/01-approved-card.png",
+    "png_size": [
+      684,
+      684
+    ],
+    "png_sha256": "d0d3fc00dc5fce7aed1917e6c6887798e6be8c9f2330bd63bc1d0a8c694c9f34",
+    "visible_text": "공유 카드\n로컬배심원0\n무일푼\n기타\n동의\n59,000원\n\n동의\n\n떼거지\nlocalhost:3800\n\n프로필 이미지는 들어가지 않습니다\n\n이미지 저장\n공유하기"
+  },
+  {
+    "case": "02-rejected",
+    "displayed_meme_url": null,
+    "image_loaded": null,
+    "no_meme_expected": true,
+    "save_button_generated_png": true,
+    "png_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/live/02-rejected-card.png",
+    "png_size": [
+      684,
+      684
+    ],
+    "png_sha256": "c92519e69341010fbeb62cec7e4478bbfc4dc409baa9e91c83411984b6595ef3",
+    "visible_text": "공유 카드\n로컬배심원0\n무일푼\n쇼핑/패션\n289,000원\n\n기각\n\n기각\n떼거지\nlocalhost:3800\n\n프로필 이미지는 들어가지 않습니다\n\n이미지 저장\n공유하기"
+  },
+  {
+    "case": "03-mild",
+    "displayed_meme_url": "http://127.0.0.1:18209/assets/disappointed",
+    "image_loaded": true,
+    "no_meme_expected": false,
+    "save_button_generated_png": true,
+    "png_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/live/03-mild-card.png",
+    "png_size": [
+      684,
+      684
+    ],
+    "png_sha256": "4217241c74f85599619627c1c5eda897eebc626ecd764f6d94dfbd73d83b829e",
+    "visible_text": "공유 카드\n로컬배심원0\n무일푼\n교통/택시\n유죄\n12,000원\n\n유죄\n\n형량\n징역 1일 (내일 하루 무지출)\n\n떼거지\nlocalhost:3800\n\n프로필 이미지는 들어가지 않습니다\n\n이미지 저장\n공유하기"
+  },
+  {
+    "case": "04-spicy",
+    "displayed_meme_url": "http://127.0.0.1:18209/assets/disappointed",
+    "image_loaded": true,
+    "no_meme_expected": false,
+    "save_button_generated_png": true,
+    "png_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/live/04-spicy-card.png",
+    "png_size": [
+      684,
+      684
+    ],
+    "png_sha256": "9a8281a71d3c1b59d7d104d245c47f53d8828004346c356530e760ef3721d184",
+    "visible_text": "공유 카드\n로컬배심원0\n무일푼\n배달\n유죄\n31,000원\n\n집밥 대신 6잔 아메리카노\n\n형량\n징역 1일 (내일 하루 무지출)\n\n떼거지\nlocalhost:3800\n\n프로필 이미지는 들어가지 않습니다\n\n이미지 저장\n공유하기"
+  },
+  {
+    "case": "05-hell",
+    "displayed_meme_url": "http://127.0.0.1:18209/assets/disappointed",
+    "image_loaded": true,
+    "no_meme_expected": false,
+    "save_button_generated_png": true,
+    "png_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/live/05-hell-card.png",
+    "png_size": [
+      684,
+      684
+    ],
+    "png_sha256": "1cf8cc0ce9c86936225ad4a0d84f3efa8a39772946a7d23eacf11af6282f0c13",
+    "visible_text": "공유 카드\n로컬배심원0\n무일푼\n취미/여가\n유죄\n99,000원\n\n유죄\n\n형량\n징역 1일 (내일 하루 무지출)\n\n떼거지\nlocalhost:3800\n\n프로필 이미지는 들어가지 않습니다\n\n이미지 저장\n공유하기"
+  }
+]

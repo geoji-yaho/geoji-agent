@@ -1,0 +1,2815 @@
+{
+  "scope": "실제 Spring + AI 그래프 + 격리 Postgres + 로컬 밈 파일 서버. 운영 S3/로그인 검증 제외.",
+  "checks": [
+    {
+      "name": "test schema exists",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "JWT missing/bad signature/expired/wrong issuer rejected",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash run1-images-1",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash run1-images-2",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash skill-test-images-3",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash skill-test-images-8",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash skill-test-images-9",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash aeng-doratna",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash disappointed",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash empty-wallet",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash gokyungpyo-shock",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash park-stop-it",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash run20260916-mnet-necklace",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash run20260916-proceed",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash run20260916-understood",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "asset hash run20260916-acknowledging-penguin",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved intake completed",
+      "passed": true,
+      "detail": "COMPLETED"
+    },
+    {
+      "name": "01-approved pending no verdict",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved text status",
+      "passed": true,
+      "detail": {
+        "schemaVersion": 1,
+        "postId": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+        "juryStatus": "agree",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "mild",
+          "headline": "연말 잔고 0원 예언",
+          "statement": [
+            "이 속도면 연말엔 키보드값만 남아요."
+          ],
+          "sentence": null,
+          "sentenceLabel": null,
+          "sentencingReason": null,
+          "source": "AI",
+          "meme": {
+            "tag": "APPROVED",
+            "imageId": "cef26a38-b64e-55cf-9f0f-49befba0c5a9",
+            "imageUrl": "http://127.0.0.1:18209/assets/run20260916-proceed"
+          }
+        },
+        "pollAfterMs": 0
+      }
+    },
+    {
+      "name": "01-approved vote count",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved saved version/text",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved finalize replay same commit",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved card excludes private fields",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved selector matches DB",
+      "passed": true,
+      "detail": {
+        "expected": "cef26a38-b64e-55cf-9f0f-49befba0c5a9",
+        "actual": "cef26a38-b64e-55cf-9f0f-49befba0c5a9"
+      }
+    },
+    {
+      "name": "01-approved card/verdict image matches",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved selected ID stable",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "01-approved image GET 200",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "02-rejected intake completed",
+      "passed": true,
+      "detail": "COMPLETED"
+    },
+    {
+      "name": "02-rejected pending no verdict",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "02-rejected text status",
+      "passed": true,
+      "detail": {
+        "schemaVersion": 1,
+        "postId": "93547ad5-3a9a-4d1a-98b6-83e03eaaf8d3",
+        "juryStatus": "disagree",
+        "sentenceStatus": "FINAL",
+        "textStatus": "TEMPLATE_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "spicy",
+          "headline": "기각",
+          "statement": [
+            "배심원단이 구매를 기각했습니다."
+          ],
+          "sentence": null,
+          "sentenceLabel": null,
+          "sentencingReason": null,
+          "source": "TEMPLATE",
+          "meme": null
+        },
+        "pollAfterMs": 30000
+      }
+    },
+    {
+      "name": "02-rejected vote count",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "02-rejected saved version/text",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "02-rejected card excludes private fields",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild intake completed",
+      "passed": true,
+      "detail": "COMPLETED"
+    },
+    {
+      "name": "03-mild pending no verdict",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild text status",
+      "passed": true,
+      "detail": {
+        "schemaVersion": 1,
+        "postId": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+        "juryStatus": "guilty",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "mild",
+          "headline": "알람 1초, 택시 8회",
+          "statement": [
+            "지각 한 번에 택시 8회분이네요."
+          ],
+          "sentence": "oneDay",
+          "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+          "sentencingReason": "유죄율 100%이고 지각을 피하려 택시를 탔지만, 같은 달 반복이 없고 예산 소진율이 2%라 하루 형으로 정한다.",
+          "source": "AI",
+          "meme": {
+            "tag": "GUILTY_LIGHT",
+            "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+            "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+          }
+        },
+        "pollAfterMs": 0
+      }
+    },
+    {
+      "name": "03-mild vote count",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild saved version/text",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild finalize replay same commit",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild card excludes private fields",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild selector matches DB",
+      "passed": true,
+      "detail": {
+        "expected": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+        "actual": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312"
+      }
+    },
+    {
+      "name": "03-mild card/verdict image matches",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild selected ID stable",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "03-mild image GET 200",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy intake completed",
+      "passed": true,
+      "detail": "COMPLETED"
+    },
+    {
+      "name": "04-spicy pending no verdict",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy text status",
+      "passed": true,
+      "detail": {
+        "schemaVersion": 1,
+        "postId": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+        "juryStatus": "guilty",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "spicy",
+          "headline": "집밥 대신 6잔 아메리카노",
+          "statement": [
+            "비 오면 라면 끓여 먹어라."
+          ],
+          "sentence": "oneDay",
+          "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+          "sentencingReason": "유죄율 100%이고 냉장고에 먹을 것이 있었지만, 예산 소진율 9%와 같은 지출 전력이 없어 하루 형으로 정한다.",
+          "source": "AI",
+          "meme": {
+            "tag": "GUILTY_LIGHT",
+            "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+            "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+          }
+        },
+        "pollAfterMs": 0
+      }
+    },
+    {
+      "name": "04-spicy vote count",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy saved version/text",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy finalize replay same commit",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy card excludes private fields",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy selector matches DB",
+      "passed": true,
+      "detail": {
+        "expected": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+        "actual": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312"
+      }
+    },
+    {
+      "name": "04-spicy card/verdict image matches",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy selected ID stable",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "04-spicy image GET 200",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell intake completed",
+      "passed": true,
+      "detail": "COMPLETED"
+    },
+    {
+      "name": "05-hell pending no verdict",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell text status",
+      "passed": true,
+      "detail": {
+        "schemaVersion": 1,
+        "postId": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+        "juryStatus": "guilty",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "hell",
+          "headline": "99k로 22잔",
+          "statement": [
+            "실력은 그대로고 잔고만 22잔어치 증발했네."
+          ],
+          "sentence": "oneDay",
+          "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+          "sentencingReason": "유죄율 100%이고 충동 결제였지만 예산 소진율이 28%이며 같은 소비 반복은 없어 하루형으로 정한다.",
+          "source": "AI",
+          "meme": {
+            "tag": "GUILTY_LIGHT",
+            "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+            "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+          }
+        },
+        "pollAfterMs": 0
+      }
+    },
+    {
+      "name": "05-hell vote count",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell saved version/text",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell finalize replay same commit",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell card excludes private fields",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell selector matches DB",
+      "passed": true,
+      "detail": {
+        "expected": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+        "actual": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312"
+      }
+    },
+    {
+      "name": "05-hell card/verdict image matches",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell selected ID stable",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "05-hell image GET 200",
+      "passed": true,
+      "detail": null
+    }
+  ],
+  "cases": [
+    {
+      "name": "01-approved",
+      "post_id": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+      "submission_id": "96816e63-b065-443f-99f9-8d7ffe482c24",
+      "verdict": {
+        "schemaVersion": 1,
+        "postId": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+        "juryStatus": "agree",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "mild",
+          "headline": "연말 잔고 0원 예언",
+          "statement": [
+            "이 속도면 연말엔 키보드값만 남아요."
+          ],
+          "sentence": null,
+          "sentenceLabel": null,
+          "sentencingReason": null,
+          "source": "AI",
+          "meme": {
+            "tag": "APPROVED",
+            "imageId": "cef26a38-b64e-55cf-9f0f-49befba0c5a9",
+            "imageUrl": "http://127.0.0.1:18209/assets/run20260916-proceed"
+          }
+        },
+        "pollAfterMs": 0
+      },
+      "share_card": {
+        "postId": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+        "postType": "considering",
+        "juryStatus": "agree",
+        "intensity": "mild",
+        "headline": "동의",
+        "statement": [
+          "배심원단이 구매를 승인했습니다."
+        ],
+        "sentence": null,
+        "sentenceLabel": null,
+        "meme": {
+          "tag": "APPROVED",
+          "imageId": "cef26a38-b64e-55cf-9f0f-49befba0c5a9",
+          "imageUrl": "http://127.0.0.1:18209/assets/run20260916-proceed"
+        }
+      },
+      "latency_ms": 23925,
+      "input": {
+        "key": "01-approved",
+        "label": "구매 승인",
+        "intensity": "mild",
+        "vote": "agree",
+        "tag": "APPROVED",
+        "item": "업무용 키보드",
+        "amountKrw": 59000,
+        "category": "기타",
+        "reason": "기존 키보드가 고장 나서 업무에 필요한 기본형으로 교체하려고 합니다."
+      },
+      "room_id": "56478217-7492-4d18-b342-0f3a1a238929",
+      "browser_url": "http://localhost:3800/posts/cb944a19-fc1f-44e4-b5ed-21824fda7761/card?room=56478217-7492-4d18-b342-0f3a1a238929",
+      "verdict_detail": {
+        "jury_result": "agree",
+        "sentence": null,
+        "sentence_source": null,
+        "sentencing_reason": null,
+        "reason_source": null,
+        "text_status": "AI_READY",
+        "last_failed_code": null
+      },
+      "finalize_draft": {
+        "schema_version": 1,
+        "texts": [
+          {
+            "intensity": "mild",
+            "headline": "연말 잔고 0원 예언",
+            "statement": [
+              {
+                "text": "이 속도면 연말엔 키보드값만 남아요.",
+                "kind": "opinion",
+                "evidence_labels": [
+                  "F0"
+                ]
+              }
+            ],
+            "banter_strategy": "CHEAPER_ALTERNATIVE",
+            "selected_candidate_id": "1fe436f3-4c5d-4e37-9584-02de6e6fcb48",
+            "attack_angle": "FUTURE_PROPHECY",
+            "source": "AI"
+          }
+        ],
+        "meme_tag": "APPROVED",
+        "meme_hints": {
+          "emotion": "RESIGNATION",
+          "keywords": [
+            "예산",
+            "예언",
+            "연말"
+          ]
+        }
+      },
+      "evaluation": {
+        "schema_version": 1,
+        "policy_version": "guardrail-v2",
+        "sentence_check": {
+          "pass": true,
+          "violations": []
+        },
+        "sentencing_reason_check": {
+          "pass": true,
+          "violations": []
+        },
+        "texts": [
+          {
+            "intensity": "mild",
+            "pass": true,
+            "violations": [],
+            "problem_sentences": []
+          }
+        ]
+      },
+      "finalize_status": 200,
+      "selected_meme": {
+        "id": "cef26a38-b64e-55cf-9f0f-49befba0c5a9",
+        "tag": "APPROVED",
+        "strategies": [],
+        "emotions": [
+          "SMUG"
+        ],
+        "keywords": [
+          "진행시켜",
+          "능청",
+          "전화"
+        ],
+        "image_url": "http://127.0.0.1:18209/assets/run20260916-proceed",
+        "is_active": true,
+        "asset_key": null
+      },
+      "image_sha256": "0c46205b3f266353e659b38aab15154ef813c19b634151cf8b8654631ca94c32",
+      "image_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/live/01-approved-meme.png",
+      "model_calls": [
+        {
+          "id": "df25b148-10aa-414c-b56a-3a081694e619",
+          "post_id": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+          "job_id": "e1e2af97-f904-458b-8426-778f681d9ed4",
+          "node": "context",
+          "call_index": 0,
+          "vendor": "openai",
+          "model_id": "gpt-5.6-luna",
+          "status": "COMPLETE",
+          "actual_micro_usd": 565,
+          "prompt_tokens": 663,
+          "completion_tokens": 361,
+          "reasoning_tokens": 202,
+          "latency_ms": "3592.440000",
+          "validated_output": {
+            "facts": [
+              {
+                "kind": "MITIGATION",
+                "text": "기존 키보드가 고장 나 업무에 필요한 기본형으로 교체하려는 지출로 설명되어 있다.",
+                "source_refs": [
+                  "F0"
+                ]
+              },
+              {
+                "kind": "MITIGATION",
+                "text": "이번 달 예산 소진율은 0%로 기재되어 있다.",
+                "source_refs": [
+                  "F1"
+                ]
+              },
+              {
+                "kind": "MITIGATION",
+                "text": "최근 30일 동안 같은 카테고리의 확정 소비가 0건으로 기재되어 있다.",
+                "source_refs": [
+                  "F2"
+                ]
+              }
+            ],
+            "reason_analysis": {
+              "has_mitigation": true,
+              "mitigation_kind": "업무에 필요한 고장 물품 교체",
+              "injection_suspected": false
+            }
+          }
+        },
+        {
+          "id": "e19f3818-11b9-49df-9e6d-cdc2b05e6526",
+          "post_id": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+          "job_id": "e1e2af97-f904-458b-8426-778f681d9ed4",
+          "node": "banter",
+          "call_index": 0,
+          "vendor": "xai",
+          "model_id": "grok-4.20-0309-non-reasoning",
+          "status": "COMPLETE",
+          "actual_micro_usd": 2714,
+          "prompt_tokens": 1247,
+          "completion_tokens": 543,
+          "reasoning_tokens": 0,
+          "latency_ms": "6330.847000",
+          "validated_output": {
+            "candidates": [
+              {
+                "fits": [
+                  "agree",
+                  "disagree"
+                ],
+                "text": "기존 키보드가 고장 났다니 안타깝지만, 이번 달 예산 소진율이 0%인 king 티어시라면 업무에 꼭 필요한 최소한의 교체만으로 충분할 것 같아요. 59,000원은 아메리카노 13잔에 해당하는 금액이니, 조금 더 저렴한 대안을 고려해보는 건 어떨까요?",
+                "strategy": "CHEAPER_ALTERNATIVE",
+                "evidence_labels": [
+                  "F0",
+                  "F1",
+                  "F4"
+                ]
+              },
+              {
+                "fits": [
+                  "guilty",
+                  "notGuilty"
+                ],
+                "text": "최근 30일 동안 같은 카테고리 소비가 전혀 없고 이번 달 예산도 0% 소진 상태라면, 이번 키보드 교체는 충분히 합리적인 선택으로 보입니다. 업무에 직접 필요한 물품이니 허락해도 괜찮을 듯해요.",
+                "strategy": "NECESSITY_APPROVAL",
+                "evidence_labels": [
+                  "F1",
+                  "F2",
+                  "F3",
+                  "F4",
+                  "F5"
+                ]
+              },
+              {
+                "fits": [
+                  "agree"
+                ],
+                "text": "'기존 키보드가 고장 나서'라는 설명이 명확하고, 최근 30일 같은 카테고리 소비가 0건이라면 불필요한 반복 지출은 아닌 것 같아요. 다만 king 티어답게 조금 더 신중하게 최저가 옵션을 찾아보는 습관을 들이면 좋겠습니다.",
+                "strategy": "REPEAT_OFFENSE",
+                "evidence_labels": [
+                  "F2",
+                  "F3",
+                  "F5"
+                ]
+              },
+              {
+                "fits": [
+                  "notGuilty",
+                  "disagree"
+                ],
+                "text": "이번 달 예산이 아직 0%밖에 안 쓰였고, 업무용 필수품 교체라는 점을 고려하면 이 지출 자체는 크게 문제없어 보이네요. 다만 59,000원이라는 금액이 아메리카노 13잔 분량이라는 사실을 떠올리며 다음부터는 더 경제적인 선택지도 함께 검토해보세요.",
+                "strategy": "EXCUSE_STRIPPING",
+                "evidence_labels": [
+                  "F0",
+                  "F1",
+                  "F4"
+                ]
+              },
+              {
+                "fits": [
+                  "guilty"
+                ],
+                "text": "고장 난 키보드를 업무용 기본형으로 교체하려는 계획 자체는 이해가 가지만, king 티어에서 59,000원을 한 번에 쓰는 대신 비슷한 성능의 더 저렴한 제품을 찾아보는 건 어떨까요?",
+                "strategy": "CHEAPER_ALTERNATIVE",
+                "evidence_labels": [
+                  "F0",
+                  "F1",
+                  "F3"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "41216a4e-34cd-4b55-988c-36a7e8fdc743",
+          "post_id": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+          "job_id": "373e0c49-84df-47ca-941a-a7a521288973",
+          "node": "writer",
+          "call_index": 0,
+          "vendor": "xai",
+          "model_id": "grok-4.20-0309-non-reasoning",
+          "status": "COMPLETE",
+          "actual_micro_usd": 4284,
+          "prompt_tokens": 3257,
+          "completion_tokens": 139,
+          "reasoning_tokens": 0,
+          "latency_ms": "2164.599000",
+          "validated_output": null
+        },
+        {
+          "id": "1eb3fb9a-8ca7-4f14-be24-4f456dfcbe9b",
+          "post_id": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+          "job_id": "373e0c49-84df-47ca-941a-a7a521288973",
+          "node": "writer",
+          "call_index": 3,
+          "vendor": "xai",
+          "model_id": "grok-4.20-0309-non-reasoning",
+          "status": "COMPLETE",
+          "actual_micro_usd": 3867,
+          "prompt_tokens": 3429,
+          "completion_tokens": 128,
+          "reasoning_tokens": 0,
+          "latency_ms": "2688.369000",
+          "validated_output": {
+            "headline": "연말 잔고 0원 예언",
+            "meme_tag": "APPROVED",
+            "intensity": "mild",
+            "statement": [
+              {
+                "kind": "opinion",
+                "text": "이 속도면 연말엔 키보드값만 남아요.",
+                "evidence_labels": [
+                  "F0"
+                ]
+              }
+            ],
+            "meme_hints": {
+              "emotion": "RESIGNATION",
+              "keywords": [
+                "예산",
+                "예언",
+                "연말"
+              ]
+            },
+            "attack_angle": "FUTURE_PROPHECY",
+            "banter_strategy": "CHEAPER_ALTERNATIVE",
+            "selected_candidate_id": "1fe436f3-4c5d-4e37-9584-02de6e6fcb48"
+          }
+        },
+        {
+          "id": "b5223d17-3679-4c5a-a4cb-8a7c07249d26",
+          "post_id": "cb944a19-fc1f-44e4-b5ed-21824fda7761",
+          "job_id": "373e0c49-84df-47ca-941a-a7a521288973",
+          "node": "evaluator",
+          "call_index": 0,
+          "vendor": "openai",
+          "model_id": "gpt-5.6-luna",
+          "status": "COMPLETE",
+          "actual_micro_usd": 924,
+          "prompt_tokens": 2203,
+          "completion_tokens": 403,
+          "reasoning_tokens": 340,
+          "latency_ms": "4022.057000",
+          "validated_output": {
+            "texts": [
+              {
+                "pass": true,
+                "intensity": "mild",
+                "violations": [],
+                "problem_sentences": []
+              }
+            ],
+            "sentence_check": {
+              "pass": true,
+              "violations": []
+            },
+            "sentencing_reason_check": {
+              "pass": true,
+              "violations": []
+            }
+          }
+        }
+      ],
+      "writer_output": {
+        "headline": "연말 잔고 0원 예언",
+        "meme_tag": "APPROVED",
+        "intensity": "mild",
+        "statement": [
+          {
+            "kind": "opinion",
+            "text": "이 속도면 연말엔 키보드값만 남아요.",
+            "evidence_labels": [
+              "F0"
+            ]
+          }
+        ],
+        "meme_hints": {
+          "emotion": "RESIGNATION",
+          "keywords": [
+            "예산",
+            "예언",
+            "연말"
+          ]
+        },
+        "attack_angle": "FUTURE_PROPHECY",
+        "banter_strategy": "CHEAPER_ALTERNATIVE",
+        "selected_candidate_id": "1fe436f3-4c5d-4e37-9584-02de6e6fcb48"
+      },
+      "share_text_replaced": true
+    },
+    {
+      "name": "02-rejected",
+      "post_id": "93547ad5-3a9a-4d1a-98b6-83e03eaaf8d3",
+      "submission_id": "f4920efc-f72e-446f-9b9f-52f4c6dda93f",
+      "verdict": {
+        "schemaVersion": 1,
+        "postId": "93547ad5-3a9a-4d1a-98b6-83e03eaaf8d3",
+        "juryStatus": "disagree",
+        "sentenceStatus": "FINAL",
+        "textStatus": "TEMPLATE_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "spicy",
+          "headline": "기각",
+          "statement": [
+            "배심원단이 구매를 기각했습니다."
+          ],
+          "sentence": null,
+          "sentenceLabel": null,
+          "sentencingReason": null,
+          "source": "TEMPLATE",
+          "meme": null
+        },
+        "pollAfterMs": 30000
+      },
+      "share_card": {
+        "postId": "93547ad5-3a9a-4d1a-98b6-83e03eaaf8d3",
+        "postType": "considering",
+        "juryStatus": "disagree",
+        "intensity": "spicy",
+        "headline": "기각",
+        "statement": [
+          "배심원단이 구매를 기각했습니다."
+        ],
+        "sentence": null,
+        "sentenceLabel": null,
+        "meme": null
+      },
+      "latency_ms": 20008,
+      "input": {
+        "key": "02-rejected",
+        "label": "구매 기각",
+        "intensity": "spicy",
+        "vote": "disagree",
+        "tag": "REJECTED",
+        "item": "한정판 운동화",
+        "amountKrw": 289000,
+        "category": "쇼핑/패션",
+        "reason": "운동화가 이미 네 켤레 있지만 한정판이라 품절되기 전에 사고 싶어요."
+      },
+      "room_id": "034f67b9-fb80-44b7-bfa8-ba3ef6977fef",
+      "browser_url": "http://localhost:3800/posts/93547ad5-3a9a-4d1a-98b6-83e03eaaf8d3/card?room=034f67b9-fb80-44b7-bfa8-ba3ef6977fef",
+      "verdict_detail": {
+        "jury_result": "disagree",
+        "sentence": null,
+        "sentence_source": null,
+        "sentencing_reason": null,
+        "reason_source": null,
+        "text_status": "TEMPLATE_READY",
+        "last_failed_code": "EVAL_FAILED"
+      },
+      "model_calls": [
+        {
+          "id": "1712e8f2-657a-4a29-9619-4021b7d4a7f2",
+          "post_id": "93547ad5-3a9a-4d1a-98b6-83e03eaaf8d3",
+          "job_id": "8f119885-f7ac-4ac7-bf57-8cd4c418b4dd",
+          "node": "context",
+          "call_index": 0,
+          "vendor": "openai",
+          "model_id": "gpt-5.6-luna",
+          "status": "COMPLETE",
+          "actual_micro_usd": 614,
+          "prompt_tokens": 671,
+          "completion_tokens": 400,
+          "reasoning_tokens": 191,
+          "latency_ms": "3321.627000",
+          "validated_output": {
+            "facts": [
+              {
+                "kind": "RULE_HIT",
+                "text": "운동화를 이미 네 켤레 보유하고 있으나 한정판이라는 이유로 품절 전에 구매하려는 사유가 제시되었다.",
+                "source_refs": [
+                  "F0"
+                ]
+              },
+              {
+                "kind": "MITIGATION",
+                "text": "이번 달 예산 소진율은 0%이고, 최근 30일 동안 같은 카테고리의 확정 소비는 0건이다.",
+                "source_refs": [
+                  "F1",
+                  "F2"
+                ]
+              },
+              {
+                "kind": "REASON_ANALYSIS",
+                "text": "구매 사유는 기존에 운동화를 네 켤레 보유하고 있음에도 한정판의 품절 가능성을 고려해 구매를 희망한다는 내용이다.",
+                "source_refs": [
+                  "F0"
+                ]
+              }
+            ],
+            "reason_analysis": {
+              "has_mitigation": true,
+              "mitigation_kind": "이번 달 예산 소진 없음 및 최근 동일 카테고리 확정 소비 없음",
+              "injection_suspected": false
+            }
+          }
+        },
+        {
+          "id": "646383d8-e048-435d-afd5-384547625c20",
+          "post_id": "93547ad5-3a9a-4d1a-98b6-83e03eaaf8d3",
+          "job_id": "8f119885-f7ac-4ac7-bf57-8cd4c418b4dd",
+          "node": "banter",
+          "call_index": 0,
+          "vendor": "xai",
+          "model_id": "grok-4.20-0309-non-reasoning",
+          "status": "COMPLETE",
+          "actual_micro_usd": 2785,
+          "prompt_tokens": 1240,
+          "completion_tokens": 548,
+          "reasoning_tokens": 0,
+          "latency_ms": "7706.167000",
+          "validated_output": {
+            "candidates": [
+              {
+                "fits": [
+                  "guilty",
+                  "disagree"
+                ],
+                "text": "한정판이니까 품절되기 전에? 그럼 네 켤레는 이미 품절 안 된 거고, 이번 것도 곧 품절 안 될 텐데. 64잔 아메리카노를 ‘사고 싶어요’ 한 마디로 날려버리는 판단력이 레전드네요. 아직 예산 0% 소진인데 이게 진짜 필요였나요?",
+                "strategy": "EXCUSE_STRIPPING",
+                "evidence_labels": [
+                  "F0",
+                  "F3"
+                ]
+              },
+              {
+                "fits": [
+                  "guilty",
+                  "disagree"
+                ],
+                "text": "운동화 네 켤레 있는데 한정판이라는 말 한 번에 289000원? 최근 30일 동안 같은 카테고리 0건, 이번 달 예산도 0% 썼는데 이게 ‘필요’라고 우길 수 있나요. 그냥 ‘사고 싶다’를 ‘한정판’으로 포장한 거 실화냐.",
+                "strategy": "PREMISE_REJECTION",
+                "evidence_labels": [
+                  "F0",
+                  "F2",
+                  "F3",
+                  "F4"
+                ]
+              },
+              {
+                "fits": [
+                  "notGuilty",
+                  "agree"
+                ],
+                "text": "티어 king에 예산 0% 소진, 최근 30일 패션 소비 0건. 이 상황에서 64회분 아메리카노를 한 번에 쓰는 게 ‘무지출 0일’을 지키는 방법인가요? 솔직히 이건 필요가 아니라 그냥 충동 아닌가요.",
+                "strategy": "NECESSITY_APPROVAL",
+                "evidence_labels": [
+                  "F1",
+                  "F2",
+                  "F4"
+                ]
+              },
+              {
+                "fits": [
+                  "guilty",
+                  "disagree"
+                ],
+                "text": "이미 네 켤레 있는데 ‘품절되기 전에’라는 말로 289000원을 정당화하는 건, 사실상 ‘사고 싶다’를 변명으로 바꾼 거예요. 0% 예산에 0건 소비 기록이 있는데 이게 정말 합리적인 선택이었나요?",
+                "strategy": "EXCUSE_STRIPPING",
+                "evidence_labels": [
+                  "F0",
+                  "F3",
+                  "F4"
+                ]
+              },
+              {
+                "fits": [
+                  "guilty",
+                  "disagree"
+                ],
+                "text": "한정판 때문에 64잔어치 돈을 쓰는 선택을 king 티어, 예산 0%, 최근 소비 0건인 사람이 했다는 게 웃기면서도 어이없네요. 이게 진짜 ‘사고 싶어서’가 아니라 ‘필요해서’였다고 믿으시나요?",
+                "strategy": "PREMISE_REJECTION",
+                "evidence_labels": [
+                  "F0",
+                  "F1",
+                  "F2",
+                  "F3"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "abdc1088-f5da-4898-9c4f-640c3596caa7",
+          "post_id": "93547ad5-3a9a-4d1a-98b6-83e03eaaf8d3",
+          "job_id": "d9804a76-c253-426f-8ae7-402b8df2c9fe",
+          "node": "writer",
+          "call_index": 0,
+          "vendor": "xai",
+          "model_id": "grok-4.20-0309-non-reasoning",
+          "status": "COMPLETE",
+          "actual_micro_usd": 4664,
+          "prompt_tokens": 3641,
+          "completion_tokens": 99,
+          "reasoning_tokens": 0,
+          "latency_ms": "1981.700000",
+          "validated_output": {
+            "headline": "64잔 대신 운동화",
+            "meme_tag": "REJECTED",
+            "intensity": "spicy",
+            "statement": [
+              {
+                "kind": "opinion",
+                "text": "64잔 아메리카노가 한 켤레로 바뀌네.",
+                "evidence_labels": [
+                  "F0"
+                ]
+              }
+            ],
+            "meme_hints": {
+              "emotion": "SMUG",
+              "keywords": [
+                "한정판",
+                "64잔",
+                "운동화"
+              ]
+            },
+            "attack_angle": "CONVERSION",
+            "banter_strategy": "PREMISE_REJECTION",
+            "selected_candidate_id": null
+          }
+        },
+        {
+          "id": "1620f2e2-35ca-4b5a-84bf-02b8021f8b2d",
+          "post_id": "93547ad5-3a9a-4d1a-98b6-83e03eaaf8d3",
+          "job_id": "d9804a76-c253-426f-8ae7-402b8df2c9fe",
+          "node": "evaluator",
+          "call_index": 0,
+          "vendor": "openai",
+          "model_id": "gpt-5.6-luna",
+          "status": "COMPLETE",
+          "actual_micro_usd": 994,
+          "prompt_tokens": 2172,
+          "completion_tokens": 467,
+          "reasoning_tokens": 298,
+          "latency_ms": "4655.008000",
+          "validated_output": null
+        }
+      ],
+      "writer_output": {
+        "headline": "64잔 대신 운동화",
+        "meme_tag": "REJECTED",
+        "intensity": "spicy",
+        "statement": [
+          {
+            "kind": "opinion",
+            "text": "64잔 아메리카노가 한 켤레로 바뀌네.",
+            "evidence_labels": [
+              "F0"
+            ]
+          }
+        ],
+        "meme_hints": {
+          "emotion": "SMUG",
+          "keywords": [
+            "한정판",
+            "64잔",
+            "운동화"
+          ]
+        },
+        "attack_angle": "CONVERSION",
+        "banter_strategy": "PREMISE_REJECTION",
+        "selected_candidate_id": null
+      },
+      "share_text_replaced": false
+    },
+    {
+      "name": "03-mild",
+      "post_id": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+      "submission_id": "ea026e78-e7bb-450a-a8ff-debf85665d98",
+      "verdict": {
+        "schemaVersion": 1,
+        "postId": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+        "juryStatus": "guilty",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "mild",
+          "headline": "알람 1초, 택시 8회",
+          "statement": [
+            "지각 한 번에 택시 8회분이네요."
+          ],
+          "sentence": "oneDay",
+          "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+          "sentencingReason": "유죄율 100%이고 지각을 피하려 택시를 탔지만, 같은 달 반복이 없고 예산 소진율이 2%라 하루 형으로 정한다.",
+          "source": "AI",
+          "meme": {
+            "tag": "GUILTY_LIGHT",
+            "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+            "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+          }
+        },
+        "pollAfterMs": 0
+      },
+      "share_card": {
+        "postId": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+        "postType": "spent",
+        "juryStatus": "guilty",
+        "intensity": "mild",
+        "headline": "유죄",
+        "statement": [
+          "배심원단이 이 지출을 유죄로 판단했습니다."
+        ],
+        "sentence": "oneDay",
+        "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+        "meme": {
+          "tag": "GUILTY_LIGHT",
+          "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+          "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+        }
+      },
+      "latency_ms": 19868,
+      "input": {
+        "key": "03-mild",
+        "label": "유죄 · 순한맛",
+        "intensity": "mild",
+        "vote": "guilty",
+        "tag": "GUILTY_LIGHT",
+        "item": "택시",
+        "amountKrw": 12000,
+        "category": "교통/택시",
+        "reason": "알람을 끄고 다시 자서 지각할 것 같아 택시를 탔어요."
+      },
+      "room_id": "56478217-7492-4d18-b342-0f3a1a238929",
+      "browser_url": "http://localhost:3800/posts/d5e0aa1f-b36f-49f3-bccd-bfb169013515/card?room=56478217-7492-4d18-b342-0f3a1a238929",
+      "verdict_detail": {
+        "jury_result": "guilty",
+        "sentence": "oneDay",
+        "sentence_source": "AI",
+        "sentencing_reason": "유죄율 100%이고 지각을 피하려 택시를 탔지만, 같은 달 반복이 없고 예산 소진율이 2%라 하루 형으로 정한다.",
+        "reason_source": "AI",
+        "text_status": "AI_READY",
+        "last_failed_code": null
+      },
+      "finalize_draft": {
+        "schema_version": 1,
+        "texts": [
+          {
+            "intensity": "mild",
+            "headline": "알람 1초, 택시 8회",
+            "statement": [
+              {
+                "text": "지각 한 번에 택시 8회분이네요.",
+                "kind": "opinion",
+                "evidence_labels": [
+                  "F0"
+                ]
+              }
+            ],
+            "banter_strategy": "CHEAPER_ALTERNATIVE",
+            "selected_candidate_id": "ef13a6cb-c495-478d-9f41-bffd8cf43fcc",
+            "attack_angle": "REPETITION",
+            "source": "AI"
+          }
+        ],
+        "meme_tag": "GUILTY_LIGHT",
+        "meme_hints": {
+          "emotion": "PITY",
+          "keywords": [
+            "지각",
+            "택시",
+            "반복",
+            "알람"
+          ]
+        }
+      },
+      "evaluation": {
+        "schema_version": 1,
+        "policy_version": "guardrail-v2",
+        "sentence_check": {
+          "pass": true,
+          "violations": []
+        },
+        "sentencing_reason_check": {
+          "pass": true,
+          "violations": []
+        },
+        "texts": [
+          {
+            "intensity": "mild",
+            "pass": true,
+            "violations": [],
+            "problem_sentences": []
+          }
+        ]
+      },
+      "finalize_status": 200,
+      "selected_meme": {
+        "id": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+        "tag": "GUILTY_LIGHT",
+        "strategies": [],
+        "emotions": [
+          "RESIGNATION"
+        ],
+        "keywords": [
+          "실망",
+          "체념",
+          "억지웃음",
+          "예상함",
+          "곁눈질"
+        ],
+        "image_url": "http://127.0.0.1:18209/assets/disappointed",
+        "is_active": true,
+        "asset_key": null
+      },
+      "image_sha256": "8d44f526cfc398ca904fbe47f209e5f0f649a4bcdbf4c05e9569d2409bebddba",
+      "image_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/live/03-mild-meme.png",
+      "model_calls": [
+        {
+          "id": "8e894456-0b14-4dcf-818f-1108d1e47193",
+          "post_id": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+          "job_id": "c9cb8e50-f9d9-490e-9a84-568d96b7e487",
+          "node": "context",
+          "call_index": 0,
+          "vendor": "openai",
+          "model_id": "gpt-5.6-luna",
+          "status": "COMPLETE",
+          "actual_micro_usd": 969,
+          "prompt_tokens": 742,
+          "completion_tokens": 684,
+          "reasoning_tokens": 346,
+          "latency_ms": "4823.680000",
+          "validated_output": {
+            "facts": [
+              {
+                "kind": "REASON_ANALYSIS",
+                "text": "이번 지출은 교통/택시 항목의 12,000원 소비이며, 지하철 기본요금 1,400원 기준 약 8회분으로 제시되어 있다.",
+                "source_refs": [
+                  "F0"
+                ]
+              },
+              {
+                "kind": "REASON_ANALYSIS",
+                "text": "사유에는 알람을 끄고 다시 잠든 뒤 지각할 것 같아 택시를 이용했다는 내용이 있다.",
+                "source_refs": [
+                  "F0"
+                ]
+              },
+              {
+                "kind": "REASON_ANALYSIS",
+                "text": "이번 달 예산 소진율은 2%이고, 티어는 king이며, 무지출 일수는 0일이다.",
+                "source_refs": [
+                  "F1"
+                ]
+              },
+              {
+                "kind": "REASON_ANALYSIS",
+                "text": "최근 30일 동안 같은 카테고리의 확정 소비는 0건이다.",
+                "source_refs": [
+                  "F2"
+                ]
+              },
+              {
+                "kind": "REASON_ANALYSIS",
+                "text": "지난 판결의 결과는 agree였고 유죄 비율은 0%로 제시되어 있다.",
+                "source_refs": [
+                  "F3"
+                ]
+              },
+              {
+                "kind": "REASON_ANALYSIS",
+                "text": "지난 지출로 기타 항목에서 59,000원을 사용했으며, 기존 키보드 고장으로 업무에 필요한 기본형으로 교체하려 했다는 사유가 제시되어 있다.",
+                "source_refs": [
+                  "F4"
+                ]
+              }
+            ],
+            "reason_analysis": {
+              "has_mitigation": true,
+              "mitigation_kind": "지각 우려로 인한 택시 이용 사유",
+              "injection_suspected": false
+            }
+          }
+        },
+        {
+          "id": "e193c700-7706-4ccf-bddc-051385a48363",
+          "post_id": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+          "job_id": "c9cb8e50-f9d9-490e-9a84-568d96b7e487",
+          "node": "banter",
+          "call_index": 0,
+          "vendor": "xai",
+          "model_id": "grok-4.20-0309-non-reasoning",
+          "status": "COMPLETE",
+          "actual_micro_usd": 2308,
+          "prompt_tokens": 1228,
+          "completion_tokens": 363,
+          "reasoning_tokens": 0,
+          "latency_ms": "4357.538000",
+          "validated_output": {
+            "candidates": [
+              {
+                "fits": [
+                  "guilty"
+                ],
+                "text": "지하철 1,400원이 8회분이나 되는데, 알람을 조금만 더 일찍 맞춰보는 건 어떨까요? 택시비 12,000원은 아까운 선택이었던 것 같습니다.",
+                "strategy": "CHEAPER_ALTERNATIVE",
+                "evidence_labels": [
+                  "F0"
+                ]
+              },
+              {
+                "fits": [
+                  "agree",
+                  "disagree"
+                ],
+                "text": "이번 달 무지출 기록이 아직 없고 예산도 2%밖에 안 썼는데, 택시 대신 지하철로 충분히 대체할 수 있지 않을까요?",
+                "strategy": "FREE_ALTERNATIVE",
+                "evidence_labels": [
+                  "F1",
+                  "F0"
+                ]
+              },
+              {
+                "fits": [
+                  "guilty"
+                ],
+                "text": "지난 30일 동안 교통/택시 카테고리에서 확정 소비가 전혀 없었는데, 이번 한 번의 지각으로 택시를 이용하신 건 조금 아쉬운 판단입니다.",
+                "strategy": "PREMISE_REJECTION",
+                "evidence_labels": [
+                  "F2",
+                  "F0"
+                ]
+              },
+              {
+                "fits": [
+                  "notGuilty",
+                  "agree"
+                ],
+                "text": "지난 판결에서도 agree로 마무리되었고 유죄 비율이 0%였는데, 이번에도 비슷한 상황에서 택시를 선택하신 이유를 다시 한 번 생각해보시는 건 어떨까요?",
+                "strategy": "ROOM_RULE_CALLBACK",
+                "evidence_labels": [
+                  "F3"
+                ]
+              },
+              {
+                "fits": [
+                  "guilty",
+                  "disagree"
+                ],
+                "text": "기존 키보드를 교체하실 때처럼 업무에 꼭 필요한 상황이 아니었다면, 이번 택시 지출은 조금 더 신중하게 결정할 수 있지 않았을까요?",
+                "strategy": "EXCUSE_STRIPPING",
+                "evidence_labels": [
+                  "F4",
+                  "F0"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "17d30cbf-120d-4ba5-9747-9556fd74a64e",
+          "post_id": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+          "job_id": "db381e87-635f-4ee2-aac2-ea3138be77e9",
+          "node": "sentencing",
+          "call_index": 0,
+          "vendor": "openai",
+          "model_id": "gpt-5.6-luna",
+          "status": "COMPLETE",
+          "actual_micro_usd": 461,
+          "prompt_tokens": 837,
+          "completion_tokens": 245,
+          "reasoning_tokens": 116,
+          "latency_ms": "2168.405000",
+          "validated_output": {
+            "sentence": "oneDay",
+            "mitigating": [
+              "최근 30일 같은 카테고리 소비 0건",
+              "이번 달 예산 소진율 2%"
+            ],
+            "aggravating": [
+              "알람을 끄고 다시 자 택시를 이용함"
+            ],
+            "evidence_labels": [
+              "F0",
+              "F1",
+              "F2"
+            ],
+            "sentencing_reason": "유죄율 100%이고 지각을 피하려 택시를 탔지만, 같은 달 반복이 없고 예산 소진율이 2%라 하루 형으로 정한다."
+          }
+        },
+        {
+          "id": "e9465ca4-7377-4497-8f9b-0ee1450eb4c2",
+          "post_id": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+          "job_id": "db381e87-635f-4ee2-aac2-ea3138be77e9",
+          "node": "writer",
+          "call_index": 0,
+          "vendor": "xai",
+          "model_id": "grok-4.20-0309-non-reasoning",
+          "status": "COMPLETE",
+          "actual_micro_usd": 3823,
+          "prompt_tokens": 3396,
+          "completion_tokens": 127,
+          "reasoning_tokens": 0,
+          "latency_ms": "1895.314000",
+          "validated_output": {
+            "headline": "알람 1초, 택시 8회",
+            "meme_tag": "GUILTY_LIGHT",
+            "intensity": "mild",
+            "statement": [
+              {
+                "kind": "opinion",
+                "text": "지각 한 번에 택시 8회분이네요.",
+                "evidence_labels": [
+                  "F0"
+                ]
+              }
+            ],
+            "meme_hints": {
+              "emotion": "PITY",
+              "keywords": [
+                "지각",
+                "택시",
+                "반복",
+                "알람"
+              ]
+            },
+            "attack_angle": "REPETITION",
+            "banter_strategy": "CHEAPER_ALTERNATIVE",
+            "selected_candidate_id": "ef13a6cb-c495-478d-9f41-bffd8cf43fcc"
+          }
+        },
+        {
+          "id": "d2933b2d-befd-48cc-bb30-484a52c4bcf3",
+          "post_id": "d5e0aa1f-b36f-49f3-bccd-bfb169013515",
+          "job_id": "db381e87-635f-4ee2-aac2-ea3138be77e9",
+          "node": "evaluator",
+          "call_index": 0,
+          "vendor": "openai",
+          "model_id": "gpt-5.6-luna",
+          "status": "COMPLETE",
+          "actual_micro_usd": 1025,
+          "prompt_tokens": 2353,
+          "completion_tokens": 462,
+          "reasoning_tokens": 399,
+          "latency_ms": "4058.633000",
+          "validated_output": {
+            "texts": [
+              {
+                "pass": true,
+                "intensity": "mild",
+                "violations": [],
+                "problem_sentences": []
+              }
+            ],
+            "sentence_check": {
+              "pass": true,
+              "violations": []
+            },
+            "sentencing_reason_check": {
+              "pass": true,
+              "violations": []
+            }
+          }
+        }
+      ],
+      "writer_output": {
+        "headline": "알람 1초, 택시 8회",
+        "meme_tag": "GUILTY_LIGHT",
+        "intensity": "mild",
+        "statement": [
+          {
+            "kind": "opinion",
+            "text": "지각 한 번에 택시 8회분이네요.",
+            "evidence_labels": [
+              "F0"
+            ]
+          }
+        ],
+        "meme_hints": {
+          "emotion": "PITY",
+          "keywords": [
+            "지각",
+            "택시",
+            "반복",
+            "알람"
+          ]
+        },
+        "attack_angle": "REPETITION",
+        "banter_strategy": "CHEAPER_ALTERNATIVE",
+        "selected_candidate_id": "ef13a6cb-c495-478d-9f41-bffd8cf43fcc"
+      },
+      "share_text_replaced": true
+    },
+    {
+      "name": "04-spicy",
+      "post_id": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+      "submission_id": "659b7543-3885-41db-915c-36922340f322",
+      "verdict": {
+        "schemaVersion": 1,
+        "postId": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+        "juryStatus": "guilty",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "spicy",
+          "headline": "집밥 대신 6잔 아메리카노",
+          "statement": [
+            "비 오면 라면 끓여 먹어라."
+          ],
+          "sentence": "oneDay",
+          "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+          "sentencingReason": "유죄율 100%이고 냉장고에 먹을 것이 있었지만, 예산 소진율 9%와 같은 지출 전력이 없어 하루 형으로 정한다.",
+          "source": "AI",
+          "meme": {
+            "tag": "GUILTY_LIGHT",
+            "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+            "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+          }
+        },
+        "pollAfterMs": 0
+      },
+      "share_card": {
+        "postId": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+        "postType": "spent",
+        "juryStatus": "guilty",
+        "intensity": "spicy",
+        "headline": "집밥 대신 6잔 아메리카노",
+        "statement": [
+          "비 오면 라면 끓여 먹어라."
+        ],
+        "sentence": "oneDay",
+        "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+        "meme": {
+          "tag": "GUILTY_LIGHT",
+          "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+          "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+        }
+      },
+      "latency_ms": 26498,
+      "input": {
+        "key": "04-spicy",
+        "label": "유죄 · 매운맛",
+        "intensity": "spicy",
+        "vote": "guilty",
+        "tag": "GUILTY_LIGHT",
+        "item": "치킨 배달",
+        "amountKrw": 31000,
+        "category": "배달",
+        "reason": "냉장고에 먹을 게 있었지만 비 오는 날이라 치킨과 사이드를 배달시켰어요."
+      },
+      "room_id": "034f67b9-fb80-44b7-bfa8-ba3ef6977fef",
+      "browser_url": "http://localhost:3800/posts/ca0b0ce7-6804-4ba9-ade7-8def9156516a/card?room=034f67b9-fb80-44b7-bfa8-ba3ef6977fef",
+      "verdict_detail": {
+        "jury_result": "guilty",
+        "sentence": "oneDay",
+        "sentence_source": "AI",
+        "sentencing_reason": "유죄율 100%이고 냉장고에 먹을 것이 있었지만, 예산 소진율 9%와 같은 지출 전력이 없어 하루 형으로 정한다.",
+        "reason_source": "AI",
+        "text_status": "AI_READY",
+        "last_failed_code": null
+      },
+      "finalize_draft": {
+        "schema_version": 1,
+        "texts": [
+          {
+            "intensity": "spicy",
+            "headline": "집밥 대신 6잔 아메리카노",
+            "statement": [
+              {
+                "text": "비 오면 라면 끓여 먹어라.",
+                "kind": "opinion",
+                "evidence_labels": []
+              }
+            ],
+            "banter_strategy": "EXCUSE_STRIPPING",
+            "selected_candidate_id": "a16c4d8b-aeb7-40db-b605-02d3333c8f49",
+            "attack_angle": "CONVERSION",
+            "source": "AI"
+          }
+        ],
+        "meme_tag": "GUILTY_LIGHT",
+        "meme_hints": {
+          "emotion": "DISAPPROVAL",
+          "keywords": [
+            "환산",
+            "핑계",
+            "배달"
+          ]
+        }
+      },
+      "evaluation": {
+        "schema_version": 1,
+        "policy_version": "guardrail-v2",
+        "sentence_check": {
+          "pass": true,
+          "violations": []
+        },
+        "sentencing_reason_check": {
+          "pass": true,
+          "violations": []
+        },
+        "texts": [
+          {
+            "intensity": "spicy",
+            "pass": true,
+            "violations": [],
+            "problem_sentences": []
+          }
+        ]
+      },
+      "finalize_status": 200,
+      "selected_meme": {
+        "id": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+        "tag": "GUILTY_LIGHT",
+        "strategies": [],
+        "emotions": [
+          "RESIGNATION"
+        ],
+        "keywords": [
+          "실망",
+          "체념",
+          "억지웃음",
+          "예상함",
+          "곁눈질"
+        ],
+        "image_url": "http://127.0.0.1:18209/assets/disappointed",
+        "is_active": true,
+        "asset_key": null
+      },
+      "image_sha256": "8d44f526cfc398ca904fbe47f209e5f0f649a4bcdbf4c05e9569d2409bebddba",
+      "image_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/live/04-spicy-meme.png",
+      "model_calls": [
+        {
+          "id": "8e94303e-2f83-4d37-8326-b2af4dfc6622",
+          "post_id": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+          "job_id": "0e0ef665-7252-4bcf-b11b-1458080a3305",
+          "node": "context",
+          "call_index": 0,
+          "vendor": "openai",
+          "model_id": "gpt-5.6-luna",
+          "status": "COMPLETE",
+          "actual_micro_usd": 981,
+          "prompt_tokens": 749,
+          "completion_tokens": 693,
+          "reasoning_tokens": 512,
+          "latency_ms": "5377.994000",
+          "validated_output": {
+            "facts": [
+              {
+                "kind": "RULE_HIT",
+                "text": "냉장고에 먹을 게 있었지만 치킨과 사이드를 배달한 지출이다.",
+                "source_refs": [
+                  "F0"
+                ]
+              },
+              {
+                "kind": "MITIGATION",
+                "text": "비 오는 날이라는 상황을 배달 사유로 제시했다.",
+                "source_refs": [
+                  "F0"
+                ]
+              },
+              {
+                "kind": "MITIGATION",
+                "text": "최근 30일 동안 같은 카테고리의 확정 소비가 0건이다.",
+                "source_refs": [
+                  "F2"
+                ]
+              },
+              {
+                "kind": "MITIGATION",
+                "text": "이번 달 예산 소진율은 9%이다.",
+                "source_refs": [
+                  "F1"
+                ]
+              }
+            ],
+            "reason_analysis": {
+              "has_mitigation": true,
+              "mitigation_kind": "상황적 사유 및 최근 동일 카테고리 소비 없음",
+              "injection_suspected": false
+            }
+          }
+        },
+        {
+          "id": "d5d60239-ab12-42e9-973c-f498e8b5a20d",
+          "post_id": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+          "job_id": "0e0ef665-7252-4bcf-b11b-1458080a3305",
+          "node": "banter",
+          "call_index": 0,
+          "vendor": "xai",
+          "model_id": "grok-4.20-0309-non-reasoning",
+          "status": "COMPLETE",
+          "actual_micro_usd": 2771,
+          "prompt_tokens": 1351,
+          "completion_tokens": 487,
+          "reasoning_tokens": 0,
+          "latency_ms": "6680.784000",
+          "validated_output": {
+            "candidates": [
+              {
+                "fits": [
+                  "guilty",
+                  "disagree"
+                ],
+                "text": "비 오는 날이라 치킨 31,000원이 필수였다고? 그럼 아메리카노 6잔 값이 매일 비 오는 날마다 날아가도 괜찮다는 거네. 숫자가 이렇게 말하고 있는데 또 '상황' 탓 하실 건가요?",
+                "strategy": "EXCUSE_STRIPPING",
+                "evidence_labels": [
+                  "F0",
+                  "F5",
+                  "F6"
+                ]
+              },
+              {
+                "fits": [
+                  "guilty"
+                ],
+                "text": "냉장고에 먹을 게 있었는데도 배달? 최근 30일 같은 카테고리 0건인데 이번 달 9%나 썼으면 이건 그냥 '배달 중독' 레벨 아닌가. king 티어답게 또 지르고 싶으신 거지?",
+                "strategy": "REPEAT_OFFENSE",
+                "evidence_labels": [
+                  "F1",
+                  "F2",
+                  "F5",
+                  "F7",
+                  "F8"
+                ]
+              },
+              {
+                "fits": [
+                  "notGuilty",
+                  "agree"
+                ],
+                "text": "비 오는 날 치킨 배달이 그렇게 급했다면, 집에 있던 재료로 간단히 만들어 먹는 DIY 버전은 왜 안 떠올랐을까. 31,000원 대신 3,000원으로도 충분했을 텐데.",
+                "strategy": "DIY_REPLACEMENT",
+                "evidence_labels": [
+                  "F0",
+                  "F5",
+                  "F6"
+                ]
+              },
+              {
+                "fits": [
+                  "guilty",
+                  "disagree"
+                ],
+                "text": "지난번엔 한정판 운동화 289,000원 지르고 disagree 받았는데, 이번엔 냉장고 음식 있는데도 배달? 패턴이 너무 똑같아서 '습관성 지름'이라고밖에 안 보이네. 또 100% 유죄 먹을 준비 되셨나.",
+                "strategy": "REPEAT_OFFENSE",
+                "evidence_labels": [
+                  "F3",
+                  "F4",
+                  "F5"
+                ]
+              },
+              {
+                "fits": [
+                  "guilty",
+                  "disagree"
+                ],
+                "text": "이번 달 예산 9%밖에 안 썼고 king 티어인데, '비 오는 날' 핑계로 6잔 분량 치킨 시킨 걸 합리화하려는 건 좀 웃기지 않나. 진짜 필요였다면 왜 사유가 상황 핑계뿐일까.",
+                "strategy": "PREMISE_REJECTION",
+                "evidence_labels": [
+                  "F0",
+                  "F1",
+                  "F6",
+                  "F8"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "edd387e0-236f-4f7c-acae-e46682c6b1e4",
+          "post_id": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+          "job_id": "944c5f86-8018-45d2-80f6-9aeebd758967",
+          "node": "sentencing",
+          "call_index": 0,
+          "vendor": "openai",
+          "model_id": "gpt-5.6-luna",
+          "status": "COMPLETE",
+          "actual_micro_usd": 738,
+          "prompt_tokens": 962,
+          "completion_tokens": 455,
+          "reasoning_tokens": 324,
+          "latency_ms": "3999.469000",
+          "validated_output": {
+            "sentence": "oneDay",
+            "mitigating": [
+              "비 오는 날의 상황",
+              "같은 카테고리 확정 소비 0건",
+              "예산 소진율 9%"
+            ],
+            "aggravating": [
+              "냉장고에 먹을 것이 있었음"
+            ],
+            "evidence_labels": [
+              "F0",
+              "F1",
+              "F2",
+              "F5",
+              "F6"
+            ],
+            "sentencing_reason": "유죄율 100%이고 냉장고에 먹을 것이 있었지만, 예산 소진율 9%와 같은 지출 전력이 없어 하루 형으로 정한다."
+          }
+        },
+        {
+          "id": "dd370cf9-bded-407f-98ab-e009ad59c2d2",
+          "post_id": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+          "job_id": "944c5f86-8018-45d2-80f6-9aeebd758967",
+          "node": "writer",
+          "call_index": 0,
+          "vendor": "xai",
+          "model_id": "grok-4.20-0309-non-reasoning",
+          "status": "COMPLETE",
+          "actual_micro_usd": 5023,
+          "prompt_tokens": 3890,
+          "completion_tokens": 118,
+          "reasoning_tokens": 0,
+          "latency_ms": "2026.346000",
+          "validated_output": null
+        },
+        {
+          "id": "63684eed-e7a9-4f7c-9281-a82293a29e83",
+          "post_id": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+          "job_id": "944c5f86-8018-45d2-80f6-9aeebd758967",
+          "node": "writer",
+          "call_index": 3,
+          "vendor": "xai",
+          "model_id": "grok-4.20-0309-non-reasoning",
+          "status": "COMPLETE",
+          "actual_micro_usd": 5118,
+          "prompt_tokens": 4000,
+          "completion_tokens": 128,
+          "reasoning_tokens": 0,
+          "latency_ms": "2360.014000",
+          "validated_output": {
+            "headline": "집밥 대신 6잔 아메리카노",
+            "meme_tag": "GUILTY_HEAVY",
+            "intensity": "spicy",
+            "statement": [
+              {
+                "kind": "opinion",
+                "text": "비 오면 라면 끓여 먹어라.",
+                "evidence_labels": []
+              }
+            ],
+            "meme_hints": {
+              "emotion": "DISAPPROVAL",
+              "keywords": [
+                "환산",
+                "핑계",
+                "배달"
+              ]
+            },
+            "attack_angle": "CONVERSION",
+            "banter_strategy": "EXCUSE_STRIPPING",
+            "selected_candidate_id": "a16c4d8b-aeb7-40db-b605-02d3333c8f49"
+          }
+        },
+        {
+          "id": "4dce7aa3-e36a-4ef9-8bc4-f78232da24e2",
+          "post_id": "ca0b0ce7-6804-4ba9-ade7-8def9156516a",
+          "job_id": "944c5f86-8018-45d2-80f6-9aeebd758967",
+          "node": "evaluator",
+          "call_index": 0,
+          "vendor": "openai",
+          "model_id": "gpt-5.6-luna",
+          "status": "COMPLETE",
+          "actual_micro_usd": 870,
+          "prompt_tokens": 2448,
+          "completion_tokens": 317,
+          "reasoning_tokens": 254,
+          "latency_ms": "2710.196000",
+          "validated_output": {
+            "texts": [
+              {
+                "pass": true,
+                "intensity": "spicy",
+                "violations": [],
+                "problem_sentences": []
+              }
+            ],
+            "sentence_check": {
+              "pass": true,
+              "violations": []
+            },
+            "sentencing_reason_check": {
+              "pass": true,
+              "violations": []
+            }
+          }
+        }
+      ],
+      "writer_output": {
+        "headline": "집밥 대신 6잔 아메리카노",
+        "meme_tag": "GUILTY_HEAVY",
+        "intensity": "spicy",
+        "statement": [
+          {
+            "kind": "opinion",
+            "text": "비 오면 라면 끓여 먹어라.",
+            "evidence_labels": []
+          }
+        ],
+        "meme_hints": {
+          "emotion": "DISAPPROVAL",
+          "keywords": [
+            "환산",
+            "핑계",
+            "배달"
+          ]
+        },
+        "attack_angle": "CONVERSION",
+        "banter_strategy": "EXCUSE_STRIPPING",
+        "selected_candidate_id": "a16c4d8b-aeb7-40db-b605-02d3333c8f49"
+      },
+      "share_text_replaced": false
+    },
+    {
+      "name": "05-hell",
+      "post_id": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+      "submission_id": "236a86a6-8cd4-47fc-990c-e2ca2253e47b",
+      "verdict": {
+        "schemaVersion": 1,
+        "postId": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+        "juryStatus": "guilty",
+        "sentenceStatus": "FINAL",
+        "textStatus": "AI_READY",
+        "textVersion": 1,
+        "view": {
+          "intensity": "hell",
+          "headline": "99k로 22잔",
+          "statement": [
+            "실력은 그대로고 잔고만 22잔어치 증발했네."
+          ],
+          "sentence": "oneDay",
+          "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+          "sentencingReason": "유죄율 100%이고 충동 결제였지만 예산 소진율이 28%이며 같은 소비 반복은 없어 하루형으로 정한다.",
+          "source": "AI",
+          "meme": {
+            "tag": "GUILTY_LIGHT",
+            "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+            "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+          }
+        },
+        "pollAfterMs": 0
+      },
+      "share_card": {
+        "postId": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+        "postType": "spent",
+        "juryStatus": "guilty",
+        "intensity": "hell",
+        "headline": "유죄",
+        "statement": [
+          "배심원단이 이 지출을 유죄로 판단했습니다."
+        ],
+        "sentence": "oneDay",
+        "sentenceLabel": "징역 1일 (내일 하루 무지출)",
+        "meme": {
+          "tag": "GUILTY_LIGHT",
+          "imageId": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+          "imageUrl": "http://127.0.0.1:18209/assets/disappointed"
+        }
+      },
+      "latency_ms": 17460,
+      "input": {
+        "key": "05-hell",
+        "label": "유죄 · 지옥맛",
+        "intensity": "hell",
+        "vote": "guilty",
+        "tag": "GUILTY_LIGHT",
+        "item": "게임 스킨 묶음",
+        "amountKrw": 99000,
+        "category": "취미/여가",
+        "reason": "실력은 그대로인데 한정 스킨을 끼면 이길 것 같아서 충동 결제했어요."
+      },
+      "room_id": "433881c0-d1bb-45c3-9f6b-22d1adf60357",
+      "browser_url": "http://localhost:3800/posts/380a53fa-2ebb-408e-81e2-e5fe29aa7ab2/card?room=433881c0-d1bb-45c3-9f6b-22d1adf60357",
+      "verdict_detail": {
+        "jury_result": "guilty",
+        "sentence": "oneDay",
+        "sentence_source": "AI",
+        "sentencing_reason": "유죄율 100%이고 충동 결제였지만 예산 소진율이 28%이며 같은 소비 반복은 없어 하루형으로 정한다.",
+        "reason_source": "AI",
+        "text_status": "AI_READY",
+        "last_failed_code": null
+      },
+      "finalize_draft": {
+        "schema_version": 1,
+        "texts": [
+          {
+            "intensity": "hell",
+            "headline": "99k로 22잔",
+            "statement": [
+              {
+                "text": "실력은 그대로고 잔고만 22잔어치 증발했네.",
+                "kind": "opinion",
+                "evidence_labels": [
+                  "F0"
+                ]
+              }
+            ],
+            "banter_strategy": "PREMISE_REJECTION",
+            "selected_candidate_id": "39747ba0-a52d-4862-8b73-697e550be4c6",
+            "attack_angle": "CONVERSION",
+            "source": "AI"
+          }
+        ],
+        "meme_tag": "GUILTY_LIGHT",
+        "meme_hints": {
+          "emotion": "DISAPPROVAL",
+          "keywords": [
+            "충동",
+            "스킨",
+            "아메리카노",
+            "증발"
+          ]
+        }
+      },
+      "evaluation": {
+        "schema_version": 1,
+        "policy_version": "guardrail-v2",
+        "sentence_check": {
+          "pass": true,
+          "violations": []
+        },
+        "sentencing_reason_check": {
+          "pass": true,
+          "violations": []
+        },
+        "texts": [
+          {
+            "intensity": "hell",
+            "pass": true,
+            "violations": [],
+            "problem_sentences": []
+          }
+        ]
+      },
+      "finalize_status": 200,
+      "selected_meme": {
+        "id": "9e1867ef-9f79-5ef6-967a-8b1a9e3be312",
+        "tag": "GUILTY_LIGHT",
+        "strategies": [],
+        "emotions": [
+          "RESIGNATION"
+        ],
+        "keywords": [
+          "실망",
+          "체념",
+          "억지웃음",
+          "예상함",
+          "곁눈질"
+        ],
+        "image_url": "http://127.0.0.1:18209/assets/disappointed",
+        "is_active": true,
+        "asset_key": null
+      },
+      "image_sha256": "8d44f526cfc398ca904fbe47f209e5f0f649a4bcdbf4c05e9569d2409bebddba",
+      "image_file": "/Users/hyun/dev/geoji/outputs/validation/20260919-five-cases/live/05-hell-meme.png",
+      "model_calls": [
+        {
+          "id": "0c7445a3-78c9-46ee-ab72-056b8859c5e5",
+          "post_id": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+          "job_id": "ab8a5ccd-d869-4716-90dd-469d0dd82979",
+          "node": "context",
+          "call_index": 0,
+          "vendor": "openai",
+          "model_id": "gpt-5.6-luna",
+          "status": "COMPLETE",
+          "actual_micro_usd": 640,
+          "prompt_tokens": 676,
+          "completion_tokens": 421,
+          "reasoning_tokens": 204,
+          "latency_ms": "3324.936000",
+          "validated_output": {
+            "facts": [
+              {
+                "kind": "RULE_HIT",
+                "text": "사유에 게임 스킨 묶음을 충동 결제했다고 기재되어 있다.",
+                "source_refs": [
+                  "F0"
+                ]
+              },
+              {
+                "kind": "MITIGATION",
+                "text": "이번 달 예산 소진율은 28%로 기재되어 있다.",
+                "source_refs": [
+                  "F1"
+                ]
+              },
+              {
+                "kind": "MITIGATION",
+                "text": "최근 30일 동안 같은 카테고리의 확정 소비는 0건으로 기재되어 있다.",
+                "source_refs": [
+                  "F2"
+                ]
+              },
+              {
+                "kind": "REASON_ANALYSIS",
+                "text": "실력은 변하지 않았지만 한정 스킨을 착용하면 이길 수 있을 것 같다는 기대가 결제 이유로 제시되어 있으며, 본인이 이를 충동 결제로 표현했다.",
+                "source_refs": [
+                  "F0"
+                ]
+              }
+            ],
+            "reason_analysis": {
+              "has_mitigation": true,
+              "mitigation_kind": "예산 소진율 및 최근 동일 카테고리 소비 이력",
+              "injection_suspected": false
+            }
+          }
+        },
+        {
+          "id": "8016953e-d4cc-4975-944e-9e0139673ae6",
+          "post_id": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+          "job_id": "ab8a5ccd-d869-4716-90dd-469d0dd82979",
+          "node": "banter",
+          "call_index": 0,
+          "vendor": "xai",
+          "model_id": "grok-4.20-0309-non-reasoning",
+          "status": "COMPLETE",
+          "actual_micro_usd": 2359,
+          "prompt_tokens": 1251,
+          "completion_tokens": 372,
+          "reasoning_tokens": 0,
+          "latency_ms": "4739.667000",
+          "validated_output": {
+            "candidates": [
+              {
+                "fits": [
+                  "guilty"
+                ],
+                "text": "야 실화냐? 실력은 그대로인데 스킨만 끼면 이긴다고? 그럼 너 지금까지 22번 아메리카노 대신 지갑에 총알 박은 거잖아. 정신 나갔냐 새끼야.",
+                "strategy": "PREMISE_REJECTION",
+                "evidence_labels": [
+                  "F0",
+                  "F3"
+                ]
+              },
+              {
+                "fits": [
+                  "guilty"
+                ],
+                "text": "이번 달 28%밖에 안 썼는데 무지출 0일에 flower 티어? 개같은 선택으로 예산 다 날려버릴 기세네. 충동이 아니라 그냥 바보 인증이야.",
+                "strategy": "EXCUSE_STRIPPING",
+                "evidence_labels": [
+                  "F1",
+                  "F4"
+                ]
+              },
+              {
+                "fits": [
+                  "disagree"
+                ],
+                "text": "최근 30일 같은 카테고리 확정 소비 0건인데 한 번에 99,000원? 레전드네. 이게 네 취미/여가의 실체구나. 지갑이랑 친구하자.",
+                "strategy": "REPEAT_OFFENSE",
+                "evidence_labels": [
+                  "F2",
+                  "F5"
+                ]
+              },
+              {
+                "fits": [
+                  "notGuilty"
+                ],
+                "text": "실력 그대로인데 스킨 사면 이긴다는 헛소리 믿고 9만 9천 원 처바른 거, 그냥 무료 스킨으로 연습이나 더 해. 그게 진짜 승률 올리는 길이야.",
+                "strategy": "DIY_REPLACEMENT",
+                "evidence_labels": [
+                  "F0",
+                  "F3"
+                ]
+              },
+              {
+                "fits": [
+                  "agree"
+                ],
+                "text": "한정 스킨 사면 이길 것 같다는 미친 논리, 완전 개소리잖아. 돈 아까우면 그냥 게임 접거나 무료로 이기는 법부터 배워.",
+                "strategy": "FREE_ALTERNATIVE",
+                "evidence_labels": [
+                  "F0"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "bb6279f3-8c9d-4efa-9f09-838e94a70d87",
+          "post_id": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+          "job_id": "adb14074-e2c0-4861-ba63-336739839586",
+          "node": "sentencing",
+          "call_index": 0,
+          "vendor": "openai",
+          "model_id": "gpt-5.6-luna",
+          "status": "COMPLETE",
+          "actual_micro_usd": 415,
+          "prompt_tokens": 867,
+          "completion_tokens": 202,
+          "reasoning_tokens": 95,
+          "latency_ms": "2091.379000",
+          "validated_output": {
+            "sentence": "oneDay",
+            "mitigating": [
+              "예산 소진율 28%",
+              "최근 30일 같은 카테고리 소비 없음"
+            ],
+            "aggravating": [
+              "충동 결제"
+            ],
+            "evidence_labels": [
+              "F1",
+              "F2",
+              "F3"
+            ],
+            "sentencing_reason": "유죄율 100%이고 충동 결제였지만 예산 소진율이 28%이며 같은 소비 반복은 없어 하루형으로 정한다."
+          }
+        },
+        {
+          "id": "d44243f9-6f85-4b4d-95df-5a56f6379c63",
+          "post_id": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+          "job_id": "adb14074-e2c0-4861-ba63-336739839586",
+          "node": "writer",
+          "call_index": 0,
+          "vendor": "xai",
+          "model_id": "grok-4.20-0309-non-reasoning",
+          "status": "COMPLETE",
+          "actual_micro_usd": 4824,
+          "prompt_tokens": 3699,
+          "completion_tokens": 134,
+          "reasoning_tokens": 0,
+          "latency_ms": "2417.223000",
+          "validated_output": {
+            "headline": "99k로 22잔",
+            "meme_tag": "GUILTY_HEAVY",
+            "intensity": "hell",
+            "statement": [
+              {
+                "kind": "opinion",
+                "text": "실력은 그대로고 잔고만 22잔어치 증발했네.",
+                "evidence_labels": [
+                  "F0"
+                ]
+              }
+            ],
+            "meme_hints": {
+              "emotion": "DISAPPROVAL",
+              "keywords": [
+                "충동",
+                "스킨",
+                "아메리카노",
+                "증발"
+              ]
+            },
+            "attack_angle": "CONVERSION",
+            "banter_strategy": "PREMISE_REJECTION",
+            "selected_candidate_id": "39747ba0-a52d-4862-8b73-697e550be4c6"
+          }
+        },
+        {
+          "id": "f244dbf1-c6ab-40c9-9394-7e014da30f89",
+          "post_id": "380a53fa-2ebb-408e-81e2-e5fe29aa7ab2",
+          "job_id": "adb14074-e2c0-4861-ba63-336739839586",
+          "node": "evaluator",
+          "call_index": 0,
+          "vendor": "openai",
+          "model_id": "gpt-5.6-luna",
+          "status": "COMPLETE",
+          "actual_micro_usd": 741,
+          "prompt_tokens": 2349,
+          "completion_tokens": 226,
+          "reasoning_tokens": 164,
+          "latency_ms": "1960.235000",
+          "validated_output": {
+            "texts": [
+              {
+                "pass": true,
+                "intensity": "hell",
+                "violations": [],
+                "problem_sentences": []
+              }
+            ],
+            "sentence_check": {
+              "pass": true,
+              "violations": []
+            },
+            "sentencing_reason_check": {
+              "pass": true,
+              "violations": []
+            }
+          }
+        }
+      ],
+      "writer_output": {
+        "headline": "99k로 22잔",
+        "meme_tag": "GUILTY_HEAVY",
+        "intensity": "hell",
+        "statement": [
+          {
+            "kind": "opinion",
+            "text": "실력은 그대로고 잔고만 22잔어치 증발했네.",
+            "evidence_labels": [
+              "F0"
+            ]
+          }
+        ],
+        "meme_hints": {
+          "emotion": "DISAPPROVAL",
+          "keywords": [
+            "충동",
+            "스킨",
+            "아메리카노",
+            "증발"
+          ]
+        },
+        "attack_angle": "CONVERSION",
+        "banter_strategy": "PREMISE_REJECTION",
+        "selected_candidate_id": "39747ba0-a52d-4862-8b73-697e550be4c6"
+      },
+      "share_text_replaced": true
+    }
+  ],
+  "commits": {
+    "ai": "f8eb99d97ed7f9bf59f013dec57dc634eb7fb2ae",
+    "backend": "fa1825601a6f6ea5140ad6caf37b7a9db7cbba32",
+    "frontend": "64e963764f00a3fe920c0f771ceb3cd1da4d096f"
+  },
+  "working_tree_dirty": {
+    "ai": true,
+    "backend": false,
+    "frontend": true
+  },
+  "plan": {
+    "posts": 5,
+    "juror_votes": 15,
+    "max_calls_including_repair": 60,
+    "reservation_cap_usd": 0.75,
+    "models": {
+      "judgment": "gpt-5.6-luna",
+      "writer": "grok-4.20-0309-non-reasoning"
+    },
+    "data": "5 synthetic cases; isolated local DB; no production writes"
+  },
+  "schema_files": [
+    "000a_roles.sql",
+    "000b_base_schema_test.sql",
+    "001_ai_jobs.sql",
+    "002_preparation_evidence.sql",
+    "003_memory_call_ledger.sql",
+    "004_verdict_generation.sql",
+    "004b_internal_read.sql",
+    "004b_meme_asset_key.sql",
+    "004b_post_comments.sql",
+    "004b_privacy.sql",
+    "004b_submissions.sql",
+    "004b_verdicts_per_room.sql"
+  ],
+  "backend_jar_sha256": "aa994e25fee9a99e79f479078a8075ac5c689292cc5bdbdf0ae8eb272b413d21",
+  "room_id": "56478217-7492-4d18-b342-0f3a1a238929",
+  "catalog_registration": "independent DB seed + hash checked local asset server",
+  "mode": "live",
+  "test_cases": [
+    {
+      "key": "01-approved",
+      "label": "구매 승인",
+      "intensity": "mild",
+      "vote": "agree",
+      "tag": "APPROVED",
+      "item": "업무용 키보드",
+      "amountKrw": 59000,
+      "category": "기타",
+      "reason": "기존 키보드가 고장 나서 업무에 필요한 기본형으로 교체하려고 합니다."
+    },
+    {
+      "key": "02-rejected",
+      "label": "구매 기각",
+      "intensity": "spicy",
+      "vote": "disagree",
+      "tag": "REJECTED",
+      "item": "한정판 운동화",
+      "amountKrw": 289000,
+      "category": "쇼핑/패션",
+      "reason": "운동화가 이미 네 켤레 있지만 한정판이라 품절되기 전에 사고 싶어요."
+    },
+    {
+      "key": "03-mild",
+      "label": "유죄 · 순한맛",
+      "intensity": "mild",
+      "vote": "guilty",
+      "tag": "GUILTY_LIGHT",
+      "item": "택시",
+      "amountKrw": 12000,
+      "category": "교통/택시",
+      "reason": "알람을 끄고 다시 자서 지각할 것 같아 택시를 탔어요."
+    },
+    {
+      "key": "04-spicy",
+      "label": "유죄 · 매운맛",
+      "intensity": "spicy",
+      "vote": "guilty",
+      "tag": "GUILTY_LIGHT",
+      "item": "치킨 배달",
+      "amountKrw": 31000,
+      "category": "배달",
+      "reason": "냉장고에 먹을 게 있었지만 비 오는 날이라 치킨과 사이드를 배달시켰어요."
+    },
+    {
+      "key": "05-hell",
+      "label": "유죄 · 지옥맛",
+      "intensity": "hell",
+      "vote": "guilty",
+      "tag": "GUILTY_LIGHT",
+      "item": "게임 스킨 묶음",
+      "amountKrw": 99000,
+      "category": "취미/여가",
+      "reason": "실력은 그대로인데 한정 스킨을 끼면 이길 것 같아서 충동 결제했어요."
+    }
+  ],
+  "source_commits": {
+    "server": "fa1825601a6f6ea5140ad6caf37b7a9db7cbba32",
+    "web": "64e963764f00a3fe920c0f771ceb3cd1da4d096f"
+  },
+  "model_calls": [
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "intake",
+      "status": "COMPLETE",
+      "actual_micro_usd": 532,
+      "prompt_tokens": 1851,
+      "completion_tokens": 135,
+      "reasoning_tokens": 70,
+      "latency_ms": "3738.614000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "context",
+      "status": "COMPLETE",
+      "actual_micro_usd": 565,
+      "prompt_tokens": 663,
+      "completion_tokens": 361,
+      "reasoning_tokens": 202,
+      "latency_ms": "3592.440000"
+    },
+    {
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "node": "banter",
+      "status": "COMPLETE",
+      "actual_micro_usd": 2714,
+      "prompt_tokens": 1247,
+      "completion_tokens": 543,
+      "reasoning_tokens": 0,
+      "latency_ms": "6330.847000"
+    },
+    {
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "node": "writer",
+      "status": "COMPLETE",
+      "actual_micro_usd": 4284,
+      "prompt_tokens": 3257,
+      "completion_tokens": 139,
+      "reasoning_tokens": 0,
+      "latency_ms": "2164.599000"
+    },
+    {
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "node": "writer",
+      "status": "COMPLETE",
+      "actual_micro_usd": 3867,
+      "prompt_tokens": 3429,
+      "completion_tokens": 128,
+      "reasoning_tokens": 0,
+      "latency_ms": "2688.369000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "evaluator",
+      "status": "COMPLETE",
+      "actual_micro_usd": 924,
+      "prompt_tokens": 2203,
+      "completion_tokens": 403,
+      "reasoning_tokens": 340,
+      "latency_ms": "4022.057000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "intake",
+      "status": "COMPLETE",
+      "actual_micro_usd": 439,
+      "prompt_tokens": 1854,
+      "completion_tokens": 57,
+      "reasoning_tokens": 0,
+      "latency_ms": "1121.838000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "context",
+      "status": "COMPLETE",
+      "actual_micro_usd": 614,
+      "prompt_tokens": 671,
+      "completion_tokens": 400,
+      "reasoning_tokens": 191,
+      "latency_ms": "3321.627000"
+    },
+    {
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "node": "banter",
+      "status": "COMPLETE",
+      "actual_micro_usd": 2785,
+      "prompt_tokens": 1240,
+      "completion_tokens": 548,
+      "reasoning_tokens": 0,
+      "latency_ms": "7706.167000"
+    },
+    {
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "node": "writer",
+      "status": "COMPLETE",
+      "actual_micro_usd": 4664,
+      "prompt_tokens": 3641,
+      "completion_tokens": 99,
+      "reasoning_tokens": 0,
+      "latency_ms": "1981.700000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "evaluator",
+      "status": "COMPLETE",
+      "actual_micro_usd": 994,
+      "prompt_tokens": 2172,
+      "completion_tokens": 467,
+      "reasoning_tokens": 298,
+      "latency_ms": "4655.008000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "intake",
+      "status": "COMPLETE",
+      "actual_micro_usd": 438,
+      "prompt_tokens": 1850,
+      "completion_tokens": 57,
+      "reasoning_tokens": 0,
+      "latency_ms": "852.704000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "context",
+      "status": "COMPLETE",
+      "actual_micro_usd": 969,
+      "prompt_tokens": 742,
+      "completion_tokens": 684,
+      "reasoning_tokens": 346,
+      "latency_ms": "4823.680000"
+    },
+    {
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "node": "banter",
+      "status": "COMPLETE",
+      "actual_micro_usd": 2308,
+      "prompt_tokens": 1228,
+      "completion_tokens": 363,
+      "reasoning_tokens": 0,
+      "latency_ms": "4357.538000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "sentencing",
+      "status": "COMPLETE",
+      "actual_micro_usd": 461,
+      "prompt_tokens": 837,
+      "completion_tokens": 245,
+      "reasoning_tokens": 116,
+      "latency_ms": "2168.405000"
+    },
+    {
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "node": "writer",
+      "status": "COMPLETE",
+      "actual_micro_usd": 3823,
+      "prompt_tokens": 3396,
+      "completion_tokens": 127,
+      "reasoning_tokens": 0,
+      "latency_ms": "1895.314000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "evaluator",
+      "status": "COMPLETE",
+      "actual_micro_usd": 1025,
+      "prompt_tokens": 2353,
+      "completion_tokens": 462,
+      "reasoning_tokens": 399,
+      "latency_ms": "4058.633000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "intake",
+      "status": "COMPLETE",
+      "actual_micro_usd": 438,
+      "prompt_tokens": 1852,
+      "completion_tokens": 57,
+      "reasoning_tokens": 0,
+      "latency_ms": "1390.624000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "context",
+      "status": "COMPLETE",
+      "actual_micro_usd": 981,
+      "prompt_tokens": 749,
+      "completion_tokens": 693,
+      "reasoning_tokens": 512,
+      "latency_ms": "5377.994000"
+    },
+    {
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "node": "banter",
+      "status": "COMPLETE",
+      "actual_micro_usd": 2771,
+      "prompt_tokens": 1351,
+      "completion_tokens": 487,
+      "reasoning_tokens": 0,
+      "latency_ms": "6680.784000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "sentencing",
+      "status": "COMPLETE",
+      "actual_micro_usd": 738,
+      "prompt_tokens": 962,
+      "completion_tokens": 455,
+      "reasoning_tokens": 324,
+      "latency_ms": "3999.469000"
+    },
+    {
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "node": "writer",
+      "status": "COMPLETE",
+      "actual_micro_usd": 5023,
+      "prompt_tokens": 3890,
+      "completion_tokens": 118,
+      "reasoning_tokens": 0,
+      "latency_ms": "2026.346000"
+    },
+    {
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "node": "writer",
+      "status": "COMPLETE",
+      "actual_micro_usd": 5118,
+      "prompt_tokens": 4000,
+      "completion_tokens": 128,
+      "reasoning_tokens": 0,
+      "latency_ms": "2360.014000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "evaluator",
+      "status": "COMPLETE",
+      "actual_micro_usd": 870,
+      "prompt_tokens": 2448,
+      "completion_tokens": 317,
+      "reasoning_tokens": 254,
+      "latency_ms": "2710.196000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "intake",
+      "status": "COMPLETE",
+      "actual_micro_usd": 475,
+      "prompt_tokens": 1856,
+      "completion_tokens": 87,
+      "reasoning_tokens": 22,
+      "latency_ms": "1707.561000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "context",
+      "status": "COMPLETE",
+      "actual_micro_usd": 640,
+      "prompt_tokens": 676,
+      "completion_tokens": 421,
+      "reasoning_tokens": 204,
+      "latency_ms": "3324.936000"
+    },
+    {
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "node": "banter",
+      "status": "COMPLETE",
+      "actual_micro_usd": 2359,
+      "prompt_tokens": 1251,
+      "completion_tokens": 372,
+      "reasoning_tokens": 0,
+      "latency_ms": "4739.667000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "sentencing",
+      "status": "COMPLETE",
+      "actual_micro_usd": 415,
+      "prompt_tokens": 867,
+      "completion_tokens": 202,
+      "reasoning_tokens": 95,
+      "latency_ms": "2091.379000"
+    },
+    {
+      "vendor": "xai",
+      "model_id": "grok-4.20-0309-non-reasoning",
+      "node": "writer",
+      "status": "COMPLETE",
+      "actual_micro_usd": 4824,
+      "prompt_tokens": 3699,
+      "completion_tokens": 134,
+      "reasoning_tokens": 0,
+      "latency_ms": "2417.223000"
+    },
+    {
+      "vendor": "openai",
+      "model_id": "gpt-5.6-luna",
+      "node": "evaluator",
+      "status": "COMPLETE",
+      "actual_micro_usd": 741,
+      "prompt_tokens": 2349,
+      "completion_tokens": 226,
+      "reasoning_tokens": 164,
+      "latency_ms": "1960.235000"
+    }
+  ],
+  "result": "FALLBACK_OBSERVED",
+  "actual_call_count": 30,
+  "recorded_cost_usd": 0.056799,
+  "unknown_cost_calls": 0,
+  "budget": {
+    "max_calls": 60,
+    "cap_usd": 0.75,
+    "reserved_usd": 0.230827,
+    "attempted_calls": 30
+  }
+}

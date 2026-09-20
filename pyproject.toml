@@ -20,6 +20,8 @@ dependencies = [
 
 [project.scripts]
 geoji-ai = "geoji_ai.cli:main"
+ctx = "tools.ctx_kit:main"
+ctx-kit = "tools.ctx_kit:main"
 
 [dependency-groups]
 dev = [
