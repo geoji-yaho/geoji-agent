@@ -280,7 +280,6 @@ WORN_PHRASE_DECLARATIONS = {
     ("writer/common-v6.0.md", "금지어"),
     ("writer/common-v6.1.md", "금지어"),
     ("writer/common-v6.2.md", "금지어"),
-    ("evaluator/guardrail-v2.3.md", "| 금지 | 금지 | 금지 |"),
     ("evaluator/guardrail-v2.2.md", "| 금지 | 금지 | 금지 |"),
     ("evaluator/guardrail-v2.1.md", "| 금지 | 금지 | 금지 |"),
     ("evaluator/guardrail-v2.md", "| 금지 | 금지 | 금지 |"),
