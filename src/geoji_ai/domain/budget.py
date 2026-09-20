@@ -29,6 +29,7 @@ __all__ = [
     "CASE_CAP_MICRO_USD",
     "EVALUATOR",
     "FINALIZE_RESERVE_SECONDS",
+    "JURY_BUDGET_PREFIX",
     "KRW_PER_USD",
     "NODE_NAMES",
     "NODE_RESULT_TTL",
@@ -38,6 +39,7 @@ __all__ = [
     "WRITER",
     "Deadline",
     "NodeResultKey",
+    "budget_key_for_jury",
     "budget_key_for_post",
     "budget_key_for_submission",
     "est_max_micro_usd",
@@ -150,6 +152,9 @@ TICKS_PER_MICRO_USD = 10_000
 #: 제출 임시 예산 키 접두어(06 §3.2). intake 는 `post_id` 가 없다.
 SUBMISSION_BUDGET_PREFIX = "submission:"
 
+#: 배심원 예산 키 접두어. 데모 배심원 호출은 판결문 예산을 먹지 않는다(9/20 운영 로그).
+JURY_BUDGET_PREFIX = "jury:"
+
 #: `node_results` 보존 기간(06 §3.2 "보존 24h").
 NODE_RESULT_TTL = timedelta(hours=24)
 
@@ -197,6 +202,16 @@ def budget_key_for_post(post_id: str) -> str:
 def budget_key_for_submission(submission_id: str) -> str:
     """제출 임시 예산 키 `submission:{id}`. 사건 예산으로 옮기는 로직은 결정 대기(10 §4.4)."""
     return f"{SUBMISSION_BUDGET_PREFIX}{submission_id}"
+
+
+def budget_key_for_jury(post_id: str) -> str:
+    """배심원 예산 키 `jury:{post_id}`.
+
+    사건 예산과 **따로** 둔다. 9/20 운영에서 배심원 호출이 사건 예산 40원을 먼저 깎아
+    같은 사건의 검수관 2차 호출이 `BUDGET_EXCEEDED` 로 거부됐다(판결문이 전 강도 TEMPLATE).
+    한 사건의 배심원 투표가 방마다 여러 건 생겨도 이 키 하나를 같이 쓰므로 총량은 막힌다.
+    """
+    return f"{JURY_BUDGET_PREFIX}{post_id}"
 
 
 def request_hash(canonical_input: Any) -> str:

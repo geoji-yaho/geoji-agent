@@ -105,7 +105,7 @@
 |---|---|---|
 | snapshot | `backend.snapshot(job_id, generation_id)` | 404 `SnapshotNotFound` → 핸들러가 `cancel`(삭제된 글) |
 | room | `room_snapshots` 에서 `payload.room_id` 찾기 → `intensity` | 없음(공유 철회) → `skipped(reason="room_not_shared")` 로 끝, 모델 호출 없음 |
-| juror | `ScopedLLM.scoped_call(role="juror", schema=juror_schema(post_type), timeout=JUROR_TIMEOUT_SECONDS − 0.2, max_output_tokens=JUROR_MAX_OUTPUT_TOKENS)`. 예산 키는 그 사건(`post_id`) 것, `node="juror"`, `call_index=0` | `LLMError`·timeout·`stop_reason != stop`·출력 없음 → 템플릿 |
+| juror | `ScopedLLM.scoped_call(role="juror", schema=juror_schema(post_type), timeout=JUROR_TIMEOUT_SECONDS − 0.2, max_output_tokens=JUROR_MAX_OUTPUT_TOKENS)`. 예산 키는 사건과 따로 둔 `jury:{post_id}`(06 §3.2), `node="juror"`, `call_index=0` | `LLMError`·timeout·`stop_reason != stop`·출력 없음 → 템플릿 |
 | validate | `verdict` 가 유형별 허용 2개 안 ∧ `reason` 공백 제거 뒤 1~60 code point ∧ 줄바꿈 없음 | 위반 → 템플릿(재작성 호출 없음, 1회로 끝) |
 | cast | §3.6 `cast_jury_vote` | 핸들러 표(§3.5) |
 

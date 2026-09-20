@@ -88,6 +88,7 @@ prompts/** 변경 ─▶ tests/evaluations/run_regression.py (골든 50사건 ×
 | UNKNOWN | timeout·transport: `status=UNKNOWN`, **예약액을 바로 환급하지 않는다.** 하루 뒤 배치(작업 8)가 정리 |
 | `call_index` | 서기 병렬 호출의 **강도 슬롯 번호**(target 순서). `UNIQUE(generation_id, node, call_index)` |
 | `node_results` | 키 = `request_hash`(canonical 입력 sha256) + `model_id` + `prompt_version` + `policy_version` + `privacy_versions`. **전부 같을 때만** 재사용. 보존 24h, 삭제·권한 철회 시 무효화(04). 원문 프롬프트·자유형 응답은 저장하지 않고 검증된 출력만. 보존 합의 전에는 합성 데이터에서만 |
+| 배심원 예산 | 데모 AI 배심원(`JURY_VOTE`)은 `case_budgets` 키 `jury:{post_id}`. 사건 예산과 **합산하지 않는다**. 9/20 운영에서 같은 키를 쓰다가 배심원 한 표가 사건 예산 40원을 먼저 깎아 같은 사건 검수관 2차 호출이 `BUDGET_EXCEEDED` 로 거부됐다(판결문 전 강도 TEMPLATE). 한 사건에 방별로 여러 표가 생겨도 이 키 하나를 같이 쓰므로 총량은 `cap` 으로 막힌다 |
 | 제출 임시 예산 | intake 는 `post_id` 가 없으므로 `case_budgets` 키 `submission:{id}`. 등록 시 백엔드가 `post_id`↔`submission_id` 를 알려주면 이전(합산), 이중 집계 금지. 알려주지 못하면 제출 예산은 그대로 두고 사건 예산에 포함하지 않는다(**결정 대기**, 10 §4.4) |
 | 관측 | `case_cost_micro_usd`, `unknown_calls`, `llm_duration_seconds` by node·vendor(작업 8) |
 

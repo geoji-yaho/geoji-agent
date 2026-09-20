@@ -5,8 +5,9 @@
 - snapshot: 기존 snapshot API 재사용(18 §1 결정 9). 404 `SnapshotNotFound` 는 핸들러가 `cancel`
 - room: `room_snapshots` 에서 `payload.room_id` 를 찾아 방 강도를 집는다. 없으면(공유 철회)
   `SKIPPED` 로 끝난다 — 모델 호출 0, cast 호출 0
-- juror: `juror` 역할로 **1회**. 예산 키는 그 사건(`budget_key_for_post(post_id)`),
-  `node="juror"`, `call_index=0`. `LLMError`·timeout·`stop_reason != "stop"`·출력 없음 → 템플릿
+- juror: `juror` 역할로 **1회**. 예산 키는 사건과 **따로 둔 배심원 예산**
+  (`budget_key_for_jury(post_id)`), `node="juror"`, `call_index=0`.
+  `LLMError`·timeout·`stop_reason != "stop"`·출력 없음 → 템플릿
 - validate: 유형별 허용 평결 2개 ∧ 사유 1~60 code point ∧ 줄바꿈 없음. 위반 → 템플릿.
   **재작성 호출은 없다. 모델 호출은 총 1회다**(18 §3.4)
 - cast: `backend.cast_jury_vote`. 백엔드 거부 처리는 핸들러(`application/jury_vote_case.py`)
@@ -45,6 +46,7 @@ from geoji_ai.contracts.juror import JurorVote
 from geoji_ai.contracts.llm_schemas import VERDICTS_BY_POST_TYPE, juror_schema
 from geoji_ai.core.config import Settings
 from geoji_ai.core.logging import get_logger
+from geoji_ai.domain.budget import budget_key_for_jury
 from geoji_ai.domain.intensity import Intensity, parse_intensity
 from geoji_ai.ports.backend import BackendPort, JuryVoteRequest
 from geoji_ai.ports.llm import LLMError, LLMPort
@@ -291,6 +293,8 @@ def build_jury_vote_graph(deps: JuryVoteDeps) -> Any:
             policy_version=settings.GUARDRAIL_POLICY_VERSION,
             remaining_s=remaining_s,
             reserve_s=_TIMEOUT_RESERVE_S,
+            # 사건 예산과 분리한다. 붙여 두면 배심원 한 표가 같은 사건 검수관 몫을 먹는다.
+            budget_key=budget_key_for_jury(snapshot.post_id),
         )
         timeout = max(budget_s - _TIMEOUT_RESERVE_S, 0.1)
         try:

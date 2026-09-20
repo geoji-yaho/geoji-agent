@@ -12,6 +12,7 @@ from geoji_ai.domain.budget import (
     CASE_CAP_MICRO_USD,
     KRW_PER_USD,
     NodeResultKey,
+    budget_key_for_jury,
     budget_key_for_post,
     budget_key_for_submission,
     est_max_micro_usd,
@@ -85,6 +86,12 @@ def test_request_hash_는_배열_순서와_값에_민감하다():
 def test_예산_키():
     assert budget_key_for_post("p-1") == "p-1"
     assert budget_key_for_submission("abc") == "submission:abc"
+    assert budget_key_for_jury("p-1") == "jury:p-1"
+
+
+def test_배심원_예산_키는_사건_예산_키와_다르다():
+    # 같으면 배심원 한 표가 그 사건 검수관 몫을 먹는다(9/20 운영).
+    assert budget_key_for_jury("p-1") != budget_key_for_post("p-1")
 
 
 def test_node_result_key_versions_는_request_hash_를_뺀_4요소():

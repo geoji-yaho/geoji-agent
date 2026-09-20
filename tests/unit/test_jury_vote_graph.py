@@ -430,8 +430,8 @@ class RecordingScopedLLM:
         self.remembered.append(scoped)
 
 
-async def test_게이트웨이_경로는_사건_예산_키와_juror_노드로_1회_부른다():
-    from geoji_ai.domain.budget import budget_key_for_post
+async def test_게이트웨이_경로는_배심원_예산_키와_juror_노드로_1회_부른다():
+    from geoji_ai.domain.budget import budget_key_for_jury, budget_key_for_post
 
     gateway = RecordingScopedLLM()
     state, backend, _ = await run(llm=gateway)
@@ -439,7 +439,9 @@ async def test_게이트웨이_경로는_사건_예산_키와_juror_노드로_1�
     assert state["outcome"] == "AI"
     assert len(gateway.scopes) == 1
     scope = gateway.scopes[0]
-    assert scope.budget_key == budget_key_for_post(POST_ID)
+    # 사건 예산과 분리. 붙여 두면 검수관 2차 호출이 BUDGET_EXCEEDED 로 거부된다(9/20 운영).
+    assert scope.budget_key == budget_key_for_jury(POST_ID)
+    assert scope.budget_key != budget_key_for_post(POST_ID)
     assert scope.node == "juror"
     assert scope.call_index == 0
     assert scope.job_id == "job-1"
