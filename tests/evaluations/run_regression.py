@@ -226,7 +226,24 @@ def load_cases(path: Path) -> list[GoldenCase]:
     return cases
 
 
+# 골든셋 kind는 작성 당시 문서 분류다. 운영 EvidenceFact의 타입으로 명시 변환한다.
+# 분석은 DB 사실로 승격하지 않는다. fixture 원문과 라벨은 회귀 대조를 위해 유지한다.
+_FACT_TYPES: dict[str, tuple[str, str]] = {
+    "THIS_CASE": ("USER_CLAIM", "SPEND"),
+    "PATTERN": ("DB_RECORD", "SPEND"),
+    "PRIOR_REASON": ("DB_RECORD", "SPEND"),
+    "PRIOR_VERDICT": ("DB_RECORD", "VERDICT"),
+    "RULE_HIT": ("DB_RECORD", "RULE"),
+    "STATUS": ("DB_RECORD", "AGGREGATE"),
+    "REASON_ANALYSIS": ("MODEL_INFERENCE", "MITIGATION"),
+    "MITIGATION": ("MODEL_INFERENCE", "MITIGATION"),
+}
+
+
 def to_dossier(case: GoldenCase) -> Dossier:
+    unknown = {f.kind for f in case.dossier.facts} - _FACT_TYPES.keys()
+    if unknown:
+        raise ValueError(f"운영 근거 타입 매핑이 없는 kind: {sorted(unknown)}")
     scope = Scope("ROOMS", frozenset(case.snapshot.audience.room_ids))
     return Dossier(
         dossier_id=case.dossier.dossier_id,
@@ -236,8 +253,8 @@ def to_dossier(case: GoldenCase) -> Dossier:
         facts=tuple(
             EvidenceFact(
                 label=f.label,
-                epistemic_type="DB_RECORD",
-                fact_type=f.kind,
+                epistemic_type=_FACT_TYPES[f.kind][0],
+                fact_type=_FACT_TYPES[f.kind][1],
                 text=f.text,
                 scope=scope,
                 aggregation=None,
