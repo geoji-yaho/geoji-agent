@@ -167,6 +167,15 @@ class Worker:
                 f"WORKER_SLOTS 에 모르는 슬롯이 있다: {sorted(unknown)}. "
                 f"아는 슬롯 {sorted(SLOT_KINDS)}"
             )
+        missing = set(SLOT_KINDS) - set(settings.WORKER_SLOTS)
+        if missing:
+            # `.env` 가 옛 기본값으로 `WORKER_SLOTS` 를 통째로 덮으면 새 슬롯의 claim loop 이
+            # 안 뜨고 그 kind 의 job 은 QUEUED 로 영원히 남는다(19 §8 JURY). 기동은 막지 않는다.
+            log.warning(
+                "worker_slots_missing",
+                missing=sorted(missing),
+                kinds=sorted(k for slot in missing for k in SLOT_KINDS[slot]),
+            )
         self._jobs = jobs
         self._settings = settings
         self._reaper = reaper

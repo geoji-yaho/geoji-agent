@@ -67,6 +67,8 @@ from sqlalchemy.types import Text
 from geoji_ai.contracts.case import CaseSnapshot
 from geoji_ai.contracts.finalize import SHA256_HEX, FinalizeRequest, check_policy_version
 from geoji_ai.contracts.jobs import RetainPayload
+from geoji_ai.contracts.juror import JUROR_REASON_MAX
+from geoji_ai.contracts.llm_schemas import VERDICTS_BY_POST_TYPE
 from geoji_ai.core.config import Settings
 from geoji_ai.ports.backend import (
     GenerationErrorCode,
@@ -85,6 +87,7 @@ __all__ = [
     "SENTENCE_GATE_WAIT",
     "FakeBackend",
     "HeldSentence",
+    "PostState",
     "VerdictState",
     "app",
     "create_fake_backend",
@@ -116,7 +119,7 @@ _SENTENCE_ROUTE = JOB_ROUTES["verdict.confirmed"]
 #: 10 §3 SENTENCE 게이트 최대 대기 `confirmed_at + 30s`(9/14 D-24).
 SENTENCE_GATE_WAIT = timedelta(seconds=30)
 #: 10 §8 무효화 트랜잭션이 끄는 job kind(9/14 D-26).
-INVALIDATED_JOB_KINDS: tuple[str, ...] = ("PREPARE", "SENTENCE", "TEXT_RETRY")
+INVALIDATED_JOB_KINDS: tuple[str, ...] = ("PREPARE", "SENTENCE", "TEXT_RETRY", "JURY_VOTE")
 _SNAPSHOT_FIXTURE = "case-snapshot-taxi"
 
 #: resolve-evidence 의 고정 aggregates. fixture 에 집계 값이 없어 테스트용으로 둔 값이다
@@ -207,7 +210,8 @@ _CANCEL_POST_JOBS_SQL = text(
     """
     UPDATE ai.jobs SET status = 'CANCELLED', owner_id = NULL, generation_id = NULL,
            lease_until = NULL, updated_at = now()
-    WHERE kind IN ('PREPARE', 'SENTENCE', 'TEXT_RETRY') AND status IN ('QUEUED', 'RUNNING')
+    WHERE kind IN ('PREPARE', 'SENTENCE', 'TEXT_RETRY', 'JURY_VOTE')
+      AND status IN ('QUEUED', 'RUNNING')
       AND (payload->>'post_id' = :post_id
            OR (kind = 'TEXT_RETRY' AND payload->>'verdict_id' = ANY(:verdict_ids)))
     RETURNING CAST(id AS text) AS id
@@ -216,6 +220,14 @@ _CANCEL_POST_JOBS_SQL = text(
 
 _STALE = "STALE_GENERATION"
 _INVALID_DRAFT = "INVALID_DRAFT"
+
+# 18 §3.6 = 19 §5 jury-votes 거부 코드.
+_INVALID_REQUEST = "INVALID_REQUEST"
+_NOT_AI_JUROR = "NOT_AI_JUROR"
+_VOTING_CLOSED = "VOTING_CLOSED"
+_ALREADY_VOTED = "ALREADY_VOTED"
+#: 봇 id 가 설정되지 않은 배포(19 §6 공개 API 와 같은 코드).
+_AI_JUROR_NOT_CONFIGURED = "AI_JUROR_NOT_CONFIGURED"
 
 
 class _BeginBody(BaseModel):
@@ -256,6 +268,29 @@ class VerdictState:
     failed_generations: dict[str, str] = field(default_factory=dict)
 
 
+class _JuryVoteBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: str
+    generation_id: str
+    room_id: str
+    voter_id: str
+    verdict: str
+    reason: str
+    source: Any
+
+
+@dataclass
+class PostState:
+    """jury-votes 가 보는 글 하나(18 §3.6). 표는 `voter_id -> verdict` 다."""
+
+    post_id: str
+    post_type: str = "spent"
+    #: 마감·확정된 글이면 True. 그 뒤 표는 409 `VOTING_CLOSED` 다.
+    voting_closed: bool = False
+    votes: dict[str, str] = field(default_factory=dict)
+
+
 @dataclass
 class HeldSentence:
     """게이트가 보류한 평결 확정(10 §3 D-24). SENTENCE 는 아직 INSERT 되지 않았다."""
@@ -277,10 +312,26 @@ def _now() -> datetime:
 class FakeBackend:
     """가짜 백엔드의 상태와 규칙. 엔드포인트는 `create_fake_backend` 가 붙인다."""
 
-    def __init__(self, *, token: str, jobs_engine: AsyncEngine | None, policy_version: str) -> None:
+    def __init__(
+        self,
+        *,
+        token: str,
+        jobs_engine: AsyncEngine | None,
+        policy_version: str,
+        ai_juror_user_id: str | None = None,
+    ) -> None:
         self.token = token
         self.jobs_engine = jobs_engine
         self.policy_version = policy_version
+        #: 떼거지봇 사용자 id(18 §3.6). 계획서에 값이 없어 기본값을 두지 않는다 —
+        #: None 이면 jury-votes 가 503 `AI_JUROR_NOT_CONFIGURED` 다(19 §6 과 같은 코드).
+        self.ai_juror_user_id = ai_juror_user_id
+        #: jury-votes 가 보는 글. `seed_post` 로 심는다.
+        self.posts: dict[str, PostState] = {}
+        #: 받은 표 `{post_id, room_id, voter_id, verdict, reason, source, vote_id}`.
+        self.jury_votes: list[dict[str, Any]] = []
+        #: jury-votes 가 앞에서부터 하나씩 꺼내 그대로 거부할 `(status, code)`. 비면 기존 동작이다.
+        self.jury_vote_rejections: list[tuple[int, str]] = []
         self.verdicts: dict[str, VerdictState] = {}
         self.commit_records: dict[str, tuple[str, dict[str, Any]]] = {}
         self.retain_jobs: list[dict[str, Any]] = []
@@ -328,6 +379,25 @@ class FakeBackend:
         )
         self.verdicts[verdict_id] = state
         return state
+
+    def seed_post(
+        self, post_id: str, *, post_type: str = "spent", voting_closed: bool = False
+    ) -> PostState:
+        state = PostState(post_id=post_id, post_type=post_type, voting_closed=voting_closed)
+        self.posts[post_id] = state
+        return state
+
+    async def owns_with_lease(self, job_id: str, generation_id: str) -> bool:
+        """job 이 RUNNING 이고 그 세대이고 lease 가 유효한가(18 §3.6 첫 검사)."""
+        if self.jobs_engine is None:
+            return True
+        row = await self._job_row(job_id)
+        return (
+            row is not None
+            and row["status"] == "RUNNING"
+            and row["generation_id"] == generation_id
+            and bool(row["lease_valid"])
+        )
 
     def verdict_for_post(self, post_id: str) -> VerdictState | None:
         return next((v for v in self.verdicts.values() if v.post_id == post_id), None)
@@ -621,6 +691,7 @@ def create_fake_backend(
     token: str = FAKE_SERVICE_TOKEN,
     snapshot_fixture: Path | str | None = None,
     resolve_fixture: Path | str | None = None,
+    ai_juror_user_id: str | None = None,
 ) -> FastAPI:
     """`snapshot_fixture`·`resolve_fixture` 는 JSON 경로(04 ME-07). 없으면 기존 동작이다.
 
@@ -628,7 +699,12 @@ def create_fake_backend(
     - `resolve_fixture`: resolve-evidence 가 이 파일을 돌려준다. `aggregates.excludes_post_id`
       만 job 의 post_id 로 치환한다
     """
-    fake = FakeBackend(token=token, jobs_engine=jobs_engine, policy_version=_DEFAULT_POLICY_VERSION)
+    fake = FakeBackend(
+        token=token,
+        jobs_engine=jobs_engine,
+        policy_version=_DEFAULT_POLICY_VERSION,
+        ai_juror_user_id=ai_juror_user_id,
+    )
 
     def load_snapshot_data() -> dict[str, Any]:
         if snapshot_fixture is None:
@@ -858,6 +934,58 @@ def create_fake_backend(
         fake.commit_records[generation_id] = (request_hash, response)
         return response
 
+    @app.post("/internal/v1/posts/{post_id}/jury-votes")
+    async def cast_jury_vote(post_id: str, request: Request) -> Any:
+        """18 §3.6 = 19 §5. 검사 순서는 계획서 그대로다."""
+        if not fake.authorized(request):
+            return _reject(401, "UNAUTHORIZED")
+        if fake.jury_vote_rejections:
+            status, code = fake.jury_vote_rejections.pop(0)
+            return _reject(status, code)
+        if fake.ai_juror_user_id is None:
+            # 봇 id 를 주지 않은 가짜다. 값을 지어내지 않는다(19 §10 회신 대기).
+            return JSONResponse(status_code=503, content={"code": _AI_JUROR_NOT_CONFIGURED})
+        try:
+            body = _JuryVoteBody.model_validate_json(await request.body())
+        except ValidationError:
+            return _reject(422, _INVALID_REQUEST)
+        if body.source not in ("AI", "TEMPLATE"):
+            return _reject(422, _INVALID_REQUEST)
+        if not await fake.owns_with_lease(body.job_id, body.generation_id):
+            return _reject(409, _STALE)
+        if body.voter_id != fake.ai_juror_user_id:
+            return _reject(403, _NOT_AI_JUROR)
+        post = fake.posts.get(post_id)
+        if post is None:
+            return _reject(404, "NOT_FOUND")
+        if post.voting_closed:
+            return _reject(409, _VOTING_CLOSED)
+        if body.voter_id in post.votes:
+            return _reject(409, _ALREADY_VOTED)
+        allowed = VERDICTS_BY_POST_TYPE.get(post.post_type, ())
+        reason = body.reason
+        if (
+            body.verdict not in allowed
+            or "\n" in reason
+            or "\r" in reason
+            or not 1 <= len(reason.strip()) <= JUROR_REASON_MAX
+        ):
+            return _reject(422, _INVALID_REQUEST)
+        post.votes[body.voter_id] = body.verdict
+        vote_id = str(uuid4())
+        fake.jury_votes.append(
+            {
+                "post_id": post_id,
+                "room_id": body.room_id,
+                "voter_id": body.voter_id,
+                "verdict": body.verdict,
+                "reason": reason,
+                "source": body.source,
+                "vote_id": vote_id,
+            }
+        )
+        return JSONResponse(status_code=201, content={"vote_id": vote_id})
+
     @app.get("/posts/{post_id}/verdict")
     async def post_verdict(post_id: str) -> Any:
         verdict = fake.verdict_for_post(post_id)
@@ -876,10 +1004,16 @@ def create_fake_backend(
 
 
 def _module_app() -> FastAPI:
-    """수동 가이드(03 §4.3)용. 토큰은 `SERVICE_AUTH_TOKEN` 환경변수, 판결 `v1`/`p1` 을 심는다."""
+    """수동 가이드(03 §4.3)용. 토큰은 `SERVICE_AUTH_TOKEN` 환경변수, 판결 `v1`/`p1` 을 심는다.
+
+    떼거지봇 id 는 `FAKE_AI_JUROR_USER_ID` 환경변수로만 준다(18 §3.6). 없으면 jury-votes 는
+    503 `AI_JUROR_NOT_CONFIGURED` 다 — 가짜가 값을 지어내지 않는다.
+    """
     token = os.environ.get("SERVICE_AUTH_TOKEN", "").strip() or FAKE_SERVICE_TOKEN
-    module_app = create_fake_backend(token=token)
+    juror_id = os.environ.get("FAKE_AI_JUROR_USER_ID", "").strip() or None
+    module_app = create_fake_backend(token=token, ai_juror_user_id=juror_id)
     module_app.state.fake.seed_verdict("v1", verdict_version=1, post_id="p1", deadline_at=None)
+    module_app.state.fake.seed_post("p1")
     return module_app
 
 

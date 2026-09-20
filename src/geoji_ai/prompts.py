@@ -16,12 +16,14 @@ from pathlib import Path
 from geoji_ai.domain.intensity import Intensity, parse_intensity
 
 __all__ = [
+    "JUROR_VERSION",
     "PROMPTS_DIR",
     "WRITER_VERSION",
-    "SENTENCING_PROMPT",
     "BANTER_PROMPT",
     "build_banter_system",
     "build_evaluator_system",
+    "build_juror_system",
+    "SENTENCING_PROMPT",
     "build_writer_system",
     "load_prompt",
     "prompt_bundle_version",
@@ -34,8 +36,14 @@ WRITER_VERSION = "v6.2"
 BANTER_PROMPT = "banter-v3.md"
 SENTENCING_PROMPT = "sentencing-v2.md"
 
+#: 배심원 프롬프트 버전(18 §3.3).
+JUROR_VERSION = "v1"
+
 #: 강도 섹션을 끼울 자리. 공통 파일에서 이 제목 바로 앞이다.
 _WRITER_OUTPUT_HEADER = "## 출력\n"
+
+#: 배심원 프롬프트에서 강도 섹션을 붙일 자리. 이 제목 **아래**다(18 §3.3).
+_JUROR_INTENSITY_HEADER = "## 강도\n"
 
 
 def load_prompt(path: str | Path, *, root: Path | None = None) -> str:
@@ -57,6 +65,21 @@ def build_writer_system(
     if not sep:
         raise ValueError(f"writer/common-{version}.md 에 {_WRITER_OUTPUT_HEADER.strip()!r} 가 없다")
     return head + section + sep + tail
+
+
+def build_juror_system(intensity: Intensity | str, *, root: Path | None = None) -> str:
+    """배심원 시스템 프롬프트 = `juror-v1.md` 본문 + 그 강도의 서기 강도 섹션(18 §3.3).
+
+    강도 정의는 단일 정의(06 §3.3)라 복사하지 않고 `writer/{intensity}-{WRITER_VERSION}.md` 파일을
+    그대로 재사용한다. 붙이는 자리는 `## 강도` 제목 **아래**다(서기 조립과 삽입 방식이 다르다).
+    """
+    key = parse_intensity(intensity)
+    body = load_prompt(f"juror-{JUROR_VERSION}.md", root=root)
+    section = load_prompt(f"writer/{key.value}-{WRITER_VERSION}.md", root=root)
+    head, sep, tail = body.partition(_JUROR_INTENSITY_HEADER)
+    if not sep:
+        raise ValueError(f"juror-{JUROR_VERSION}.md 에 {_JUROR_INTENSITY_HEADER.strip()!r} 가 없다")
+    return head + sep + section + tail
 
 
 def prompt_bundle_version(root: Path | None = None) -> str:

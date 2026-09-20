@@ -125,7 +125,7 @@ uv run scripts/probe_writer_latency.py --provider openai --role sentencing --n 5
 드립·서기·검수관이 같은 문체 예시를 사용한다. 자동 커피 환산과 본문 뒷부분 절단은 제거했다.
 외부 판결 계약과 DB 스키마, 모델 기본값은 유지한다.
 
-[변경 범위·검증 방법](docs/plans/18-natural-verdict-style.md)과
+[변경 범위·검증 방법](docs/plans/20-natural-verdict-style.md)과
 [실제 모델 12회 결과](outputs/validation/20260920-verdict-style/README.md)를 참고한다.
 실측은 초기 v6.0 기준이며 10응답·2타임아웃, 사유 왜곡·강도 부족을 발견했다.
 사유 이해를 보완한 v6.1에 승인된 수위를 반영한 **v6.2는 실제 모델 재검증 전이다.**
@@ -216,11 +216,12 @@ uv run python tools/gen_contracts.py
 | `REPAIR_PATH_BUDGET_SECONDS` | `15` | 복구 경로 예산 |
 | `SENTENCING_NODE_TIMEOUT_SECONDS` | `12` | 9/16 luna 실측 p90 5.7초·백엔드 관측 8.6초(옛 3) |
 | `WRITER_NODE_TIMEOUT_SECONDS` | `10` | grok 실측 p90 5.8초 + repair 여유(옛 6) |
+| `JUROR_TIMEOUT_SECONDS` | `10` | 데모 AI 배심원 모델 1회 상한(서기 노드와 같다). 작업 18 |
 | `EVALUATOR_NODE_TIMEOUT_SECONDS` | `30` | 9/16 luna 실측 13.9~17.3초, reasoning 900~1,400 토큰(옛 4 — 늘 TIMEOUT 이었다) |
 | `WORKER_POLL_MS` | `250` | 작업 2 |
 | `JOB_LEASE_SECONDS` | `15` | 작업 2 |
 | `HEARTBEAT_SECONDS` | `5` | 작업 2 |
-| `WORKER_SLOTS` | `{"SENTENCE":2,"PREPARE":1,"BACKGROUND":1}` | JSON. 작업 2 |
+| `WORKER_SLOTS` | `{"SENTENCE":2,"PREPARE":1,"BACKGROUND":1,"JURY":1}` | JSON. 작업 2. `JURY` 는 작업 18 — `.env` 에 옛 값을 적어 뒀다면 `JURY` 를 더해야 봇이 투표한다 |
 | `WORKER_SHUTDOWN_DEADLINE_SECONDS` | `10` | 종료 시 진행 중 핸들러에 주는 시간. 작업 2 |
 | `REAPER_INTERVAL_SECONDS` | `5` | `--reaper` 의 lease 회수 주기. 작업 2 |
 | `FINALIZE_RESERVE_MS` | `500` | 작업 5 |
@@ -241,6 +242,7 @@ uv run python tools/gen_contracts.py
 | `BANTER_MAX_OUTPUT_TOKENS` | `1200` | |
 | `SENTENCING_MAX_OUTPUT_TOKENS` | `2000` | 9/16 luna reasoning 이 400 을 다 먹어 형량이 RULE 로 떨어졌다(옛 400) |
 | `WRITER_MAX_OUTPUT_TOKENS` | `700` | 강도 1개당 |
+| `JUROR_MAX_OUTPUT_TOKENS` | `120` | 두 키 JSON 이면 충분하다. 작업 18 |
 | `EVALUATOR_MAX_OUTPUT_TOKENS` | `3000` | OpenAI 는 reasoning 토큰을 포함해 센다(옛 800 이면 잘림) |
 | `ROOM_COMMENT_STYLE_ENABLED` | `false` | |
 | `PUBLIC_HISTORY_CALLBACK_ENABLED` | `false` | |

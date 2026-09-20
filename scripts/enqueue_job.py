@@ -11,6 +11,7 @@ INSERT 는 원래 백엔드 몫이다(`ai_worker` 에는 INSERT 권한이 없다
     uv run scripts/enqueue_job.py --kind TEXT_RETRY --verdict v1 --version 1 --round 1
     uv run scripts/enqueue_job.py --kind RETAIN --event sentence.finalized --verdict v1 --version 1
     uv run scripts/enqueue_job.py --kind RETAIN --event comment.approved  --comment c1 --version 1
+    uv run scripts/enqueue_job.py --kind JURY_VOTE --post p1 --version 1 --room-id r1 --voter-id bot1
 
 SENTENCE 게이트(9/14 D-24, 10 §3): SENTENCE 는 기본으로 같은 post 의 PREPARE 가 `QUEUED`·`RUNNING`
 이면 끝날 때까지(최대 `--prepare-wait-seconds`, 기본 30초) 기다린 뒤 넣는다. 마감은 INSERT 시각 +
@@ -36,6 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from geoji_ai.adapters.postgres_jobs import make_engine
 from geoji_ai.contracts.jobs import (
+    JuryVotePayload,
     PreparePayload,
     RetainPayload,
     SentencePayload,
@@ -44,7 +46,7 @@ from geoji_ai.contracts.jobs import (
 from geoji_ai.core.config import get_settings, secret_value
 from geoji_ai.workers.dispatch import DEFAULT_ROUTE_BY_KIND, JOB_ROUTES, JobRoute, build_dedupe_key
 
-KINDS = ("PREPARE", "SENTENCE", "TEXT_RETRY", "RETAIN")
+KINDS = ("PREPARE", "SENTENCE", "TEXT_RETRY", "RETAIN", "JURY_VOTE")
 
 #: 10 §3 게이트 최대 대기 `confirmed_at + 30s`(D-24). 이 스크립트는 실행 시각을 확정 시각으로 본다.
 PREPARE_WAIT_SECONDS = 30.0
@@ -88,6 +90,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", type=int, required=True, help="aggregate version")
     parser.add_argument("--audience", type=int, help="audience_version (PREPARE)")
     parser.add_argument("--round", type=int, help="round (TEXT_RETRY)")
+    parser.add_argument("--room-id", help="room_id (JURY_VOTE)")
+    parser.add_argument("--voter-id", help="voter_id (JURY_VOTE). 떼거지봇 사용자 id 다.")
     parser.add_argument(
         "--wait-prepare",
         action=argparse.BooleanOptionalAction,
@@ -116,7 +120,7 @@ def pick_route(parser: argparse.ArgumentParser, args: argparse.Namespace) -> Job
 def build_payload(
     parser: argparse.ArgumentParser, args: argparse.Namespace, route: JobRoute
 ) -> dict[str, Any]:
-    """`contracts/jobs.py` 의 4형으로 만든다(`extra="forbid"`)."""
+    """`contracts/jobs.py` 의 payload 모델로 만든다(`extra="forbid"`)."""
     if args.kind == "PREPARE":
         if not args.post or args.audience is None:
             parser.error("PREPARE 는 --post 와 --audience 가 필요하다.")
@@ -128,6 +132,15 @@ def build_payload(
             parser.error("SENTENCE 는 --verdict 와 --post 가 필요하다.")
         payload = SentencePayload(
             verdict_id=args.verdict, verdict_version=args.version, post_id=args.post
+        )
+    elif args.kind == "JURY_VOTE":
+        if not args.post or not args.room_id or not args.voter_id:
+            parser.error("JURY_VOTE 는 --post 와 --room-id 와 --voter-id 가 필요하다.")
+        payload = JuryVotePayload(
+            post_id=args.post,
+            post_version=args.version,
+            room_id=args.room_id,
+            voter_id=args.voter_id,
         )
     elif args.kind == "TEXT_RETRY":
         if not args.verdict or args.round is None:

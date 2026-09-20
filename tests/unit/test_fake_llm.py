@@ -21,7 +21,7 @@ from geoji_ai.adapters.fake_llm import (
 from geoji_ai.ports.llm import LLMError, LLMPort
 from tests.conftest import load_fixture
 
-ROLES = ("intake", "context", "banter", "sentencing", "writer", "evaluator")
+ROLES = ("intake", "context", "banter", "sentencing", "writer", "evaluator", "juror")
 
 #: 스키마 모양만 흉내 낸 최소 스텁. strict 스키마 검증은 아래 `test_strict_schema_*` 가 한다.
 STUB_SCHEMA: dict[str, dict] = {
@@ -30,6 +30,7 @@ STUB_SCHEMA: dict[str, dict] = {
     "banter": {"type": "object"},
     "sentencing": {"type": "object"},
     "writer": {"type": "object", "properties": {"intensity": {"enum": ["spicy"]}}},
+    "juror": {"type": "object"},
     "evaluator": {
         "type": "object",
         "properties": {
@@ -88,6 +89,14 @@ async def test_ok_sentencing_output_is_the_fixture():
     fake = FakeLLM()
     result = await call(fake, "sentencing")
     assert result.output == load_fixture("sentencing-taxi")
+
+
+async def test_ok_juror_output_is_the_fixture():
+    """18 §3.2 `FIXTURE_BY_ROLE["juror"] = "juror-vote-taxi"`."""
+    fake = FakeLLM()
+    result = await call(fake, "juror")
+    assert result.output == load_fixture("juror-vote-taxi")
+    assert result.output["verdict"] == "guilty"
 
 
 async def test_ok_context_output_is_the_fixture():
@@ -308,6 +317,8 @@ def strict_schema(role: str) -> dict:
             return llm_schemas.writer_schema(["spicy"], ["CONVERSION"])
         case "evaluator":
             return llm_schemas.evaluator_schema(["mild", "spicy", "hell"])
+        case "juror":
+            return llm_schemas.juror_schema("spent")
     raise AssertionError(role)
 
 

@@ -105,11 +105,15 @@
 | [작업 7 — 심문관 · 프론트](archive/07-intake-frontend.md) | Intake | 9/15 | #26 | AI 파트 · **프론트** · 백엔드(submissions) |
 | [작업 8 — 장애 복구 · 관측 · 리허설 · 동결](archive/08-failure-recovery-rehearsal.md) | M4 | 9/18 | #28~#30 | AI 파트 · 백엔드(watchdog·round·시드·짤) · 프론트 |
 | [P1 로드맵](archive/09-p1-roadmap.md) | P1 | 10/6~ | #31 | 아키텍트 · 팀 |
-| [백엔드 계약서](10-backend-contract.md) | Contract | 9/8~9/17 | #1, #9, #27 + 각 절 | **백엔드 담당 필독** |
+| [백엔드 계약서](10-backend-contract.md) | Contract — 상시 계약만(9/20 정리판) | — | #1, #9, #27 + 각 절 | **백엔드 담당 필독** |
+| [백엔드 계약서 9/19 판](archive/10-backend-contract-2026-09-19.md) | 9/14~9/19 전달 21건·미결 27건·날짜별 결정 기록 원문 | — | 전부 반영됨 | 참조만 |
+| [백엔드 전달 19 — 데모 AI 배심원](19-backend-handoff-ai-juror.md) | `JURY_VOTE` · jury-votes · ai-member · 006 | 9/20 | 백엔드 할 일 6개 | **백엔드 담당** |
 | [로컬 전체 흐름 검증](archive/14-local-e2e-validation.md) | 9/15 검증·후속 계획 | — | 실제 연결의 기준선 | AI 파트 |
 | [로컬 구현·재실행](15-local-e2e-implementation.md) | 9/16 검증·증거·참고 패치 | — | 무료 E2E, PNG, 이미지 등록 | AI 파트 |
 | [프론트 반영 요청](archive/16-frontend-handoff.md) | 신규 posts·저장 PNG·관리자 파일 등록 | — | 프론트 인수인계 | 프론트 담당 |
 | [백엔드 전달 보고서 9/15](archive/17-backend-status-report-2026-09-15.md) | 백엔드 → AI: 할 일 10·질문 15·10 과 달라진 점·§0.1 반영 제안 | — | 백엔드가 쓴 보고서. 10 으로 옮기는 것은 사람(A3 는 9/16 정정, 10 §16.6) | 백엔드 담당 |
+| [작업 18 — 데모 AI 배심원 떼거지봇](18-demo-ai-juror.md) | `JURY_VOTE` 잡 · juror 역할 · 템플릿 표 | 9/20 | JV-01~06 | AI 파트 · **백엔드**(10 §0.1 9/20 행) · **프론트**(18 §2 버튼) |
+| [20 — 사유에 맞는 판결문·세 강도 문체](20-natural-verdict-style.md) | 서기 v6.2·드립 v3·양형 v2·검수 v2.2 문체 개선(codex, PR #57). 9/20 번호 충돌로 18 → 20 개명 | 9/20 | 프롬프트 | AI 파트 |
 
 ---
 
@@ -235,7 +239,8 @@ flowchart LR
 | `003` | `003_memory_call_ledger.sql` | AI(04) | 9/11 | `memory_facts`·`processed_memory_events`·`case_budgets`·`llm_calls`·`node_results` |
 | `004` | `004_verdict_generation.sql` | **백엔드**(10 §2) | 9/10 | 업무 테이블 변경 + `privacy_epochs`·`verdict_commit_records`·`text_evidence_refs` |
 | `005` | `005_memory_summaries.sql` | AI(09) | P1 | reflect |
-- AI 러너는 001~003 만 적용. 004 초안은 AI 저장소에 두고 백엔드 저장소로 이관
+| `006` | `006_jury_vote_kind.sql` | AI(18) | 9/20 | `ai.jobs.kind` CHECK 에 `JURY_VOTE` |
+- AI 러너는 001~003·006 을 적용(9/20 `MAX_OWNED_VERSION` 6, 번호 4 는 명시적으로 건너뜀). 004 초안은 AI 저장소에 두고 백엔드 저장소로 이관
 
 ### 8.2 문서 간 소유 정리
 | 항목 | 소유 | 소비 | 비고 |

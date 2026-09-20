@@ -11,7 +11,7 @@
 - 응답 완료 10건 지연: 1.691~8.845초. 타임아웃 2건 약 10초. 표본이 작아 운영 지연으로 일반화하지 않음.
 - 서기만 호출. 양형은 합성 fixture, 검수관·재작성·백엔드 저장·공유 카드는 실측하지 않음.
 - 이 보고서 작성 시 writer: `v6.1`, 번들: `bundle-24a2318ecfdf`. 초기 실측과 구분해야 함.
-- 후속 v6.2 변경·검증은 [18 수위 후속 조정](../../../docs/plans/18-natural-verdict-style.md)에 기록. 기존 JSON 결과는 재실행하거나 덮어쓰지 않음.
+- 후속 v6.2 변경·검증은 [20 수위 후속 조정](../../../docs/plans/20-natural-verdict-style.md)에 기록. 기존 JSON 결과는 재실행하거나 덮어쓰지 않음.
 
 ## 실측 원문
 
@@ -48,7 +48,7 @@
 
 ## 무료 검증과 재실행
 
-계약·단위 테스트 결과는 docs/plans/18-natural-verdict-style.md에 기록한다. 아래 dry-run은 실제 문구 품질을 평가하지 않는다.
+계약·단위 테스트 결과는 docs/plans/20-natural-verdict-style.md에 기록한다. 아래 dry-run은 실제 문구 품질을 평가하지 않는다.
 
 ```bash
 uv run scripts/probe_verdict_cards.py --case 0 --out /tmp/taxi-late-dry.json

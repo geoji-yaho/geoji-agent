@@ -34,6 +34,8 @@ from geoji_ai.ports.backend import (
     BeginGenerationResult,
     FinalizeResult,
     GenerationErrorCode,
+    JuryVoteRequest,
+    JuryVoteResult,
     ResolveEvidenceRequest,
     ResolveEvidenceResponse,
     SnapshotNotFound,
@@ -62,6 +64,8 @@ TIMEOUTS_S: dict[str, float] = {
     "begin_generation": 1.0,
     "finalize": 3.0,
     "generation_failed": 1.0,
+    # 18 §3.6(19 §5). 4xx 는 재전송하지 않는다 — 백엔드가 같은 표를 `ALREADY_VOTED` 로 받는다.
+    "cast_jury_vote": 2.0,
 }
 
 #: 03 §3.2 재전송 백오프. 길이가 곧 재전송 횟수(2회)다.
@@ -217,6 +221,17 @@ class BackendHttp:
             generation_id=generation_id,
             body=_json_bytes(body),
         )
+
+    async def cast_jury_vote(self, post_id: str, req: JuryVoteRequest) -> JuryVoteResult:
+        response = await self._send(
+            "cast_jury_vote",
+            "POST",
+            f"/internal/v1/posts/{post_id}/jury-votes",
+            job_id=req.job_id,
+            generation_id=req.generation_id,
+            body=req.model_dump_json().encode("utf-8"),
+        )
+        return self._parse(response, JuryVoteResult)
 
     # --- 내부 -----------------------------------------------------------------
 

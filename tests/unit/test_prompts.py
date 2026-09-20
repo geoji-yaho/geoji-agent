@@ -18,8 +18,10 @@ from geoji_ai.contracts.writer import CARD_STATEMENT_MAX
 from geoji_ai.domain import lexicon
 from geoji_ai.domain.validation import apply_text_rules
 from geoji_ai.prompts import (
+    JUROR_VERSION,
     PROMPTS_DIR,
     WRITER_VERSION,
+    build_juror_system,
     build_writer_system,
     load_prompt,
     prompt_bundle_version,
@@ -169,6 +171,7 @@ def test_spicy_system_has_no_hell_section() -> None:
         "banter-v2.md",
         "evaluator/guardrail-v2.md",
         "evaluator/guardrail-v1.md",
+        "juror-v1.md",
     ],
 )
 def test_prompt_files_exist(relative: str) -> None:
@@ -191,6 +194,40 @@ def test_bundle_version_changes_on_one_byte(tmp_path: Path) -> None:
     data[-1] = ord("!") if data[-1] != ord("!") else ord("?")
     target.write_bytes(bytes(data))
     assert prompt_bundle_version(copy_root) != original
+
+
+# ---------------------------------------------------------------------------
+# 배심원 프롬프트(18 §3.3·§4.2)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("intensity", ["mild", "spicy", "hell"])
+def test_juror_system_is_body_plus_that_intensity_section(intensity: str) -> None:
+    """`juror-v1.md` 본문 + `writer/{intensity}-{WRITER_VERSION}.md` 를 `## 강도` 아래에."""
+    system = build_juror_system(intensity)
+    body = load_prompt(f"juror-{JUROR_VERSION}.md")
+    section = load_prompt(f"writer/{intensity}-{WRITER_VERSION}.md")
+
+    head, sep, tail = body.partition("## 강도\n")
+    assert sep, "juror 프롬프트에 `## 강도` 제목이 있어야 한다"
+    assert system == head + sep + section + tail
+    assert system.index("## 강도") < system.index(section.splitlines()[0])
+    # 본문의 고정 규칙이 그대로 남아 있다.
+    assert "60자 이내" in system
+    assert "allowed_verdicts" in system
+
+
+def test_juror_system_differs_per_intensity() -> None:
+    systems = [build_juror_system(i) for i in ("mild", "spicy", "hell")]
+    assert len(set(systems)) == 3
+    hell_section = load_prompt(f"writer/hell-{WRITER_VERSION}.md").strip()
+    assert hell_section in build_juror_system("hell")
+    assert hell_section not in build_juror_system("spicy")
+
+
+def test_juror_system_rejects_unknown_intensity() -> None:
+    with pytest.raises(ValueError):
+        build_juror_system("HELL")
 
 
 def test_unknown_intensity_rejected() -> None:

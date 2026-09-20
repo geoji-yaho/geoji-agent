@@ -17,6 +17,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from geoji_ai.application.jury_vote_case import JuryVoteHandler
 from geoji_ai.application.llm_gateway import ScopedLLM
 from geoji_ai.application.prepare_case import PrepareHandler
 from geoji_ai.application.retain_memory import RetainHandler
@@ -109,6 +110,16 @@ JOB_ROUTES: dict[str, JobRoute] = {
         dedupe_template="retain:comment:{comment_id}:{version}",
         aggregate_fields=("comment_id", "version"),
     ),
+    # 18 §3.1 = 10 §3 새 행. 데모 AI 배심원(떼거지봇) 한 표. 마감 없음.
+    "jury.vote_requested": JobRoute(
+        event_type="jury.vote_requested",
+        kind="JURY_VOTE",
+        priority=60,
+        max_attempts=2,
+        deadline_after_s=None,
+        dedupe_template="jury-vote:{post_id}:{room_id}:{voter_id}",
+        aggregate_fields=("post_id", "post_version"),
+    ),
 }
 
 
@@ -133,11 +144,14 @@ def build_dedupe_key(route: JobRoute, payload: Mapping[str, Any]) -> str:
     return route.dedupe_template.format(**payload)
 
 
-#: 02 §3.3 슬롯 3종. 슬롯마다 독립 claim loop 이 돌고 이 `kinds` 로 필터한다.
+#: 02 §3.3 슬롯. 슬롯마다 독립 claim loop 이 돌고 이 `kinds` 로 필터한다.
+#: JURY 는 18 §3.1 이 더한 슬롯이다. BACKGROUND 에 넣지 않는 이유: TEXT_RETRY(최대 60초) 뒤에
+#: 줄을 서면 데모의 5~10초 약속이 깨진다.
 SLOT_KINDS: dict[str, tuple[str, ...]] = {
     "SENTENCE": ("SENTENCE",),
     "PREPARE": ("PREPARE",),
     "BACKGROUND": ("TEXT_RETRY", "RETAIN"),
+    "JURY": ("JURY_VOTE",),
 }
 
 
@@ -193,6 +207,7 @@ HANDLERS: dict[str, Handler] = {
     "SENTENCE": _sentence,
     "TEXT_RETRY": _sentence,
     "RETAIN": RetainHandler(),
+    "JURY_VOTE": JuryVoteHandler(),
 }
 
 
