@@ -7,7 +7,7 @@
 | 201 `{vote_id}` · skip(방 없음) | `complete` |
 | 409 `VOTING_CLOSED` · `ALREADY_VOTED` | `complete` + 로그 `jury_vote_skipped`(정상 종료) |
 | 409 `STALE_GENERATION` | `complete`(결과 폐기) |
-| 404 `NOT_FOUND`(snapshot 또는 cast) | `cancel(SNAPSHOT_NOT_FOUND)` |
+| 404 `NOT_FOUND`(snapshot 또는 cast) | `cancel(SNAPSHOT_NOT_FOUND)`. 본문 없는 404 는 "그 밖" |
 | 403 `NOT_AI_JUROR` | `fail("NOT_AI_JUROR", retry_after_s=None)` |
 | 401 · 그 밖의 403 | `fail("BACKEND_AUTH", 60)` |
 | 422 `INVALID_REQUEST` | `fail("SCHEMA_INVALID", None)` |
@@ -44,6 +44,7 @@ BACKEND_UNAVAILABLE = "BACKEND_UNAVAILABLE"
 BACKEND_AUTH = "BACKEND_AUTH"
 BACKEND_AUTH_RETRY_AFTER_S = 60
 NOT_AI_JUROR = "NOT_AI_JUROR"
+NOT_FOUND = "NOT_FOUND"
 SCHEMA_INVALID = "SCHEMA_INVALID"
 SNAPSHOT_NOT_FOUND = "SNAPSHOT_NOT_FOUND"
 
@@ -101,7 +102,9 @@ async def _settle_backend_error(job: Job, ctx: _Context, exc: Exception) -> bool
     code = getattr(exc, "code", None)
     if not isinstance(status, int) or not isinstance(code, str):
         return False
-    if status == 404:
+    if status == 404 and code == NOT_FOUND:
+        # 계약의 404 `NOT_FOUND` 만 삭제로 본다. 본문 없는 404(`HTTP_404`, 경로 미배포 등)는
+        # 아래 else 로 가서 재시도·알림 대상이다(리뷰 9/20)
         await ctx.jobs.cancel(
             job.id, ctx.worker_id, ctx.generation_id, error_code=SNAPSHOT_NOT_FOUND
         )

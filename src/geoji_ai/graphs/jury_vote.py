@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -40,13 +41,14 @@ from geoji_ai.application import instrument
 from geoji_ai.application.llm_gateway import CallScope, ScopedLLM, case_scope
 from geoji_ai.contracts.case import CaseSnapshot
 from geoji_ai.contracts.jobs import Job, JuryVotePayload, parse_payload
-from geoji_ai.contracts.juror import JUROR_REASON_MAX, JurorVote
+from geoji_ai.contracts.juror import JurorVote
 from geoji_ai.contracts.llm_schemas import VERDICTS_BY_POST_TYPE, juror_schema
 from geoji_ai.core.config import Settings
 from geoji_ai.core.logging import get_logger
 from geoji_ai.domain.intensity import Intensity, parse_intensity
 from geoji_ai.ports.backend import BackendPort, JuryVoteRequest
 from geoji_ai.ports.llm import LLMError, LLMPort
+from geoji_ai.ports.preparation import EvidenceInvalidated
 from geoji_ai.prompts import build_juror_system, prompt_bundle_version
 
 __all__ = [
@@ -86,6 +88,8 @@ class JuryVoteState(TypedDict):
     intensity: Intensity | None
     #: juror 노드가 받은 모델 출력 그대로. 검증 전이라 계약을 지킨다는 보장이 없다.
     raw_output: dict[str, Any] | None
+    #: 게이트웨이 경로의 `ScopedResult`. 검증을 지난 뒤 `remember` 에 돌려준다(원장·재사용 캐시).
+    scoped: Any | None
     verdict: str | None
     reason: str | None
     source: Literal["AI", "TEMPLATE"] | None
@@ -144,27 +148,24 @@ def template_vote(
 def validate_juror_output(output: Any, post_type: str) -> tuple[str, str] | None:
     """모델 출력이 계약을 지키면 (평결, 턴 사유). 아니면 None(→ 템플릿).
 
-    ① 유형별 허용 평결 2개 안 ② 사유에 줄바꿈 없음 ③ 앞뒤 공백을 턴 뒤 1~60 code point.
+    ① 키는 `verdict`·`reason` 둘뿐(모르는 키가 섞인 출력은 받지 않는다) ② 유형별 허용 평결 2개 안
+    ③ 사유에 줄바꿈 없음 ④ 앞뒤 공백을 턴 뒤 1~60 code point — 길이는 `JurorVote` 계약이 검사한다.
     """
-    if not isinstance(output, dict):
+    if not isinstance(output, dict) or set(output) != {"verdict", "reason"}:
         return None
-    verdict = output.get("verdict")
-    reason = output.get("reason")
+    verdict = output["verdict"]
+    reason = output["reason"]
     if not isinstance(verdict, str) or not isinstance(reason, str):
         return None
     if verdict not in VERDICTS_BY_POST_TYPE.get(post_type, ()):
         return None
     if "\n" in reason or "\r" in reason:
         return None
-    trimmed = reason.strip()
-    if not 1 <= len(trimmed) <= JUROR_REASON_MAX:
-        return None
-    # `extra="forbid"` 계약으로 한 번 더 확인한다(모르는 키가 섞인 출력은 받지 않는다).
     try:
-        JurorVote.model_validate({"verdict": verdict, "reason": trimmed})
+        vote = JurorVote.model_validate({"verdict": verdict, "reason": reason.strip()})
     except Exception:
         return None
-    return verdict, trimmed
+    return vote.verdict, vote.reason
 
 
 def _juror_messages(snapshot: CaseSnapshot, intensity: Intensity) -> list[dict]:
@@ -192,11 +193,16 @@ async def call_juror(
     intensity: Intensity,
     *,
     scope: CallScope | None = None,
-) -> dict[str, Any] | None:
-    """배심원 1회 호출. 출력(dict) 또는 None(거절·잘림). 오류는 호출자에게 올린다."""
+) -> tuple[dict[str, Any] | None, Any]:
+    """배심원 1회 호출. (출력 dict 또는 None(거절·잘림), 게이트웨이 `ScopedResult` 또는 None).
+
+    오류는 호출자에게 올린다. 게이트웨이 경로의 timeout·재시도 대기는 `scope.remaining_s` 가
+    묶는다(호출자가 `JUROR_TIMEOUT_SECONDS` 기준으로 넣는다).
+    """
     timeout = max(float(settings.JUROR_TIMEOUT_SECONDS) - _TIMEOUT_RESERVE_S, 0.1)
     messages = _juror_messages(snapshot, intensity)
     schema = juror_schema(str(snapshot.post_type))
+    scoped = None
     async with semaphore:
         if isinstance(llm, ScopedLLM):
             if scope is None:
@@ -222,8 +228,8 @@ async def call_juror(
                 timeout=timeout,
             )
     if result.stop_reason != "stop" or not isinstance(result.output, dict):
-        return None
-    return dict(result.output)
+        return None, scoped
+    return dict(result.output), scoped
 
 
 # --- 그래프 -----------------------------------------------------------------------
@@ -267,6 +273,14 @@ def build_jury_vote_graph(deps: JuryVoteDeps) -> Any:
         if deps.llm is None:
             log.info("jury_vote_call", intensity=intensity.value, error="no_llm")
             return {"fallback_reason": "no_llm"}
+        # 게이트웨이의 timeout·재시도 대기(Retry-After)를 이 노드의 상한 안에 묶는다.
+        # 없으면 remaining 이 무한대라 429 한 번에 수십 초를 잘 수 있다(리뷰 9/20).
+        started = time.monotonic()
+        budget_s = float(settings.JUROR_TIMEOUT_SECONDS)
+
+        def remaining_s() -> float:
+            return max(budget_s - (time.monotonic() - started), 0.0)
+
         scope = case_scope(
             snapshot,
             node="juror",
@@ -275,12 +289,19 @@ def build_jury_vote_graph(deps: JuryVoteDeps) -> Any:
             generation_id=deps.generation_id,
             prompt_version=deps.prompt_version,
             policy_version=settings.GUARDRAIL_POLICY_VERSION,
+            remaining_s=remaining_s,
+            reserve_s=_TIMEOUT_RESERVE_S,
         )
-        timeout = max(float(settings.JUROR_TIMEOUT_SECONDS) - _TIMEOUT_RESERVE_S, 0.1)
+        timeout = max(budget_s - _TIMEOUT_RESERVE_S, 0.1)
         try:
-            output = await call_juror(
+            output, scoped = await call_juror(
                 deps.llm, deps.semaphore, settings, snapshot, intensity, scope=scope
             )
+        except EvidenceInvalidated:
+            # D-26: 모델 호출 직전 epoch 가 달라졌다(삭제·공유 철회). 모델을 부르지 않고
+            # 템플릿 표로 간다 — 백엔드가 VOTING_CLOSED·404 로 정리한다.
+            log.info("jury_vote_call", intensity=intensity.value, error="EVIDENCE_INVALIDATED")
+            return {"fallback_reason": "evidence_invalidated"}
         except LLMError as exc:
             log.warning(
                 "jury_vote_call",
@@ -296,8 +317,8 @@ def build_jury_vote_graph(deps: JuryVoteDeps) -> Any:
             return {"fallback_reason": "llm_error:TIMEOUT"}
         log.info("jury_vote_call", intensity=intensity.value, timeout_s=timeout, error=None)
         if output is None:
-            return {"fallback_reason": "no_output"}
-        return {"raw_output": output}
+            return {"fallback_reason": "no_output", "scoped": scoped}
+        return {"raw_output": output, "scoped": scoped}
 
     async def validate_node(state: JuryVoteState) -> dict[str, Any]:
         snapshot = state["snapshot"]
@@ -319,6 +340,10 @@ def build_jury_vote_graph(deps: JuryVoteDeps) -> Any:
             source = "AI"
             outcome = "AI"
             fallback_reason = None
+            # 검증을 지난 출력만 원장·재사용 캐시에 남긴다(서기·검수와 같은 규칙).
+            scoped = state.get("scoped")
+            if scoped is not None and isinstance(deps.llm, ScopedLLM):
+                await deps.llm.remember(scoped)
         return {
             "verdict": verdict,
             "reason": reason,
@@ -370,6 +395,7 @@ def _initial_state(job: Job) -> JuryVoteState:
         "snapshot": None,
         "intensity": None,
         "raw_output": None,
+        "scoped": None,
         "verdict": None,
         "reason": None,
         "source": None,

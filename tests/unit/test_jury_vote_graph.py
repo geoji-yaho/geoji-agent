@@ -479,3 +479,60 @@ async def test_모델이_상한을_넘기면_TimeoutError_로_템플릿이다():
     assert (state["verdict"], state["reason"]) == (verdict, reason)
     assert len(backend.casts) == 1
     assert backend.casts[0][1].source == "TEMPLATE"
+
+
+# ---------------------------------------------------------------------------
+# ⑪ 리뷰 9/20 — 게이트웨이 remaining_s·remember, EvidenceInvalidated, 모르는 키
+# ---------------------------------------------------------------------------
+
+
+async def test_게이트웨이_scope_는_노드_상한으로_묶이고_검증_뒤_remember_한다():
+    gateway = RecordingScopedLLM()
+    state, _, _ = await run(llm=gateway)
+
+    scope = gateway.scopes[0]
+    assert scope.remaining_s is not None
+    assert 0 < scope.remaining_s() <= Settings(_env_file=None).JUROR_TIMEOUT_SECONDS
+    assert scope.reserve_s == pytest.approx(0.2)
+    assert state["outcome"] == "AI"
+    assert len(gateway.remembered) == 1
+
+
+async def test_검증에_떨어진_출력은_remember_하지_않는다():
+    class BadScopedLLM(RecordingScopedLLM):
+        def __init__(self) -> None:
+            super().__init__()
+            self.inner = FakeLLM(outputs={"juror": {"verdict": "guilty", "reason": ""}})
+
+    gateway = BadScopedLLM()
+    state, _, _ = await run(llm=gateway)
+
+    assert state["outcome"] == "TEMPLATE"
+    assert gateway.remembered == []
+
+
+async def test_epoch_불일치는_모델_없이_템플릿으로_간다():
+    from geoji_ai.ports.preparation import EvidenceInvalidated
+
+    class InvalidatedScopedLLM(RecordingScopedLLM):
+        async def scoped_call(self, scope: Any, **kw: Any) -> Any:
+            self.scopes.append(scope)
+            raise EvidenceInvalidated(["post:p1"])
+
+    gateway = InvalidatedScopedLLM()
+    state, backend, _ = await run(llm=gateway)
+
+    assert state["outcome"] == "TEMPLATE"
+    assert state["fallback_reason"] == "evidence_invalidated"
+    assert len(backend.casts) == 1
+    assert backend.casts[0][1].source == "TEMPLATE"
+
+
+async def test_모르는_키가_섞인_출력은_템플릿이다():
+    model = FakeLLM(
+        outputs={"juror": {"verdict": "guilty", "reason": "택시비 치고 비싸요", "foo": 1}}
+    )
+    state, _, _ = await run(llm=model)
+
+    assert state["outcome"] == "TEMPLATE"
+    assert state["fallback_reason"] == "invalid_output"

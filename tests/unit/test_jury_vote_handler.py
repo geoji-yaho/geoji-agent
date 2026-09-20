@@ -210,3 +210,11 @@ async def test_BackendUnavailable_은_retry_after_를_그대로_싣는다():
 async def test_모르는_예외는_상위로_올린다():
     with pytest.raises(RuntimeError):
         await run_handler(cast_error=RuntimeError("boom"))
+
+
+async def test_본문_없는_404_는_삭제가_아니라_fail_이다():
+    """리뷰 9/20: 경로 미배포(Spring 404, `HTTP_404`)를 삭제로 오인해 cancel 하지 않는다."""
+    ctx = await run_handler(cast_error=Rejected(404, "HTTP_404"))
+
+    assert ctx.jobs.cancelled == []
+    assert ctx.jobs.failures == [("HTTP_404", None)]

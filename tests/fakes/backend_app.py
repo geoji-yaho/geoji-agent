@@ -119,7 +119,7 @@ _SENTENCE_ROUTE = JOB_ROUTES["verdict.confirmed"]
 #: 10 §3 SENTENCE 게이트 최대 대기 `confirmed_at + 30s`(9/14 D-24).
 SENTENCE_GATE_WAIT = timedelta(seconds=30)
 #: 10 §8 무효화 트랜잭션이 끄는 job kind(9/14 D-26).
-INVALIDATED_JOB_KINDS: tuple[str, ...] = ("PREPARE", "SENTENCE", "TEXT_RETRY")
+INVALIDATED_JOB_KINDS: tuple[str, ...] = ("PREPARE", "SENTENCE", "TEXT_RETRY", "JURY_VOTE")
 _SNAPSHOT_FIXTURE = "case-snapshot-taxi"
 
 #: resolve-evidence 의 고정 aggregates. fixture 에 집계 값이 없어 테스트용으로 둔 값이다
@@ -210,7 +210,8 @@ _CANCEL_POST_JOBS_SQL = text(
     """
     UPDATE ai.jobs SET status = 'CANCELLED', owner_id = NULL, generation_id = NULL,
            lease_until = NULL, updated_at = now()
-    WHERE kind IN ('PREPARE', 'SENTENCE', 'TEXT_RETRY') AND status IN ('QUEUED', 'RUNNING')
+    WHERE kind IN ('PREPARE', 'SENTENCE', 'TEXT_RETRY', 'JURY_VOTE')
+      AND status IN ('QUEUED', 'RUNNING')
       AND (payload->>'post_id' = :post_id
            OR (kind = 'TEXT_RETRY' AND payload->>'verdict_id' = ANY(:verdict_ids)))
     RETURNING CAST(id AS text) AS id

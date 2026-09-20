@@ -15,6 +15,7 @@
 | 4 | 새 내부 API `POST /internal/v1/posts/{postId}/jury-votes` → `PostVoteService.cast(postId, 봇, …)` | §5 | 미전달 |
 | 5 | 새 공개 API `POST /api/rooms/{roomId}/ai-member` — 봇 멤버 추가 + 템플릿 글 2개, 멱등 | §6·§7 | 미전달 |
 | 6 | 테스트 DDL 복사본 `001_ai_jobs.sql` 의 `kind` CHECK 에 `'JURY_VOTE'`(운영 DB 는 AI 마이그레이션 006 이 바꾼다) | §8 | 미전달 |
+| 7 | 삭제·공유 철회 무효화 트랜잭션(10 §8 D-26)이 `CANCELLED` 로 바꾸는 kind 목록에 `JURY_VOTE` 추가(`payload->>'post_id'` 로 찾는다) | 10 §8 | 미전달 |
 
 AI 파트가 할 일(참고): 006 을 운영 DB 에 적용(②를 배포하기 **전에**), 새 이미지 태그 전달. 프론트 버튼은 18 §2.
 
