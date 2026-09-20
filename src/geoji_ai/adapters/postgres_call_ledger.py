@@ -46,11 +46,15 @@ VERSION_KEYS: tuple[str, ...] = ("model_id", "prompt_version", "policy_version",
 
 _OPEN_STATUSES = "('RESERVED','SENT')"
 
+# 상한을 올린 이미지를 배포하면 **이미 있는 행에도** 듣게 한다. DO NOTHING 이면 먼저 만들어진
+# 사건이 옛 상한을 영원히 들고 가서 상수를 고쳐도 아무 일이 안 난다(9/20).
+# 내리지는 않는다(GREATEST). 진행 중인 사건의 예약을 사후에 깨뜨리지 않기 위해서다.
 _ENSURE_BUDGET_SQL = text(
     """
     INSERT INTO ai.case_budgets (post_id, cap_micro_usd)
     VALUES (:post_id, :cap)
-    ON CONFLICT (post_id) DO NOTHING
+    ON CONFLICT (post_id) DO UPDATE
+       SET cap_micro_usd = GREATEST(case_budgets.cap_micro_usd, EXCLUDED.cap_micro_usd)
     """
 )
 

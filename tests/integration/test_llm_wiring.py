@@ -64,6 +64,11 @@ FetchJob = Callable[[str], Awaitable[dict[str, Any]]]
 LOW_CAP_MICRO_USD = 1_500
 HELL_MODEL = "gpt-5.6-terra"
 
+#: ⑭ 의 cap. hell 검수 예약(출력 3000 × terra 12.0 = 36,000 + 입력)만으로 넘게 만드는 값이고
+#: 제품 상한이 아니다. 예전에는 제품 상한(40원 = 27,586)이 마침 이 자리였는데 100원으로
+#: 올리면서 경계가 사라졌다(9/20). 경계를 테스트에 박아 둔다.
+HELL_EVAL_CAP_MICRO_USD = 27_586
+
 
 # --- 준비물 ----------------------------------------------------------------------
 
@@ -404,13 +409,16 @@ async def test_14_hell_별도_검수는_MODEL_EVALUATOR_HELL_모델로_원장에
     )
     assert settings.MODEL_EVALUATOR_HELL != settings.MODEL_JUDGMENT
     assert price_for(HELL_MODEL) is not None
-    wired = wire(env.engine, settings, hell=True)
+    cap = HELL_EVAL_CAP_MICRO_USD if max_tokens == 3000 else CASE_CAP_MICRO_USD
+    wired = wire(env.engine, settings, hell=True, cap=cap)
 
     job_id = await env.sentence(wired.gateway, settings=settings)
 
     assert (await env.fetch_job(job_id))["status"] == "SUCCEEDED"
     if max_tokens == 3000:
         # 고가 모델의 출력 예약액만으로 사건 cap을 넘으면 실제 호출하지 않는다.
+        # cap 은 HELL_EVAL_CAP_MICRO_USD 로 박아 둔다. 제품 상한을 따라가면 상한을 올릴 때마다
+        # 이 경계가 조용히 사라진다.
         assert env.backend.finalized == []
         assert env.backend.failed == ["BUDGET_EXCEEDED"]
         assert roles(wired.hell) == Counter()

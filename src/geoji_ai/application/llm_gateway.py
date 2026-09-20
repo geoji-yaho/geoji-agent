@@ -168,10 +168,14 @@ def case_scope(
     model_override: str | None = None,
     remaining_s: Callable[[], float] | None = None,
     reserve_s: float = 0.0,
+    budget_key: str | None = None,
 ) -> CallScope:
-    """사건 스냅샷 기준 `CallScope`. 예산 키 `budget_key_for_post(post_id)`, 빈 id 는 None."""
+    """사건 스냅샷 기준 `CallScope`. 예산 키 `budget_key_for_post(post_id)`, 빈 id 는 None.
+
+    `budget_key` 를 주면 그 키를 쓴다. 사건 예산과 따로 두는 호출(배심원)이 쓴다.
+    """
     return CallScope(
-        budget_key=budget_key_for_post(snapshot.post_id),
+        budget_key=budget_key or budget_key_for_post(snapshot.post_id),
         node=node,
         call_index=call_index,
         generation_id=generation_id or None,
@@ -327,7 +331,17 @@ class LLMGateway:
         try:
             call_id = await self._ledger.reserve(scope.budget_key, spec)
         except BudgetExceeded as exc:
-            log.info("llm_budget_exceeded", node=scope.node, est_max_micro_usd=est)
+            # 어느 예산이 얼마나 찼는지 같이 남긴다. est_max 만으로는 상한 소진인지
+            # 예약 누수인지 로그로 못 가른다(9/20 운영 진단).
+            log.info(
+                "llm_budget_exceeded",
+                node=scope.node,
+                budget_key=scope.budget_key,
+                est_max_micro_usd=est,
+                cap_micro_usd=exc.cap_micro_usd,
+                spent_micro_usd=exc.spent_micro_usd,
+                reserved_micro_usd=exc.reserved_micro_usd,
+            )
             raise LLMError("BUDGET", message=str(exc)) from exc
         except Exception as exc:
             log.error(
