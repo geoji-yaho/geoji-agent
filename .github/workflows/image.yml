@@ -1,0 +1,41 @@
+# 운영 이미지(ai-api·ai-worker 공용)를 GHCR 에 올린다.
+#
+# EC2(t3.micro 급, 가용 메모리 300MB 대)에서 직접 빌드하면 uv sync 가 스왑으로 밀려
+# 돌고 있는 ai-worker 를 위협한다. 빌드는 여기서 하고 EC2 는 pull 만 한다.
+# 태그 규칙은 runbook §6 의 `ai-YYYYMMDD-N`.
+name: 운영 이미지 빌드
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 이미지 태그 (ai-YYYYMMDD-N)
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ inputs.tag }}
+
+      # 배포 전 대조값. 이 값이 EC2 에서 확인할 prompt_bundle_version 과 같아야 한다
+      - name: 번들 대조값
+        run: |
+          docker run --rm ghcr.io/${{ github.repository }}:${{ inputs.tag }} \
+            python -c "from geoji_ai.prompts import prompt_bundle_version as v; print(v())"
