@@ -317,7 +317,7 @@ AI `Settings` 는 프로세스 환경변수를 `.env` 보다 우선한다. 키�
 | `APP_ENV` | `production` | 개발 모드(기동 검사 느슨) |
 | `GUARDRAIL_POLICY_VERSION` | `guardrail-v2` | **기동 실패.** production 은 환경에 직접 적어야 한다 |
 | `OPENAI_API_KEY` · `XAI_API_KEY` | AI 파트가 전달 | `/health/ready` 503, intake 폴백 |
-| `DATABASE_URL` | Supabase Session Pooler(`ai_api`/`ai_worker` role). `postgresql://` 그대로 줘도 된다 | `/health/ready` 503 |
+| `AI_API_DATABASE_URL` · `AI_WORKER_DATABASE_URL` | Supabase Session Pooler 를 role 별로(`ai_api`/`ai_worker`). `postgresql://` 그대로 줘도 된다. compose 가 서비스마다 이것을 `DATABASE_URL` 로 넘긴다 — 코드가 읽는 이름은 `DATABASE_URL` 하나다 | API `/health/ready` 503 · **워커 기동 실패**(`DATABASE_URL 이 비어 있다`) |
 | `BACKEND_INTERNAL_URL` | 백엔드 호스트 루트(예: `http://127.0.0.1:18080`), `/internal/v1` 을 붙이지 않는다 | **워커 기동 실패** |
 | `SERVICE_AUTH_TOKEN` | 내부 API 서비스 토큰(양쪽 같은 값) | 전부 401 |
 | `ALERT_DISCORD_WEBHOOK_URL` | 팀 디스코드 웹훅 | 알림 없음 |
