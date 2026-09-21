@@ -11,6 +11,8 @@ services:
       APP_ENV: production
       # production 은 환경에 직접 적어야 한다. 없으면 기동 실패(10 §16.1)
       GUARDRAIL_POLICY_VERSION: ${GUARDRAIL_POLICY_VERSION:-guardrail-v2}
+      # 백엔드는 role 별로 두 키를 준다. 코드가 읽는 이름은 DATABASE_URL 하나다(10 §16.1)
+      DATABASE_URL: ${AI_API_DATABASE_URL:?AI_API_DATABASE_URL 이 .env 에 없다}
     ports:
       # 백엔드(EB)가 부르는 포트. 보안 그룹에서 백엔드 쪽만 열어 준다
       - "8000:8000"
@@ -32,6 +34,7 @@ services:
     environment:
       APP_ENV: production
       GUARDRAIL_POLICY_VERSION: ${GUARDRAIL_POLICY_VERSION:-guardrail-v2}
+      DATABASE_URL: ${AI_WORKER_DATABASE_URL:?AI_WORKER_DATABASE_URL 이 .env 에 없다}
     # 운영에서 reaper 는 백엔드 스케줄러가 돈다 — 워커 --reaper 는 끈다(10 §16.3)
     command: ["geoji-ai", "worker"]
     depends_on:
