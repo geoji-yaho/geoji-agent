@@ -1,0 +1,69 @@
+name: 🚨 운영 장애
+description: 심사·서비스 중 AI 파트가 제 역할을 못 한다
+labels: ["ops"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### 🚨 운영 장애
+        먼저 runbook §4 의 진단 순서를 밟는다. **워커가 살아 있는지부터** 본다 —
+        `docker ps` 는 `Status` 열까지 봐야 크래시 루프를 놓치지 않는다.
+
+  - type: checkboxes
+    id: triage
+    attributes:
+      label: 🔍 먼저 확인한 것
+      options:
+        - label: "`docker ps` 의 Status 열 — 워커가 `Up` 으로 유지되나 (`Restarting` 아닌가)"
+        - label: "`curl localhost:8000/health/ready` 가 200 인가"
+        - label: "이미지 태그와 `prompt_bundle_version` 이 배포하려던 것과 같은가"
+        - label: "워커 로그에 `sentence_summary` 가 찍히는가 (잡이 들어오고 있는가)"
+
+  - type: textarea
+    id: symptom
+    attributes:
+      label: 💥 증상
+      description: 사용자에게 무엇이 보이나
+      placeholder: 판결문이 전부 "배심원단이 이 지출을 유죄로 판단했습니다" 로 나온다
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 📊 범위
+      options:
+        - 전부
+        - 일부 (간헐)
+        - 특정 강도·기능만
+        - 모르겠음
+    validations:
+      required: true
+
+  - type: textarea
+    id: timeline
+    attributes:
+      label: ⏱ 언제부터 · 직전에 바뀐 것
+      description: 배포·환경변수·백엔드 변경이 있었는지
+      placeholder: |
+        - 언제부터:
+        - 직전 변경:
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 🧾 로그
+      description: "`sentence_summary` 의 `outcome`·`source`·`fallback_reason` 이 핵심이다"
+      render: json
+
+  - type: dropdown
+    id: rollback
+    attributes:
+      label: ⏮ 롤백했나
+      options:
+        - 아직 (조사 중)
+        - 했다 — 증상 사라짐
+        - 했다 — 증상 그대로
+        - 롤백 대상 이미지가 없다
