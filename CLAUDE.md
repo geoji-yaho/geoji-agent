@@ -5,6 +5,7 @@
 ## 규칙
 
 - 문서와 주석, 커밋 메시지, 응답은 한국어. 코드 식별자는 영어
+- Always write Korean (and other non-ASCII) strings in tool-call parameters as literal UTF-8; never as \\uXXXX unicode escape style.
 - 정본은 `docs/plans/`다. 문서는 `10 §15.2`, `01 CT-07`처럼 번호와 절로 부른다. 골격과 결정 기록 절차는 `.claude/rules/plans-format.md`
 - Git: `.claude/rules/git-workflow.md`. `type(scope): 한국어 제목`, 계획서 갱신은 `docs(plans)`. `.env`는 `git add` 하지 않는다
 - 용어: `.claude/rules/domain-vocabulary.md`. enum은 프론트 값이 표준이다(D-21)
@@ -25,3 +26,4 @@
 ## 자주 틀리는 것
 
 <!-- TODO 실제로 틀렸던 것만 적는다 -->
+
