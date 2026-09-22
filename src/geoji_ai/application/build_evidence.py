@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import uuid
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
@@ -36,6 +37,7 @@ from geoji_ai.ports.preparation import EVIDENCE_TEXT_MAX, Dossier, EvidenceFact
 __all__ = [
     "RuleMatcher",
     "build_evidence",
+    "evidence_text",
     "no_rule_match",
     "resolve_label",
     "snapshot_hash",
@@ -56,6 +58,17 @@ AGGREGATE = "AGGREGATE"
 
 # resolve-evidence `sources[].source_type` → fact_type (04 §3.3 source 열)
 _SOURCE_FACT_TYPE = {"POST": SPEND, "VERDICT": VERDICT}
+
+# 프론트 정본: geoji-web/src/shared/domain/tier.ts. 계약의 enum 값은 바꾸지 않는다.
+_TIER_LABELS = {"king": "거지왕", "flower": "꽃거지", "hardcore": "상거지", "penniless": "무일푼"}
+_AGGREGATE_TIER = re.compile(r"(?<=티어 )(?:king|flower|hardcore|penniless)(?=,|$)")
+
+
+def evidence_text(fact: EvidenceFact) -> str:
+    """재사용 근거도 모델 입력에서는 한글 티어로 표시한다. 저장 원문은 수정하지 않는다."""
+    if fact.fact_type == AGGREGATE and fact.epistemic_type == DB_RECORD:
+        return _AGGREGATE_TIER.sub(lambda match: _TIER_LABELS[match[0]], fact.text)
+    return fact.text
 
 
 @dataclass(frozen=True)
@@ -145,9 +158,14 @@ def _aggregates(snapshot: CaseSnapshot, aggregates: Aggregates) -> list[_Draft]:
         return []
 
     scope = _audience_scope(snapshot)
+    tier = _TIER_LABELS.get(aggregates.tier)
+    if tier is None and aggregates.tier in _TIER_LABELS.values():
+        tier = aggregates.tier
+    # 알 수 없는 코드로 표시명을 추측하지 않는다. 나머지 집계는 그대로 쓴다.
+    tier_clause = f"티어 {tier}, " if tier is not None else ""
     status = (
         f"이번 달 예산 소진율 {round(aggregates.burn_rate * 100)}%, "
-        f"티어 {aggregates.tier}, 무지출 {aggregates.no_spend_days}일."
+        f"{tier_clause}무지출 {aggregates.no_spend_days}일."
     )
     repeat = f"최근 30일 같은 카테고리 확정 소비 {aggregates.repeat_same_category_30d}건."
     return [

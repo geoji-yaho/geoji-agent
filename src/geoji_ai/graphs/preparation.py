@@ -37,7 +37,7 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 
 from geoji_ai.application import instrument
-from geoji_ai.application.build_evidence import build_evidence, target_pack
+from geoji_ai.application.build_evidence import build_evidence, evidence_text, target_pack
 from geoji_ai.application.llm_gateway import CallScope, ScopedLLM, case_scope
 from geoji_ai.contracts.case import CaseSnapshot, VerdictResult
 from geoji_ai.contracts.jobs import Job, PreparePayload, parse_payload
@@ -289,7 +289,7 @@ def _parse_candidates(output: Mapping[str, Any] | None) -> list[Candidate]:
 
 
 def _evidence_lines(facts: Iterable[EvidenceFact]) -> list[dict[str, str]]:
-    return [{"label": fact.label, "text": fact.text} for fact in facts]
+    return [{"label": fact.label, "text": evidence_text(fact)} for fact in facts]
 
 
 def _dumps(value: Any) -> str:

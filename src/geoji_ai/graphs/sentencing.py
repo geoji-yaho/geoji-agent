@@ -81,7 +81,7 @@ from langgraph.graph import END, START, StateGraph
 from pydantic import ValidationError
 
 from geoji_ai.application import instrument
-from geoji_ai.application.build_evidence import build_evidence
+from geoji_ai.application.build_evidence import build_evidence, evidence_text
 from geoji_ai.application.llm_gateway import (
     ScopedLLM,
     case_scope,
@@ -429,7 +429,7 @@ def _facts_view(dossier: Dossier | None) -> list[dict[str, str]]:
         []
         if dossier is None
         else [
-            {"id": f.label, "text": f.text, "epistemic_type": f.epistemic_type}
+            {"id": f.label, "text": evidence_text(f), "epistemic_type": f.epistemic_type}
             for f in dossier.facts
         ]
     )
@@ -1719,7 +1719,9 @@ def build_sentence_graph(deps: SentenceDeps) -> Any:
         if needs_sentence != (decision is not None):
             return ("FAILED", None, [], [])
         evidence = (
-            {} if state["dossier"] is None else {f.label: f.text for f in state["dossier"].facts}
+            {}
+            if state["dossier"] is None
+            else {f.label: evidence_text(f) for f in state["dossier"].facts}
         )
         evidence_metadata = (
             {}
