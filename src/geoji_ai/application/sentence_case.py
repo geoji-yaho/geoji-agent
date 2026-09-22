@@ -27,6 +27,12 @@ from datetime import datetime, timedelta
 from typing import Any, Protocol
 
 from geoji_ai.application import instrument
+from geoji_ai.application.backend_errors import (
+    BACKEND_AUTH,
+    BACKEND_AUTH_RETRY_AFTER_S,
+    BACKEND_UNAVAILABLE,
+    settle_backend_error,
+)
 from geoji_ai.application.llm_gateway import ScopedLLM
 from geoji_ai.contracts.jobs import Job, SentencePayload, TextRetryPayload, parse_payload
 from geoji_ai.graphs.sentencing import SentenceDeps, build_sentence_graph, initial_state
@@ -45,13 +51,6 @@ __all__ = [
 
 #: 스텁이 백엔드에 보내는 코드. 즉시 폴백·재시도 없음 무리다(10 §4.6).
 STUB_ERROR_CODE = "AI_NOT_READY"
-
-BACKEND_UNAVAILABLE = "BACKEND_UNAVAILABLE"
-BACKEND_AUTH = "BACKEND_AUTH"
-BACKEND_AUTH_RETRY_AFTER_S = 60
-
-_STALE_GENERATION = "STALE_GENERATION"
-_AUTH_STATUSES = frozenset({401, 403})
 
 
 class StubContext(Protocol):
@@ -83,7 +82,7 @@ class SentenceStubHandler:
                 error_code=STUB_ERROR_CODE,
             )
         except Exception as exc:
-            if not await _settle_backend_error(job, ctx, exc):
+            if not await settle_backend_error(job, ctx, exc):
                 raise
             return
         await ctx.jobs.complete(job.id, ctx.worker_id, ctx.generation_id)
@@ -105,7 +104,7 @@ class SentenceHandler:
     """SENTENCE·TEXT_RETRY 본체(05 GR-03). payload → 스냅샷 → 그래프 C → `complete`/`fail`.
 
     그래프가 끝나면(finalize 200·폐기·generation-failed 보고 모두) `complete`.
-    백엔드 예외는 `_settle_backend_error` 가 스텁과 같은 표로 정리한다.
+    백엔드 예외는 `settle_backend_error` 가 스텁과 같은 표로 정리한다.
 
     `db_now`(`Deadline.from_db`)는 주입하지 않으면 `job.updated_at` 에 핸들러 시작부터의 경과
     monotonic 을 더한 값이다. claim 이 `updated_at = now()` 를 DB 시각으로 찍고, begin 응답에는
@@ -170,7 +169,7 @@ class SentenceHandler:
             )
             return
         except Exception as exc:
-            if not await _settle_backend_error(job, ctx, exc):
+            if not await settle_backend_error(job, ctx, exc):
                 raise
             return
         await ctx.jobs.complete(job.id, ctx.worker_id, ctx.generation_id)
@@ -213,37 +212,3 @@ def _log_summary(job: Job, generation_id: str, mode: str, state: Any, *, latency
         fallback_reason=",".join(errors) or None,
         source=f"{state.get('dossier_source', '-')}|{state.get('sentencing_source', '-')}|{texts}",
     )
-
-
-async def _settle_backend_error(job: Job, ctx: StubContext, exc: Exception) -> bool:
-    """어댑터 예외면 job 을 정리하고 `True`. 모르는 예외면 `False`(상위로 올린다)."""
-    if getattr(exc, "error_code", None) == BACKEND_UNAVAILABLE:
-        retry_after_s = getattr(exc, "retry_after_s", None)
-        await ctx.jobs.fail(
-            job.id,
-            ctx.worker_id,
-            ctx.generation_id,
-            error_code=BACKEND_UNAVAILABLE,
-            retry_after_s=retry_after_s,
-        )
-        return True
-    status = getattr(exc, "status", None)
-    code = getattr(exc, "code", None)
-    if not isinstance(status, int) or not isinstance(code, str):
-        return False
-    if status in _AUTH_STATUSES:
-        await ctx.jobs.fail(
-            job.id,
-            ctx.worker_id,
-            ctx.generation_id,
-            error_code=BACKEND_AUTH,
-            retry_after_s=BACKEND_AUTH_RETRY_AFTER_S,
-        )
-    elif code == _STALE_GENERATION:
-        # 다른 세대가 활성이다. 우리 결과는 버리고 job 은 끝낸다(03 §3.2).
-        await ctx.jobs.complete(job.id, ctx.worker_id, ctx.generation_id)
-    else:
-        await ctx.jobs.fail(
-            job.id, ctx.worker_id, ctx.generation_id, error_code=code, retry_after_s=None
-        )
-    return True
