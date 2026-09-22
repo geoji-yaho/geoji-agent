@@ -61,7 +61,16 @@ curl -s localhost:8100/internal/v1/trials/$POST_ID/trace -H "Authorization: Bear
 
 ### 판결문이 기본 문구로 나오거나 생성이 끝나지 않을 때
 
-먼저 실행 중인 worker의 로그를 확인한다. `TEMPLATE_READY`는 대체 문구 저장이며 실제 모델 생성
+**먼저 워커가 살아 있는지 본다.** 이미지 이름만 보면 크래시 루프를 놓친다 — `Status` 열까지 본다.
+
+```bash
+sudo docker ps --format '{{.Names}}	{{.Image}}	{{.Status}}'
+```
+
+`Restarting` 이면 판결이 한 건도 돌지 않으므로 아래 로그를 파기 전에 그것부터 고친다. `ai-api` 는
+compose healthcheck 가 `/health/live` 라 DB 에 닿지 못해도 `healthy` 로 보인다. 워커만 죽는 이유다.
+
+워커가 `Up` 이면 로그를 본다. `TEMPLATE_READY`는 대체 문구 저장이며 실제 모델 생성
 성공을 뜻하지 않는다. 저장소 테스트 통과만으로 운영 모델·키·백엔드 연결 상태를 확인할 수 없다.
 
 ```bash
@@ -81,6 +90,9 @@ docker compose -f docker-compose.prod.yml logs --since 30m ai-worker \
 | `EVAL_FAILED` | `sentence_fallback`의 상세 이유 확인. 검수 거부, 불완전 응답, 전 강도 템플릿을 구분한다 |
 | 서기 `SCHEMA_INVALID` | 카드 규격은 제목 20자·본문 1항목 100자(9/19, 30→100)이며 줄바꿈·공백값을 금지한다. xAI 는 스키마 `maxLength` 를 강제하지 않으므로 길이는 프롬프트(v5.8 `## 길이` 절)로만 잡힌다. 9/18부터 ① 본문이 "찌르는 문장 + 조언 문장" 이면 첫 문장만 남긴다(`sentence_fallback outcome=TRIMMED`, 호출 없음) ② INITIAL 은 남은 시간·기존 재작성 예산 안에서 1회 보정하되 서기에게 직전 제목·본문·글자 수를 주고 압축시킨다. 불합격 응답은 캐시하지 않는다. TEXT_RETRY 회차 안 보정은 없다(구제 ①은 적용). 재현은 `probe_verdict_cards.py --execute`(구제·재작성 없이 원본 통과율) |
 | finalize `422`·`SCHEMA_INVALID` | 백엔드의 계약·정책 버전과 AI 설정을 비교한다 |
+| 워커가 `Restarting`, 로그에 `DATABASE_URL 이 비어 있다` 반복 | 운영 `.env` 는 role 별로 `AI_API_DATABASE_URL`·`AI_WORKER_DATABASE_URL` 을 갖는다. compose 가 이것을 `DATABASE_URL` 로 넘기는지 본다(10 §16.1). `.env` 에 `DATABASE_URL` 을 직접 넣으면 api 까지 워커 role 로 붙는다 |
+| 워커가 `Restarting`, `BACKEND_INTERNAL_URL 이 비어 있다` | 같은 자리. 워커만 이 키가 필요하다(`workers/main.py`) |
+| `.env` 에 시간 예산 키가 적혀 있다 | 기본값(10 §16.1)과 대조한다. 낮으면 지워 기본값을 쓰게 한다 — 검수관 `TIMEOUT` 은 전 강도 TEMPLATE 으로 끝난다 |
 
 9/17 카드 규격 배포 전에는 백엔드 본문 최소 개수 2→1과 공유 템플릿 갱신이 필요하다(10 §5·§10).
 서기 출력 토큰 상한 700은 그대로다. 제목·본문의 길이를 줄였으며 밈 선택·검수 메타데이터는 유지한다.
