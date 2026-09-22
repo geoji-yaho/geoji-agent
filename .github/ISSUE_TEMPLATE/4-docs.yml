@@ -1,6 +1,6 @@
 name: 📄 문서 · 계획서
 description: 문서가 사실과 다르거나 빈칸이 남아 있다
-labels: ["docs"]
+labels: ["documentation"]
 body:
   - type: input
     id: doc
