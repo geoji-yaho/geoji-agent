@@ -14,9 +14,7 @@
 | `BackendUnavailable` | `fail("BACKEND_UNAVAILABLE", retry_after_s)` |
 | 그 밖의 예외 | 상위로(워커 `HANDLER_ERROR`) |
 
-`prepare_case._settle_backend_error` 는 401·403 을 모두 `BACKEND_AUTH` 로 묶는다. 18 §3.5 는
-**403 `NOT_AI_JUROR` 만 따로** 떼라고 하므로 그 분기를 이 모듈에 새로 둔다(prepare_case 를 고치지
-않는다).
+배심원 전용 거부 규칙은 공통 오류 처리기에 전달한다(18 §3.5).
 
 application 은 어댑터를 import 하지 않는다. 백엔드 예외는 속성으로 알아본다
 (`status`·`code`, `error_code == "BACKEND_UNAVAILABLE"`·`retry_after_s`).
@@ -27,6 +25,7 @@ from __future__ import annotations
 import asyncio
 from typing import Protocol
 
+from geoji_ai.application.backend_errors import BackendErrorAction, settle_backend_error
 from geoji_ai.application.llm_gateway import ScopedLLM
 from geoji_ai.contracts.jobs import Job
 from geoji_ai.core.config import Settings
@@ -40,17 +39,16 @@ __all__ = ["JuryVoteHandler"]
 
 log = get_logger(__name__)
 
-BACKEND_UNAVAILABLE = "BACKEND_UNAVAILABLE"
-BACKEND_AUTH = "BACKEND_AUTH"
-BACKEND_AUTH_RETRY_AFTER_S = 60
-NOT_AI_JUROR = "NOT_AI_JUROR"
-NOT_FOUND = "NOT_FOUND"
-SCHEMA_INVALID = "SCHEMA_INVALID"
 SNAPSHOT_NOT_FOUND = "SNAPSHOT_NOT_FOUND"
 
-_STALE_GENERATION = "STALE_GENERATION"
-#: 마감·확정·중복은 정상 종료다(18 §3.5).
-_SKIP_CODES = frozenset({"VOTING_CLOSED", "ALREADY_VOTED"})
+# 본문 없는 404는 취소하지 않는다. 인증 오류보다 정확한 403 규칙이 먼저 적용된다.
+_BACKEND_ERROR_OVERRIDES = {
+    (404, "NOT_FOUND"): BackendErrorAction("cancel", error_code=SNAPSHOT_NOT_FOUND),
+    (403, "NOT_AI_JUROR"): BackendErrorAction("fail", error_code="NOT_AI_JUROR"),
+    (422, None): BackendErrorAction("fail", error_code="SCHEMA_INVALID"),
+    (None, "VOTING_CLOSED"): BackendErrorAction("complete", log_event="jury_vote_skipped"),
+    (None, "ALREADY_VOTED"): BackendErrorAction("complete", log_event="jury_vote_skipped"),
+}
 
 
 class _Context(Protocol):
@@ -80,58 +78,8 @@ class JuryVoteHandler:
             )
             return
         except Exception as exc:
-            if not await _settle_backend_error(job, ctx, exc):
+            if not await settle_backend_error(job, ctx, exc, overrides=_BACKEND_ERROR_OVERRIDES):
                 raise
             return
         log.info("jury_vote_done", status=state.get("status"), outcome=state.get("outcome"))
         await ctx.jobs.complete(job.id, ctx.worker_id, ctx.generation_id)
-
-
-async def _settle_backend_error(job: Job, ctx: _Context, exc: Exception) -> bool:
-    """백엔드 어댑터 예외면 job 을 정리하고 True. 모르는 예외면 False."""
-    if getattr(exc, "error_code", None) == BACKEND_UNAVAILABLE:
-        await ctx.jobs.fail(
-            job.id,
-            ctx.worker_id,
-            ctx.generation_id,
-            error_code=BACKEND_UNAVAILABLE,
-            retry_after_s=getattr(exc, "retry_after_s", None),
-        )
-        return True
-    status = getattr(exc, "status", None)
-    code = getattr(exc, "code", None)
-    if not isinstance(status, int) or not isinstance(code, str):
-        return False
-    if status == 404 and code == NOT_FOUND:
-        # 계약의 404 `NOT_FOUND` 만 삭제로 본다. 본문 없는 404(`HTTP_404`, 경로 미배포 등)는
-        # 아래 else 로 가서 재시도·알림 대상이다(리뷰 9/20)
-        await ctx.jobs.cancel(
-            job.id, ctx.worker_id, ctx.generation_id, error_code=SNAPSHOT_NOT_FOUND
-        )
-    elif status == 403 and code == NOT_AI_JUROR:
-        # 설정 불일치다. 재시도해도 같으므로 간격을 두지 않는다(attempts 소진 뒤 알림).
-        await ctx.jobs.fail(
-            job.id, ctx.worker_id, ctx.generation_id, error_code=NOT_AI_JUROR, retry_after_s=None
-        )
-    elif status in (401, 403):
-        await ctx.jobs.fail(
-            job.id,
-            ctx.worker_id,
-            ctx.generation_id,
-            error_code=BACKEND_AUTH,
-            retry_after_s=BACKEND_AUTH_RETRY_AFTER_S,
-        )
-    elif status == 422:
-        await ctx.jobs.fail(
-            job.id, ctx.worker_id, ctx.generation_id, error_code=SCHEMA_INVALID, retry_after_s=None
-        )
-    elif code in _SKIP_CODES:
-        log.info("jury_vote_skipped", reason=code, job_id=job.id)
-        await ctx.jobs.complete(job.id, ctx.worker_id, ctx.generation_id)
-    elif code == _STALE_GENERATION:
-        await ctx.jobs.complete(job.id, ctx.worker_id, ctx.generation_id)
-    else:
-        await ctx.jobs.fail(
-            job.id, ctx.worker_id, ctx.generation_id, error_code=code, retry_after_s=None
-        )
-    return True
