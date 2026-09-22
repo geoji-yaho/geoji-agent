@@ -1,0 +1,35 @@
+name: 📄 문서 · 계획서
+description: 문서가 사실과 다르거나 빈칸이 남아 있다
+labels: ["documentation"]
+body:
+  - type: input
+    id: doc
+    attributes:
+      label: 📍 어느 문서 몇 절
+      placeholder: 10 §16.3 / 19 §8 / runbook §4
+    validations:
+      required: true
+
+  - type: textarea
+    id: now
+    attributes:
+      label: 📝 지금 이렇게 적혀 있다
+    validations:
+      required: true
+
+  - type: textarea
+    id: fact
+    attributes:
+      label: ✅ 실제 사실은 이렇다
+      description: 코드·로그의 근거를 함께 적는다
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: handoff
+    attributes:
+      label: 📮 백엔드에 영향이 있나
+      options:
+        - label: "백엔드가 할 일이 생긴다 → 전달 문서 §0 체크리스트에 `미전달` 로 추가"
+        - label: "상시 계약이 바뀐다 (헤더·거부 코드·INSERT 표·finalize·배포 키) → 10 의 해당 절"
+        - label: "AI 파트 내부 결정이라 백엔드는 할 일 없음"

@@ -1,0 +1,55 @@
+name: 🧩 작업 (계획서 카드)
+description: 계획서의 카드나 절을 코드로 만든다
+labels: ["task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### 🧩 작업
+        계획서에 없는 값은 만들지 않는다. 없으면 먼저 묻는다.
+
+  - type: input
+    id: card
+    attributes:
+      label: 📌 대상 카드 · 절
+      description: 번호로 적는다
+      placeholder: 02 CT-01·CT-02 / 06 §3.3
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: 🎯 무엇을 만드나
+    validations:
+      required: true
+
+  - type: textarea
+    id: done
+    attributes:
+      label: ✅ 완료 기준
+      value: |
+        - [ ] 계획서 §3 의 파일이 생겼다
+        - [ ] 계획서 §4.2 의 테스트 케이스가 테스트 파일로 옮겨졌다
+        - [ ] `uv run pytest -q --ignore=tests/integration` 통과
+        - [ ] `uv run ruff check` · `ruff format --check` 통과
+    validations:
+      required: true
+
+  - type: textarea
+    id: deps
+    attributes:
+      label: 🔗 의존 · 선행
+      placeholder: CT-03 이 먼저 머지돼야 한다
+
+  - type: checkboxes
+    id: shared
+    attributes:
+      label: ⚠️ 공유 자원을 건드리나
+      description: 건드린다면 동시에 도는 다른 작업과 부딪힌다
+      options:
+        - label: "`pyproject.toml` · `uv.lock`"
+        - label: "`tests/conftest.py` · `core/config.py`"
+        - label: "`contracts/*.schema.json` · `schema_version` (소유는 01)"
+        - label: "`database/migrations/` 번호"
+        - label: "`prompts/` (변경하면 골든셋 회귀 필요)"

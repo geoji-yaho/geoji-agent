@@ -1,0 +1,69 @@
+name: 🐛 버그
+description: 코드가 계획서·계약과 다르게 동작한다
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### 🐛 버그 제보
+        로그를 붙일 때 **원문(사유·댓글·판결문)과 비밀값은 빼고** 코드·해시·개수만 붙인다(08 §3.3).
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: 📍 어디서
+      options:
+        - 운영 (EC2)
+        - 로컬
+        - CI (GitHub Actions)
+        - 모르겠음
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 💥 무슨 일이 일어났나
+      placeholder: 지옥맛 판결문이 TEMPLATE 으로만 나온다
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: ✅ 무엇을 기대했나
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 🔁 재현
+      description: 명령이나 순서. 특정 사건이면 `trace_id`·`job_id`
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 🧾 로그·증거
+      description: "`sentence_summary`·`sentence_fallback`·`sentence_call`·`jury_vote_summary` 한 줄이면 대개 충분하다"
+      render: json
+
+  - type: input
+    id: version
+    attributes:
+      label: 🏷 이미지 태그 · prompt_bundle_version
+      description: "운영이면 `docker run --rm <이미지> python -c \"from geoji_ai.prompts import prompt_bundle_version as v; print(v())\"`"
+      placeholder: ai-20260921-1 / bundle-8e868116333c
+
+  - type: input
+    id: docs
+    attributes:
+      label: 📄 관련 문서
+      description: 번호와 절로 적는다
+      placeholder: 10 §16.1, 06 §3.3
