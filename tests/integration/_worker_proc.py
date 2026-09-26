@@ -92,11 +92,16 @@ def _worker_env(
 
 
 def _popen(args: list[str], env: dict[str, str], log_path: Path) -> subprocess.Popen[bytes]:
+    # cwd 를 저장소 루트로 두면 `Settings(env_file=".env")` 가 루트 `.env` 의 벤더 키를 읽어
+    # 실제 벤더를 부른다(환경변수에서 키를 빼도 소용없다). 로그 디렉터리에서 띄우고 import 는
+    # PYTHONPATH 로 잡는다. 저장소 파일(prompts·fixtures·migrations)은 `__file__` 기준이라 영향 없다
+    python_path = os.pathsep.join(filter(None, [str(REPO_ROOT), env.get("PYTHONPATH")]))
+    env = {**env, "PYTHONPATH": python_path}
     log_file = log_path.open("ab")
     try:
         return subprocess.Popen(
             [sys.executable, *args],
-            cwd=REPO_ROOT,
+            cwd=log_path.parent,
             env=env,
             stdout=log_file,
             stderr=subprocess.STDOUT,

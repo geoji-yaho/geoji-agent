@@ -11,6 +11,7 @@
 - 용어: `.claude/rules/domain-vocabulary.md`. enum은 프론트 값이 표준이다(D-21)
 - 코드: `.claude/rules/code-layout.md`. uv와 Python 3.12, `api/workers → application → domain/ports`
 - 테스트와 모델 호출: `.claude/rules/testing.md`. 테스트는 fake provider만, 프롬프트 변경은 골든셋 회귀와 사람 검수
+- 테스트 실행: 절차는 `TESTING.md`, 진입점은 `scripts/test.sh`. 실행만 필요하면 `test-runner` 에이전트(haiku)에 맡기고, 실패 분석과 수정은 메인에서 한다
 - 계획서에 없는 값이 필요하면 만들지 말고 묻는다. 실측 뒤 채울 빈칸은 임의 값으로 채우지 않는다
 
 ## 스킬셋
@@ -24,6 +25,8 @@
 <!-- TODO 정본이 어디인지, 문서끼리 어긋나면 어느 것이 이기는지 -->
 
 ## 자주 틀리는 것
+
+- `Settings`는 현재 디렉터리의 `.env`를 읽는다. 환경변수에서 벤더 키를 빼도 저장소 루트에서 띄운 프로세스는 실제 벤더를 부른다. 테스트 워커는 `tests/integration/_worker_proc.py`의 도우미로만 띄운다
 
 <!-- TODO 실제로 틀렸던 것만 적는다 -->
 
