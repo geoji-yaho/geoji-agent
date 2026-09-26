@@ -106,10 +106,19 @@
 | snapshot | `backend.snapshot(job_id, generation_id)` | 404 `SnapshotNotFound` → 핸들러가 `cancel`(삭제된 글) |
 | room | `room_snapshots` 에서 `payload.room_id` 찾기 → `intensity` | 없음(공유 철회) → `skipped(reason="room_not_shared")` 로 끝, 모델 호출 없음 |
 | juror | `ScopedLLM.scoped_call(role="juror", schema=juror_schema(post_type), timeout=JUROR_TIMEOUT_SECONDS − 0.2, max_output_tokens=JUROR_MAX_OUTPUT_TOKENS)`. 예산 키는 사건과 따로 둔 `jury:{post_id}`(06 §3.2), `node="juror"`, `call_index=0` | `LLMError`·timeout·`stop_reason != stop`·출력 없음 → 템플릿 |
-| validate | `verdict` 가 유형별 허용 2개 안 ∧ `reason` 공백 제거 뒤 1~60 code point ∧ 줄바꿈 없음 | 위반 → 템플릿(재작성 호출 없음, 1회로 끝) |
+| validate | `verdict` 가 유형별 허용 2개 안 ∧ `reason` 공백 제거 뒤 1~60 code point ∧ 줄바꿈 없음 ∧ 명시적 원화 금액이 입력 근거에 있음 | 위반 → 템플릿(재작성 호출 없음, 1회로 끝) |
 | cast | §3.6 `cast_jury_vote` | 핸들러 표(§3.5) |
 
 - 템플릿 표: 평결은 `spent → guilty`, `considering → disagree`. 사유는 `contracts/fixtures/juror-templates-v1.json` 의 `{intensity}.{post_type}` 문구(아래). `source="TEMPLATE"`. 파일 형태 `{version: "juror-templates-v1", reasons: {mild: {spent, considering}, spicy: {…}, hell: {…}}}`
+
+- 9/22 #73: `domain/juror_amounts.py`가 숫자로 시작해 `원`으로 끝나는 금액을 정규화한다.
+  `400만원`·`4백만원`·`4,000,000원`·`0.04억원`은 같은 4,000,000원이다. 만·억·조와 십·백·천,
+  쉼표·소수·띄어쓰기를 처리하며, 잘못된 표기나 원 미만 소수는 허용하지 않는다.
+  허용 근거는 `amount_krw`와 모델에 전달한 `item`·`reason` 안의 명시적 원화 금액이다.
+  하나라도 근거가 없으면 `fallback_reason=ungrounded_amount`로 템플릿 표를 사용하며 `remember`하지 않는다.
+  추가 모델 호출·재작성은 없고 사유 원문이나 금액은 로그에 남기지 않는다.
+  수량·날짜는 검사 대상이 아니다. `원`을 생략한 금액, 한글로만 쓴 수사, 통화 기호·다른 통화,
+  입력에 있는 금액의 의미를 바꿔 인용한 경우까지 검증하지는 않는다. 프롬프트·외부 계약은 유지한다.
 
 | 강도 | spent | considering |
 |---|---|---|
