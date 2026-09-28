@@ -538,3 +538,49 @@ async def test_모르는_키가_섞인_출력은_템플릿이다():
 
     assert state["outcome"] == "TEMPLATE"
     assert state["fallback_reason"] == "invalid_output"
+
+
+@pytest.mark.parametrize("post_type", ["spent", "considering"])
+@pytest.mark.parametrize("intensity", ["mild", "spicy", "hell"])
+async def test_400만원을_4천만원이라_말하면_캐시하지_않고_템플릿으로_투표한다(post_type, intensity):
+    snapshot = make_snapshot(post_type=post_type, intensity=intensity).model_copy(
+        update={"amount_krw": 4_000_000, "item": "노트북", "reason": "업무에 필요해서"}
+    )
+    backend = FakeBackend(snapshot)
+    gateway = RecordingScopedLLM()
+    gateway.inner = FakeLLM(
+        outputs={
+            "juror": {
+                "verdict": "notGuilty" if post_type == "spent" else "agree",
+                "reason": "4천만원이면 업무에 필요한 투자죠.",
+            }
+        }
+    )
+
+    state = await run_jury_vote(make_job(), make_deps(backend, gateway))
+
+    assert state["fallback_reason"] == "ungrounded_amount"
+    assert state["source"] == "TEMPLATE"
+    assert (state["verdict"], state["reason"]) == template_vote(intensity, post_type)
+    assert gateway.remembered == []
+    assert len(gateway.inner.calls) == 1
+    assert len(backend.casts) == 1
+    assert backend.casts[0][1].source == "TEMPLATE"
+
+
+@pytest.mark.parametrize("amount", ["400만원", "4백만원", "4,000,000원", "0.04억원"])
+async def test_400만원의_동일_금액_표기는_정상_투표한다(amount):
+    snapshot = make_snapshot().model_copy(
+        update={"amount_krw": 4_000_000, "item": "노트북", "reason": "업무에 필요해서"}
+    )
+    backend = FakeBackend(snapshot)
+    model = FakeLLM(
+        outputs={"juror": {"verdict": "notGuilty", "reason": f"{amount}의 업무 투자죠."}}
+    )
+
+    state = await run_jury_vote(make_job(), make_deps(backend, model))
+
+    assert state["source"] == "AI"
+    assert state["fallback_reason"] is None
+    assert backend.casts[0][1].verdict == "notGuilty"
+    assert len(model.calls) == 1

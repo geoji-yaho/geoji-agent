@@ -9,6 +9,7 @@
   (`budget_key_for_jury(post_id)`), `node="juror"`, `call_index=0`.
   `LLMError`·timeout·`stop_reason != "stop"`·출력 없음 → 템플릿
 - validate: 유형별 허용 평결 2개 ∧ 사유 1~60 code point ∧ 줄바꿈 없음. 위반 → 템플릿.
+  명시적 원화 금액도 입력의 금액·항목·사유와 대조한다. 불일치 → 템플릿, 캐시 저장 없음.
   **재작성 호출은 없다. 모델 호출은 총 1회다**(18 §3.4)
 - cast: `backend.cast_jury_vote`. 백엔드 거부 처리는 핸들러(`application/jury_vote_case.py`)
 
@@ -48,6 +49,7 @@ from geoji_ai.core.config import Settings
 from geoji_ai.core.logging import get_logger
 from geoji_ai.domain.budget import budget_key_for_jury
 from geoji_ai.domain.intensity import Intensity, parse_intensity
+from geoji_ai.domain.juror_amounts import has_grounded_amounts
 from geoji_ai.ports.backend import BackendPort, JuryVoteRequest
 from geoji_ai.ports.llm import LLMError, LLMPort
 from geoji_ai.ports.preparation import EvidenceInvalidated
@@ -335,6 +337,14 @@ def build_jury_vote_graph(deps: JuryVoteDeps) -> Any:
             checked = validate_juror_output(state.get("raw_output"), post_type)
             if checked is None:
                 fallback_reason = "invalid_output"
+            elif not has_grounded_amounts(
+                checked[1],
+                amount_krw=snapshot.amount_krw,
+                item=snapshot.item,
+                post_reason=snapshot.reason,
+            ):
+                checked = None
+                fallback_reason = "ungrounded_amount"
         if checked is None:
             verdict, reason = template_vote(intensity, post_type)
             source: Literal["AI", "TEMPLATE"] = "TEMPLATE"
