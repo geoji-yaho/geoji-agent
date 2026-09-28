@@ -21,6 +21,7 @@ import asyncio
 from typing import Protocol
 
 from geoji_ai.application import instrument
+from geoji_ai.application.backend_errors import settle_backend_error
 from geoji_ai.application.llm_gateway import ScopedLLM
 from geoji_ai.contracts.jobs import Job
 from geoji_ai.core.config import Settings
@@ -35,12 +36,6 @@ from geoji_ai.ports.preparation import EvidenceInvalidated, PreparationPort
 __all__ = ["PrepareHandler"]
 
 log = get_logger(__name__)
-
-BACKEND_UNAVAILABLE = "BACKEND_UNAVAILABLE"
-BACKEND_AUTH = "BACKEND_AUTH"
-BACKEND_AUTH_RETRY_AFTER_S = 60
-_STALE_GENERATION = "STALE_GENERATION"
-_AUTH_STATUSES = frozenset({401, 403})
 
 
 class _Context(Protocol):
@@ -86,40 +81,8 @@ class PrepareHandler:
             )
             return
         except Exception as exc:
-            if not await _settle_backend_error(job, ctx, exc):
+            if not await settle_backend_error(job, ctx, exc):
                 raise
             return
         log.info("prepare_done", status=state.get("status"))
         await ctx.jobs.complete(job.id, ctx.worker_id, ctx.generation_id)
-
-
-async def _settle_backend_error(job: Job, ctx: _Context, exc: Exception) -> bool:
-    """백엔드 어댑터 예외면 job 을 정리하고 True. 모르는 예외면 False."""
-    if getattr(exc, "error_code", None) == BACKEND_UNAVAILABLE:
-        await ctx.jobs.fail(
-            job.id,
-            ctx.worker_id,
-            ctx.generation_id,
-            error_code=BACKEND_UNAVAILABLE,
-            retry_after_s=getattr(exc, "retry_after_s", None),
-        )
-        return True
-    status = getattr(exc, "status", None)
-    code = getattr(exc, "code", None)
-    if not isinstance(status, int) or not isinstance(code, str):
-        return False
-    if status in _AUTH_STATUSES:
-        await ctx.jobs.fail(
-            job.id,
-            ctx.worker_id,
-            ctx.generation_id,
-            error_code=BACKEND_AUTH,
-            retry_after_s=BACKEND_AUTH_RETRY_AFTER_S,
-        )
-    elif code == _STALE_GENERATION:
-        await ctx.jobs.complete(job.id, ctx.worker_id, ctx.generation_id)
-    else:
-        await ctx.jobs.fail(
-            job.id, ctx.worker_id, ctx.generation_id, error_code=code, retry_after_s=None
-        )
-    return True
