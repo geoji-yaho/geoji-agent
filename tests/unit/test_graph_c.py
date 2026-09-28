@@ -570,9 +570,7 @@ def test_06b_template_intensity_is_not_graded() -> None:
     llm = ScriptedLLM(
         FakeScenario.INTENSITY_FAIL,
         sequences={
-            "evaluator": [
-                report(["spicy", "hell"], fail=["hell"], code="INTENSITY_MISMATCH")
-            ]
+            "evaluator": [report(["spicy", "hell"], fail=["hell"], code="INTENSITY_MISMATCH")]
         },
     )
     result = run(llm)
@@ -893,9 +891,7 @@ def test_16b_ungrounded_claim_alone_does_not_reject() -> None:
     골든셋 50 건에서 반려 131 회 중 71 회가 이 코드였고, 한 강도만 걸려도 전 강도가 TEMPLATE 이었다.
     """
     llm = ScriptedLLM(
-        sequences={
-            "evaluator": [report(["spicy", "hell"], fail=["hell"], code="UNGROUNDED_CLAIM")]
-        }
+        sequences={"evaluator": [report(["spicy", "hell"], fail=["hell"], code="UNGROUNDED_CLAIM")]}
     )
     result = run(llm)
     assert [writer_intensity(c) for c in result.calls_of("writer")] == ["spicy", "hell"]

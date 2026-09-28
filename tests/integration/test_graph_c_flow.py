@@ -40,7 +40,7 @@ from geoji_ai.application.sentence_case import SentenceHandler
 from geoji_ai.contracts.case import CaseSnapshot
 from geoji_ai.contracts.finalize import FinalizeRequest
 from geoji_ai.core.config import Settings
-from geoji_ai.domain.attack_angles import NEEDS_EVIDENCE
+from geoji_ai.domain.attack_angles import HISTORY_ANGLES
 from geoji_ai.graphs.sentencing import build_sentence_graph
 from geoji_ai.ports.llm import LLMResult
 from geoji_ai.workers.dispatch import HandlerContext, handler_for
@@ -416,9 +416,10 @@ async def test_03_검수_실패_2회면_repair_1회_뒤_그_강도만_TEMPLATE(e
     repair_schema, repair_messages = writers[2][1], writers[2][2]
     assert _enum(repair_schema, "properties", "intensity") == ["hell"]
     repair_input = _user_payload(repair_messages)
-    # 9/18: 가짜 백엔드 조서에는 이력·규칙이 없어 반복·규칙 의인화 각도를 건너뛴다.
+    # 9/18: CONTEXT_OK 조서에는 RULE_HIT 는 있고 F0 밖 지출·판결 이력이 없다.
+    # 반복·미래 예언만 건너뛰고 규칙 의인화는 허용된다(ungrounded_angles).
     assert not {a["code"] for a in repair_input["attack_angles"]} & {
-        a.value for a in NEEDS_EVIDENCE
+        a.value for a in HISTORY_ANGLES
     }
     assert _enum(writers[0][1], "properties", "attack_angle") == [
         a["code"] for a in repair_input["attack_angles"]
@@ -508,7 +509,7 @@ async def test_06_finalize_422_이면_repair_1회_뒤_성공(env: Env):
     ]
     assert repair_angles[0] == repair_angles[1]
     assert len(repair_angles[0]) > 1
-    assert not set(repair_angles[0]) & {a.value for a in NEEDS_EVIDENCE}
+    assert not set(repair_angles[0]) & {a.value for a in HISTORY_ANGLES}
     first, second = env.backend.finalized
     assert first.sentencing == second.sentencing  # 형량 불변
     assert _sources(second) == [("spicy", "AI"), ("hell", "AI")]
